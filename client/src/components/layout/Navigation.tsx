@@ -54,6 +54,12 @@ const Navigation: React.FC = () => {
             } transition-all duration-200`}>
               Financial Literacy
             </Link>
+            <Link href="/how-we-learn" className={`px-4 py-3 font-medium ${isActive('/how-we-learn') 
+              ? 'text-primary border-b-2 border-primary' 
+              : 'text-neutral-600 hover:text-primary border-b-2 border-transparent hover:border-primary'
+            } transition-all duration-200`}>
+              How We Learn
+            </Link>
             <Link href="/about" className={`px-4 py-3 font-medium ${isActive('/about') 
               ? 'text-primary border-b-2 border-primary' 
               : 'text-neutral-600 hover:text-primary border-b-2 border-transparent hover:border-primary'
@@ -110,6 +116,12 @@ const Navigation: React.FC = () => {
             : 'text-neutral-600 hover:text-primary hover:bg-blue-50'
           } transition-colors duration-200`}>
             Financial Literacy
+          </Link>
+          <Link href="/how-we-learn" className={`block px-4 py-2 font-medium rounded-md ${isActive('/how-we-learn') 
+            ? 'text-primary bg-blue-50' 
+            : 'text-neutral-600 hover:text-primary hover:bg-blue-50'
+          } transition-colors duration-200`}>
+            How We Learn
           </Link>
           <Link href="/about" className={`block px-4 py-2 font-medium rounded-md ${isActive('/about') 
             ? 'text-primary bg-blue-50' 

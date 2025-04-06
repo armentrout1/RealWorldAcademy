@@ -12,6 +12,7 @@ import SelfDiscovery from "@/pages/SelfDiscovery";
 import Projects from "@/pages/Projects";
 import About from "@/pages/About";
 import FinancialLiteracy from "@/pages/FinancialLiteracy";
+import HowWeLearn from "@/pages/HowWeLearn";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -28,6 +29,7 @@ function Router() {
         <Route path="/about" component={About} />
         <Route path="/financial-literacy" component={FinancialLiteracy} />
         <Route path="/financial-literacy/:moduleId" component={FinancialLiteracy} />
+        <Route path="/how-we-learn" component={HowWeLearn} />
         <Route component={NotFound} />
       </Switch>
     </Layout>
