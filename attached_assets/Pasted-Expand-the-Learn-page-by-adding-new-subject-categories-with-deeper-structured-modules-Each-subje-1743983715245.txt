@@ -1,0 +1,60 @@
+Expand the “Learn” page by adding new subject categories with deeper, structured modules. Each subject should be real-world focused and scaffolded by age group.
+
+1. **Add 4 New Subject Cards to the Learn Page**:
+   Add these new cards alongside the existing ones (Math, Science, etc.):
+   - 🗣️ **Communication & Relationships**  
+     “Learn how to express yourself, listen, and work well with others.”
+   - 🧘 **Health & Wellness**  
+     “Understand your body, your mind, and how to take care of both.”
+   - 💼 **Entrepreneurship & Work Skills**  
+     “Start a hustle, prep for jobs, and build skills employers want.”
+   - 💻 **Tech in the Real World**  
+     “Explore tools, apps, and digital skills used by real professionals.”
+
+Each card should follow the same style: title, icon/image, 1-sentence real-world use, and a “Learn More” button.
+
+2. **Create Module Pages for Each Subject**:
+   For each subject, create a dedicated module page with 3–4 lessons, divided by **age group tiers**:
+   - Tier 1: Ages 9–12 (Beginner concepts)
+   - Tier 2: Ages 13–15 (Intermediate real-world use)
+   - Tier 3: Ages 16–18 (Deeper applications, independence)
+
+Each lesson should include:
+   - A title (e.g., “Active Listening 101” or “How Credit Cards Actually Work”)
+   - 1–2 paragraph explanation
+   - Optional: image or diagram
+   - 1 interactive component (button to generate example, a multiple-choice question, or a “Think About It” reflection box)
+
+3. **Age Group Selector Component**:
+   On each subject page, include a toggle or dropdown to select their age group so content adjusts accordingly.
+
+4. **Add Sample Content to Each New Subject**:
+
+**Example for Communication & Relationships:**
+   - Tier 1: “Using Kind Words”
+   - Tier 2: “Handling Arguments With Respect”
+   - Tier 3: “How to Speak in a Job Interview”
+
+**Example for Health & Wellness:**
+   - Tier 1: “What Is Sleep and Why It Matters”
+   - Tier 2: “Eating for Energy”
+   - Tier 3: “Mental Health Basics and Boundaries”
+
+**Example for Entrepreneurship:**
+   - Tier 1: “What is a Business?”
+   - Tier 2: “How to Price Something You Sell”
+   - Tier 3: “Starting a Side Hustle or Micro-Business”
+
+**Example for Tech in the Real World:**
+   - Tier 1: “What is the Cloud?”
+   - Tier 2: “Using Google Docs & Spreadsheets”
+   - Tier 3: “How to Build a Simple Website”
+
+5. **Link Progress to Tracker**:
+   For each completed lesson, trigger a visual update on the progress tracker created in Phase 10 (can be static JS for now).
+
+6. **Make Everything Mobile-Friendly and Engaging**:
+   - Use icons, soft color blocks, and collapsible sections
+   - Support touch interactions for younger learners using tablets
+
+This phase makes the platform deeper, smarter, and more powerful — while still feeling playful and personal for every kid using it.
