@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Link } from "wouter";
 import { 
@@ -7,11 +7,31 @@ import {
   Rocket, 
   Target, 
   ChevronRight,
-  BarChart
+  BarChart,
+  Sparkles
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
+const motivationalQuotes = [
+  "Today is a great day to grow.",
+  "What can you build today?",
+  "Your future starts now.",
+  "Small steps lead to big change.",
+  "Learning is a journey, not a destination.",
+  "Every expert was once a beginner.",
+  "The best way to predict your future is to create it.",
+  "Growth happens outside your comfort zone."
+];
+
 const Dashboard: React.FC = () => {
+  const [quote, setQuote] = useState<string>("");
+  
+  useEffect(() => {
+    // Select a random quote when the component mounts
+    const randomIndex = Math.floor(Math.random() * motivationalQuotes.length);
+    setQuote(motivationalQuotes[randomIndex]);
+  }, []);
+  
   return (
     <div className="container mx-auto px-4 py-12">
       <div className="mb-10 text-center">
@@ -21,6 +41,28 @@ const Dashboard: React.FC = () => {
         <p className="text-neutral-600 max-w-2xl mx-auto text-lg">
           Discover practical skills, explore your strengths, and prepare for real-world challenges with our personalized learning platform.
         </p>
+      </div>
+      
+      {/* Motivational Banner */}
+      <div className="mb-8 bg-gradient-to-r from-blue-50 to-purple-50 p-6 rounded-xl shadow-sm border border-blue-100 text-center animate-fade-in">
+        <div className="flex items-center justify-center gap-2 mb-1">
+          <Sparkles className="h-5 w-5 text-primary animate-pulse" />
+          <h3 className="font-medium text-lg text-primary">Daily Inspiration</h3>
+        </div>
+        <p className="text-xl font-medium text-neutral-800">{quote}</p>
+        <div className="mt-3">
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="text-xs text-neutral-500 hover:text-primary"
+            onClick={() => {
+              const randomIndex = Math.floor(Math.random() * motivationalQuotes.length);
+              setQuote(motivationalQuotes[randomIndex]);
+            }}
+          >
+            New quote
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-8 mb-12">
