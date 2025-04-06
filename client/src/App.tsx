@@ -24,6 +24,7 @@ function Router() {
         <Route path="/learn/:subject" component={Learn} />
         <Route path="/self-discovery" component={SelfDiscovery} />
         <Route path="/projects" component={Projects} />
+        <Route path="/projects/:projectId" component={Projects} />
         <Route path="/about" component={About} />
         <Route path="/financial-literacy" component={FinancialLiteracy} />
         <Route path="/financial-literacy/:moduleId" component={FinancialLiteracy} />
