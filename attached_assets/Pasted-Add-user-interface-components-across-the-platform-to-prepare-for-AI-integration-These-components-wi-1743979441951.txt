@@ -1,0 +1,35 @@
+Add user interface components across the platform to prepare for AI integration. These components will simulate personalized learning, content generation, and support, even if they use static responses for now.
+
+1. **AI Assistant Widget (Global Component)**:
+   - Create a floating “Ask Me Anything” button or chat bubble in the bottom-right corner of every page
+   - When clicked, open a small chatbot-style popup titled “Real World Assistant”
+   - Include a message area and input box
+   - For now, display pre-programmed responses to common student questions like:
+     - “What should I work on next?”
+     - “What’s a budget?”
+     - “Help me understand credit scores.”
+   - Add friendly AI responses using simple JavaScript logic (no backend yet)
+
+2. **Smart Suggestions Panel**:
+   - On the Dashboard, add a “Suggested Next Step” section based on fake student progress
+   - Example logic:
+     - If Self Discovery is done but no projects started, show: “Start your first real-world project!”
+     - If 2 subjects completed, suggest: “Try a budgeting challenge next.”
+
+3. **AI-Enhanced Content Stubs**:
+   - On Learn and Project pages, add buttons labeled “Ask AI to explain this” or “Generate an example”
+   - For now, clicking the button can show a hardcoded answer, like:
+     - “Compound interest means your money grows on itself over time. The earlier you start, the better!”
+     - “Here’s an example budget for a college student…”
+
+4. **Prompt Design & Placeholder Inputs**:
+   - Wherever AI will be used in the future (e.g., quiz analysis, personalized career paths), include text areas with instructions like:
+     - “Coming Soon: AI will help you analyze your strengths and suggest career options.”
+   - Keep the input/output UX clean so it’s easy to wire up later
+
+5. **Admin Note (Comment in Code)**:
+   - In key components, add comments for developers like:
+     <!-- TODO: Replace static response with OpenAI API call -->
+     <!-- TODO: Connect to user data for smart recommendations -->
+
+Make all AI components lightweight and optional — they should enhance the UX without breaking anything. You’re building the bones now so the brain can plug in later.

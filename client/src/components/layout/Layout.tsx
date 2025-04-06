@@ -2,6 +2,7 @@ import React from "react";
 import Header from "./Header";
 import Navigation from "./Navigation";
 import Footer from "./Footer";
+import { AIAssistant } from "@/components/ai";
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -16,6 +17,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         {children}
       </main>
       <Footer />
+      <AIAssistant />
     </div>
   );
 };
