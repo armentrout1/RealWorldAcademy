@@ -7,7 +7,10 @@ import {
   badges, type Badge, type InsertBadge,
   categoryProgress, type CategoryProgress, type InsertCategoryProgress,
   timelineEvents, type TimelineEvent, type InsertTimelineEvent,
-  userProgressSummary, type UserProgressSummary, type InsertUserProgressSummary
+  userProgressSummary, type UserProgressSummary, type InsertUserProgressSummary,
+  careerPaths, type CareerPath, type InsertCareerPath,
+  goals, type Goal, type InsertGoal,
+  visionBoardItems, type VisionBoardItem, type InsertVisionBoardItem
 } from "@shared/schema";
 import { db } from "./db";
 import { eq } from "drizzle-orm";
@@ -56,6 +59,23 @@ export interface IStorage {
   getUserProgressSummary(userId: number): Promise<UserProgressSummary | undefined>;
   createUserProgressSummary(summary: InsertUserProgressSummary): Promise<UserProgressSummary>;
   updateUserProgressSummary(userId: number, summary: Partial<UserProgressSummary>): Promise<UserProgressSummary>;
+  
+  // Career path operations
+  getAllCareerPaths(): Promise<CareerPath[]>;
+  getCareerPath(id: number): Promise<CareerPath | undefined>;
+  createCareerPath(careerPath: InsertCareerPath): Promise<CareerPath>;
+  
+  // Goal operations
+  getUserGoals(userId: number): Promise<Goal[]>;
+  createGoal(goal: InsertGoal): Promise<Goal>;
+  updateGoal(id: number, goal: Partial<Goal>): Promise<Goal>;
+  deleteGoal(id: number): Promise<void>;
+  
+  // Vision board operations
+  getUserVisionBoardItems(userId: number): Promise<VisionBoardItem[]>;
+  createVisionBoardItem(item: InsertVisionBoardItem): Promise<VisionBoardItem>;
+  updateVisionBoardItem(id: number, item: Partial<VisionBoardItem>): Promise<VisionBoardItem>;
+  deleteVisionBoardItem(id: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -209,6 +229,67 @@ export class DatabaseStorage implements IStorage {
       return await this.createUserProgressSummary(newSummary);
     }
   }
+  
+  // Career path operations
+  async getAllCareerPaths(): Promise<CareerPath[]> {
+    return await db.select().from(careerPaths);
+  }
+  
+  async getCareerPath(id: number): Promise<CareerPath | undefined> {
+    const results = await db.select().from(careerPaths).where(eq(careerPaths.id, id));
+    return results.length > 0 ? results[0] : undefined;
+  }
+  
+  async createCareerPath(careerPath: InsertCareerPath): Promise<CareerPath> {
+    const results = await db.insert(careerPaths).values(careerPath).returning();
+    return results[0];
+  }
+  
+  // Goal operations
+  async getUserGoals(userId: number): Promise<Goal[]> {
+    return await db.select().from(goals).where(eq(goals.userId, userId));
+  }
+  
+  async createGoal(goal: InsertGoal): Promise<Goal> {
+    const results = await db.insert(goals).values(goal).returning();
+    return results[0];
+  }
+  
+  async updateGoal(id: number, goal: Partial<Goal>): Promise<Goal> {
+    const results = await db
+      .update(goals)
+      .set(goal)
+      .where(eq(goals.id, id))
+      .returning();
+    return results[0];
+  }
+  
+  async deleteGoal(id: number): Promise<void> {
+    await db.delete(goals).where(eq(goals.id, id));
+  }
+  
+  // Vision board operations
+  async getUserVisionBoardItems(userId: number): Promise<VisionBoardItem[]> {
+    return await db.select().from(visionBoardItems).where(eq(visionBoardItems.userId, userId));
+  }
+  
+  async createVisionBoardItem(item: InsertVisionBoardItem): Promise<VisionBoardItem> {
+    const results = await db.insert(visionBoardItems).values(item).returning();
+    return results[0];
+  }
+  
+  async updateVisionBoardItem(id: number, item: Partial<VisionBoardItem>): Promise<VisionBoardItem> {
+    const results = await db
+      .update(visionBoardItems)
+      .set(item)
+      .where(eq(visionBoardItems.id, id))
+      .returning();
+    return results[0];
+  }
+  
+  async deleteVisionBoardItem(id: number): Promise<void> {
+    await db.delete(visionBoardItems).where(eq(visionBoardItems.id, id));
+  }
 
   // Initialize with sample data
   async initializeData() {
@@ -333,7 +414,14 @@ export class DatabaseStorage implements IStorage {
     
     // Check if default user already has badge data
     const existingBadges = await this.getUserBadges(defaultUser.id);
-    if (existingBadges.length > 0) return; // Progress data already exists
+    if (existingBadges.length > 0) {
+      // Initialize career paths if none exist
+      const existingCareerPaths = await this.getAllCareerPaths();
+      if (existingCareerPaths.length === 0) {
+        await this.initializeCareerPathsData();
+      }
+      return; // Progress data already exists
+    }
     
     // Initialize badges
     const badges = [
@@ -450,6 +538,126 @@ export class DatabaseStorage implements IStorage {
     });
     
     console.log("Progress data initialized for user:", defaultUser.username);
+    
+    // Initialize career paths data
+    await this.initializeCareerPathsData();
+  }
+  
+  // Initialize career paths data
+  async initializeCareerPathsData() {
+    // Check if career paths already exist
+    const existingCareerPaths = await this.getAllCareerPaths();
+    if (existingCareerPaths.length > 0) return; // Skip if data exists
+    
+    // Create sample career paths
+    const careerPathsData = [
+      {
+        title: "Software Developer",
+        description: "Design, build, and maintain software applications and systems",
+        tasks: JSON.stringify([
+          "Write clean, efficient code",
+          "Debug and fix issues in software",
+          "Collaborate with teams to design features",
+          "Test and document software"
+        ]),
+        skills: JSON.stringify([
+          { name: "Programming", level: 4 },
+          { name: "Problem Solving", level: 5 },
+          { name: "Critical Thinking", level: 4 },
+          { name: "Communication", level: 3 }
+        ]),
+        education: "Bachelor's degree in Computer Science or related field, or equivalent experience through coding bootcamps and self-learning",
+        whyLoveIt: "Building solutions that solve real problems, constant learning, and the satisfaction of creating something that works",
+        iconName: "Code",
+        color: "blue"
+      },
+      {
+        title: "Data Scientist",
+        description: "Analyze complex data to help organizations make better decisions",
+        tasks: JSON.stringify([
+          "Collect and clean large datasets",
+          "Build predictive models",
+          "Visualize data findings",
+          "Present insights to stakeholders"
+        ]),
+        skills: JSON.stringify([
+          { name: "Statistics", level: 5 },
+          { name: "Programming", level: 4 },
+          { name: "Data Visualization", level: 4 },
+          { name: "Machine Learning", level: 4 }
+        ]),
+        education: "Master's or PhD in Statistics, Mathematics, Computer Science, or related field",
+        whyLoveIt: "Discovering hidden patterns in data, solving complex problems, and directly impacting business decisions",
+        iconName: "BarChart",
+        color: "purple"
+      },
+      {
+        title: "Digital Marketing Specialist",
+        description: "Create and implement strategies to promote brands and products online",
+        tasks: JSON.stringify([
+          "Run social media campaigns",
+          "Analyze marketing metrics",
+          "Create content strategies",
+          "Optimize websites for search engines"
+        ]),
+        skills: JSON.stringify([
+          { name: "Creative Thinking", level: 4 },
+          { name: "Analytics", level: 3 },
+          { name: "Communication", level: 5 },
+          { name: "Strategic Planning", level: 4 }
+        ]),
+        education: "Bachelor's degree in Marketing, Communications, or related field; certifications in digital marketing platforms",
+        whyLoveIt: "Combining creativity with analytics, seeing immediate results from campaigns, and staying on top of digital trends",
+        iconName: "Megaphone",
+        color: "green"
+      },
+      {
+        title: "Healthcare Professional",
+        description: "Provide care and treatment to patients in various medical settings",
+        tasks: JSON.stringify([
+          "Assess patient health problems",
+          "Develop care plans",
+          "Administer treatments",
+          "Educate patients on health management"
+        ]),
+        skills: JSON.stringify([
+          { name: "Patient Care", level: 5 },
+          { name: "Critical Thinking", level: 4 },
+          { name: "Empathy", level: 5 },
+          { name: "Communication", level: 4 }
+        ]),
+        education: "Degrees vary by specialization: Associate to Doctoral degrees in Nursing, Medicine, or related fields",
+        whyLoveIt: "Making a direct impact on people's lives, intellectual challenges of medicine, and the human connection with patients",
+        iconName: "Heart",
+        color: "red"
+      },
+      {
+        title: "Financial Analyst",
+        description: "Evaluate financial data and market trends to guide investment decisions",
+        tasks: JSON.stringify([
+          "Analyze financial statements",
+          "Create financial models",
+          "Research market trends",
+          "Prepare investment recommendations"
+        ]),
+        skills: JSON.stringify([
+          { name: "Financial Modeling", level: 5 },
+          { name: "Research", level: 4 },
+          { name: "Analytical Thinking", level: 5 },
+          { name: "Attention to Detail", level: 4 }
+        ]),
+        education: "Bachelor's degree in Finance, Economics, Accounting, or related field; MBA or CFA often preferred",
+        whyLoveIt: "The challenge of predicting market movements, helping others build wealth, and working with complex financial systems",
+        iconName: "Landmark",
+        color: "amber"
+      }
+    ];
+    
+    for (const careerPathData of careerPathsData) {
+      await this.createCareerPath(careerPathData);
+    }
+    
+    console.log("Career paths data initialized");
   }
 }
 

@@ -1,0 +1,54 @@
+Prepare the app to support user accounts, saved progress, and backend-connected features. For now, everything can be placeholder UI — no real authentication or APIs yet.
+
+1. **Create a Login & Signup UI (Mock Only)**:
+   - Add a Login page with:
+     - Email and password inputs
+     - “Login” button
+     - “Forgot password?” link
+   - Add a Signup page with:
+     - First name, last name, email, age range, password
+     - “Sign Up” button
+     - Terms/consent checkbox
+
+   These pages do not need to connect to a backend yet — just build the forms and success/failure messages using static logic.
+
+2. **Simulated Logged-In State**:
+   - After logging in (mock), redirect the user to their Dashboard
+   - Show their name (e.g., “Welcome, Alex!”)
+   - Display fake user-specific progress (like 60% done with Financial Literacy)
+
+3. **Build a Settings/Profile Page**:
+   - Include fields like:
+     - First/last name
+     - Age group (e.g., 9–12, 13–15, 16–18)
+     - Interests (checkboxes like: “Money,” “Tech,” “Creativity,” etc.)
+     - Avatar image (placeholder for now)
+   - Allow editing and “Save Changes” (use local storage or dummy function)
+
+4. **Future API Comment Hooks**:
+   - In relevant files, add comments for where APIs will go later:
+     <!-- TODO: Connect to user auth backend -->
+     <!-- TODO: Fetch user progress from database -->
+     <!-- TODO: Submit quiz data to server -->
+
+5. **Plan for API Integration (JSON Simulation)**:
+   - Simulate backend responses using a static `userData.json` file or JavaScript object
+   - For example:
+     ```js
+     const user = {
+       name: "Alex",
+       ageGroup: "13–15",
+       interests: ["Money", "Creativity"],
+       progress: {
+         selfDiscovery: true,
+         financialLiteracy: 0.6,
+         projectsCompleted: 2
+       }
+     };
+     ```
+
+6. **Navigation Logic Prep**:
+   - On each page, show/hide certain features depending on whether the user is “logged in” (use a simple JS flag)
+   - Example: hide “Progress Tracker” or “Vision Board” until login
+
+Keep everything clean, organized, and clearly marked for API upgrades later. This phase is the bridge between the prototype and a true dynamic web app.

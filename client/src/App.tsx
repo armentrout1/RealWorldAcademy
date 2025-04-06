@@ -6,6 +6,7 @@ import Layout from "@/components/layout/Layout";
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { ProgressProvider } from "@/contexts/ProgressContext";
+import { AuthProvider } from "@/contexts/AuthContext";
 
 // Import pages
 import Home from "@/pages/Home";
@@ -18,6 +19,9 @@ import About from "@/pages/About";
 import FinancialLiteracy from "@/pages/FinancialLiteracy";
 import HowWeLearn from "@/pages/HowWeLearn";
 import PlanYourFuture from "@/pages/PlanYourFuture";
+import Login from "@/pages/Login";
+import Signup from "@/pages/Signup";
+import Profile from "@/pages/Profile";
 import NotFound from "@/pages/not-found";
 
 // Page transition variants
@@ -147,6 +151,21 @@ function Router() {
                 <PlanYourFuture />
               </PageWrapper>
             </Route>
+            <Route path="/login">
+              <PageWrapper>
+                <Login />
+              </PageWrapper>
+            </Route>
+            <Route path="/signup">
+              <PageWrapper>
+                <Signup />
+              </PageWrapper>
+            </Route>
+            <Route path="/profile">
+              <PageWrapper>
+                <Profile />
+              </PageWrapper>
+            </Route>
             <Route>
               <PageWrapper>
                 <NotFound />
@@ -162,10 +181,12 @@ function Router() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <ProgressProvider>
-        <Router />
-        <Toaster />
-      </ProgressProvider>
+      <AuthProvider>
+        <ProgressProvider>
+          <Router />
+          <Toaster />
+        </ProgressProvider>
+      </AuthProvider>
     </QueryClientProvider>
   );
 }

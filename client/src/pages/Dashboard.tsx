@@ -8,9 +8,14 @@ import {
   Target, 
   ChevronRight,
   BarChart,
-  Sparkles
+  Sparkles,
+  Award,
+  Clock
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/contexts/AuthContext";
+import { Progress } from "@/components/ui/progress";
+import { SmartSuggestions } from "@/components/ai";
 
 const motivationalQuotes = [
   "Today is a great day to grow.",
@@ -25,6 +30,7 @@ const motivationalQuotes = [
 
 const Dashboard: React.FC = () => {
   const [quote, setQuote] = useState<string>("");
+  const { user, isAuthenticated } = useAuth();
   
   useEffect(() => {
     // Select a random quote when the component mounts
@@ -36,12 +42,129 @@ const Dashboard: React.FC = () => {
     <div className="container mx-auto px-4 py-12">
       <div className="mb-10 text-center">
         <h1 className="font-sans font-bold text-3xl md:text-4xl text-neutral-900 mb-3">
-          Welcome to Your Real World Journey
+          {isAuthenticated 
+            ? `Welcome, ${user?.firstName}!` 
+            : "Welcome to Your Real World Journey"}
         </h1>
         <p className="text-neutral-600 max-w-2xl mx-auto text-lg">
-          Discover practical skills, explore your strengths, and prepare for real-world challenges with our personalized learning platform.
+          {isAuthenticated
+            ? "Continue your learning journey from where you left off."
+            : "Discover practical skills, explore your strengths, and prepare for real-world challenges with our personalized learning platform."}
         </p>
       </div>
+      
+      {/* User Progress Summary - Only show when logged in */}
+      {isAuthenticated && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+          <Card className="shadow-sm">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base font-medium flex items-center gap-2">
+                <BookOpen className="h-4 w-4 text-primary" />
+                Financial Literacy
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span>Progress</span>
+                  <span className="font-medium">{Math.round(user?.progress?.financialLiteracy * 100 || 0)}%</span>
+                </div>
+                <Progress value={user?.progress?.financialLiteracy * 100 || 0} className="h-2" />
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card className="shadow-sm">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base font-medium flex items-center gap-2">
+                <Lightbulb className="h-4 w-4 text-amber-500" />
+                Self Discovery
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span>Progress</span>
+                  <span className="font-medium">{Math.round(user?.progress?.selfDiscovery * 100 || 0)}%</span>
+                </div>
+                <Progress value={user?.progress?.selfDiscovery * 100 || 0} className="h-2" />
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card className="shadow-sm">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base font-medium flex items-center gap-2">
+                <Award className="h-4 w-4 text-green-500" />
+                Projects Completed
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span>Total</span>
+                  <span className="font-medium">{user?.progress?.projectsCompleted || 0}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span>Learning Paths Started</span>
+                  <span className="font-medium">{user?.progress?.learningPathsStarted || 0}</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+      
+      {/* Recommended Next Steps - Only show when logged in */}
+      {isAuthenticated && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+          <div className="md:col-span-2">
+            <Card className="shadow-sm h-full">
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Clock className="h-4 w-4 text-primary" />
+                  Continue Your Learning
+                </CardTitle>
+                <CardDescription>
+                  Pick up where you left off
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="p-4 bg-primary/5 rounded-lg border border-primary/10">
+                    <h3 className="font-medium mb-1">Financial Literacy: Budgeting Basics</h3>
+                    <p className="text-sm text-muted-foreground mb-2">
+                      You completed 60% of this module
+                    </p>
+                    <Progress value={60} className="h-2 mb-4" />
+                    <Link href="/financial-literacy">
+                      <Button variant="outline" size="sm">
+                        Continue Learning
+                      </Button>
+                    </Link>
+                  </div>
+                  
+                  <div className="p-4 bg-amber-50 rounded-lg border border-amber-100">
+                    <h3 className="font-medium mb-1">Career Planning: Finding Your Path</h3>
+                    <p className="text-sm text-muted-foreground mb-2">
+                      New module available
+                    </p>
+                    <Link href="/plan-your-future">
+                      <Button variant="outline" size="sm" className="border-amber-200 bg-amber-100/50 hover:bg-amber-100">
+                        Start Module
+                      </Button>
+                    </Link>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+          
+          <div>
+            <SmartSuggestions />
+          </div>
+        </div>
+      )}
       
       {/* Motivational Banner */}
       <div className="mb-8 bg-gradient-to-r from-blue-50 to-purple-50 p-6 rounded-xl shadow-sm border border-blue-100 text-center animate-fade-in">

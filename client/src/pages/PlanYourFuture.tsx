@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Lightbulb,
   BookOpen,
@@ -13,7 +13,11 @@ import {
   ArrowRight,
   Edit,
   Save,
-  Trash2
+  Trash2,
+  BarChart,
+  Megaphone,
+  Landmark,
+  X
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -25,12 +29,17 @@ import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { useProgress } from "@/contexts/ProgressContext";
+import { useAuth } from "@/contexts/AuthContext";
+import { apiRequest } from "@/lib/queryClient";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
 
 // Career path definitions
 interface CareerPath {
-  id: string;
+  id: number;
   title: string;
-  icon: React.ReactNode;
+  description: string;
+  iconName: string;
   color: string;
   whyLoveIt: string;
   tasks: string[];
@@ -38,133 +47,42 @@ interface CareerPath {
   skills: { name: string; level: number }[];
 }
 
-const careerPaths: CareerPath[] = [
-  {
-    id: "graphic-designer",
-    title: "Graphic Designer",
-    icon: <Lightbulb className="h-8 w-8" />,
-    color: "bg-purple-100 text-purple-700 border-purple-200",
-    whyLoveIt: "You'll combine your artistic skills with technology to communicate messages visually.",
-    tasks: [
-      "Create visual concepts for websites, ads, and publications",
-      "Design brand identities and logos",
-      "Work with color, typography, and layout",
-      "Use digital design tools to bring ideas to life"
-    ],
-    education: "Associate's degree + portfolio",
-    skills: [
-      { name: "Creative thinking", level: 4 },
-      { name: "Visual communication", level: 5 },
-      { name: "Digital design tools", level: 4 },
-      { name: "Attention to detail", level: 3 }
-    ]
-  },
-  {
-    id: "teacher",
-    title: "Teacher",
-    icon: <BookOpen className="h-8 w-8" />,
-    color: "bg-blue-100 text-blue-700 border-blue-200",
-    whyLoveIt: "You'll shape young minds and make a lasting impact on students' lives.",
-    tasks: [
-      "Create engaging lesson plans",
-      "Present information in multiple formats",
-      "Provide feedback and guidance",
-      "Track student progress and adapt teaching methods"
-    ],
-    education: "Bachelor's degree + certification",
-    skills: [
-      { name: "Communication", level: 5 },
-      { name: "Organization", level: 4 },
-      { name: "Empathy", level: 5 },
-      { name: "Subject expertise", level: 4 }
-    ]
-  },
-  {
-    id: "engineer",
-    title: "Engineer",
-    icon: <Wrench className="h-8 w-8" />,
-    color: "bg-green-100 text-green-700 border-green-200",
-    whyLoveIt: "You'll solve complex problems and build solutions that transform our world.",
-    tasks: [
-      "Design and test new systems or structures",
-      "Analyze data and performance metrics",
-      "Improve efficiency of processes",
-      "Collaborate with cross-functional teams"
-    ],
-    education: "Bachelor's degree in Engineering",
-    skills: [
-      { name: "Analytical thinking", level: 5 },
-      { name: "Math & physics", level: 4 },
-      { name: "Problem-solving", level: 5 },
-      { name: "Technical knowledge", level: 4 }
-    ]
-  },
-  {
-    id: "social-worker",
-    title: "Social Worker",
-    icon: <Heart className="h-8 w-8" />,
-    color: "bg-rose-100 text-rose-700 border-rose-200",
-    whyLoveIt: "You'll directly help people navigate challenges and improve their lives.",
-    tasks: [
-      "Assess client needs and situations",
-      "Connect people with resources and support",
-      "Advocate for vulnerable populations",
-      "Create intervention plans for clients"
-    ],
-    education: "Bachelor's or Master's in Social Work",
-    skills: [
-      { name: "Empathy", level: 5 },
-      { name: "Active listening", level: 5 },
-      { name: "Problem-solving", level: 4 },
-      { name: "Emotional resilience", level: 4 }
-    ]
-  },
-  {
-    id: "web-developer",
-    title: "Web Developer",
-    icon: <Code className="h-8 w-8" />,
-    color: "bg-indigo-100 text-indigo-700 border-indigo-200",
-    whyLoveIt: "You'll create interactive websites and apps that people use every day.",
-    tasks: [
-      "Write clean, functional code",
-      "Build and maintain websites",
-      "Collaborate with designers and clients",
-      "Test and debug across browsers/devices"
-    ],
-    education: "Bachelor's degree or bootcamp certification",
-    skills: [
-      { name: "HTML/CSS/JavaScript", level: 5 },
-      { name: "Logical thinking", level: 4 },
-      { name: "Problem-solving", level: 5 },
-      { name: "Attention to detail", level: 4 }
-    ]
-  },
-  {
-    id: "project-manager",
-    title: "Project Manager",
-    icon: <TargetIcon className="h-8 w-8" />,
-    color: "bg-amber-100 text-amber-700 border-amber-200",
-    whyLoveIt: "You'll lead teams to achieve goals and bring complex projects to completion.",
-    tasks: [
-      "Plan project scope, timeline, and resources",
-      "Coordinate team members and track progress",
-      "Manage budgets and stakeholder expectations",
-      "Identify and mitigate risks"
-    ],
-    education: "Bachelor's degree + certification",
-    skills: [
-      { name: "Organization", level: 5 },
-      { name: "Communication", level: 5 },
-      { name: "Leadership", level: 4 },
-      { name: "Problem-solving", level: 4 }
-    ]
-  }
-];
+// Icon mapping for career paths
+const getIconComponent = (iconName: string) => {
+  const iconMap: Record<string, React.ReactNode> = {
+    'Code': <Code className="h-8 w-8" />,
+    'BarChart': <BarChart className="h-8 w-8" />,
+    'Megaphone': <Megaphone className="h-8 w-8" />,
+    'Heart': <Heart className="h-8 w-8" />,
+    'Landmark': <Landmark className="h-8 w-8" />,
+    'Lightbulb': <Lightbulb className="h-8 w-8" />,
+    'BookOpen': <BookOpen className="h-8 w-8" />,
+    'Wrench': <Wrench className="h-8 w-8" />,
+    'Target': <TargetIcon className="h-8 w-8" />
+  };
+  
+  return iconMap[iconName] || <Lightbulb className="h-8 w-8" />;
+};
+
+// Get color style based on color name
+const getColorStyle = (color: string) => {
+  const colorMap: Record<string, string> = {
+    'blue': 'bg-blue-100 text-blue-700 border-blue-200',
+    'purple': 'bg-purple-100 text-purple-700 border-purple-200',
+    'green': 'bg-green-100 text-green-700 border-green-200',
+    'red': 'bg-rose-100 text-rose-700 border-rose-200',
+    'amber': 'bg-amber-100 text-amber-700 border-amber-200',
+    'indigo': 'bg-indigo-100 text-indigo-700 border-indigo-200'
+  };
+  
+  return colorMap[color] || 'bg-gray-100 text-gray-700 border-gray-200';
+};
 
 // Goal definitions
 interface Goal {
   id: string;
   text: string;
+  type: 'short-term' | 'mid-term' | 'long-term';
   isEditing?: boolean;
 }
 
@@ -177,33 +95,149 @@ interface VisionBoardItem {
 
 const PlanYourFuture: React.FC = () => {
   const { progress, updateCategoryProgress, unlockBadge, addTimelineEvent } = useProgress();
+  const { user, isAuthenticated } = useAuth();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
   
-  const [shortTermGoals, setShortTermGoals] = useState<Goal[]>([
-    { id: "stg-1", text: "Learn basic coding skills" }
-  ]);
-  const [midTermGoals, setMidTermGoals] = useState<Goal[]>([
-    { id: "mtg-1", text: "Complete a web development course" }
-  ]);
-  const [longTermGoals, setLongTermGoals] = useState<Goal[]>([
-    { id: "ltg-1", text: "Start a career in tech" }
-  ]);
-  
+  // State for temporary form values
   const [newShortTermGoal, setNewShortTermGoal] = useState("");
   const [newMidTermGoal, setNewMidTermGoal] = useState("");
   const [newLongTermGoal, setNewLongTermGoal] = useState("");
-  
-  const [visionBoardItems, setVisionBoardItems] = useState<VisionBoardItem[]>([
-    { id: "vb-1", type: "quote", content: "The future belongs to those who believe in the beauty of their dreams." },
-    { id: "vb-2", type: "quote", content: "Your time is limited, don't waste it living someone else's life." },
-    { id: "vb-3", type: "image", content: "https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=300&h=200&fit=crop" }
-  ]);
-  
   const [newQuote, setNewQuote] = useState("");
+  
+  // API Calls for Career Paths
+  const { data: careerPaths = [], isLoading: isLoadingCareerPaths } = useQuery({
+    queryKey: ['/api/career-paths'],
+    queryFn: async () => {
+      const response = await apiRequest<CareerPath[]>('/api/career-paths');
+      // Parse tasks and skills which are stored as JSON strings
+      return response.map(path => ({
+        ...path,
+        tasks: typeof path.tasks === 'string' ? JSON.parse(path.tasks) : path.tasks,
+        skills: typeof path.skills === 'string' ? JSON.parse(path.skills) : path.skills
+      }));
+    }
+  });
+  
+  // Goals API calls
+  const { data: goals = [], isLoading: isLoadingGoals } = useQuery({
+    queryKey: ['/api/users', user?.id, 'goals'],
+    enabled: isAuthenticated && !!user?.id,
+    queryFn: async () => {
+      const response = await apiRequest<Goal[]>(`/api/users/${user?.id}/goals`);
+      return response || [];
+    }
+  });
+  
+  // Track editing state for goals
+  const [editingGoalId, setEditingGoalId] = useState<string | null>(null);
+  const [editingText, setEditingText] = useState('');
+  
+  // Organize goals by type
+  const shortTermGoals = goals.filter(goal => goal.type === 'short-term');
+  const midTermGoals = goals.filter(goal => goal.type === 'mid-term');
+  const longTermGoals = goals.filter(goal => goal.type === 'long-term');
+  
+  // Vision Board API calls
+  const { data: visionBoardItems = [], isLoading: isLoadingVisionBoard } = useQuery({
+    queryKey: ['/api/users', user?.id, 'vision-board'],
+    enabled: isAuthenticated && !!user?.id,
+    queryFn: async () => {
+      const response = await apiRequest<VisionBoardItem[]>(`/api/users/${user?.id}/vision-board`);
+      return response || [];
+    }
+  });
+  
+  // Goal mutations
+  const createGoalMutation = useMutation({
+    mutationFn: async (goalData: { text: string, type: string }) => {
+      return await apiRequest(`/api/users/${user?.id}/goals`, {
+        method: 'POST',
+        body: JSON.stringify(goalData)
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/users', user?.id, 'goals'] });
+      toast({
+        title: "Goal added!",
+        description: "Your goal has been saved."
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Couldn't add goal",
+        description: "There was a problem saving your goal. Please try again.",
+        variant: "destructive"
+      });
+    }
+  });
+  
+  const updateGoalMutation = useMutation({
+    mutationFn: async ({ id, text }: { id: number, text: string }) => {
+      return await apiRequest(`/api/users/${user?.id}/goals/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ text })
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/users', user?.id, 'goals'] });
+      toast({
+        title: "Goal updated!",
+        description: "Your goal has been updated."
+      });
+    }
+  });
+  
+  const deleteGoalMutation = useMutation({
+    mutationFn: async (id: number) => {
+      return await apiRequest(`/api/users/${user?.id}/goals/${id}`, {
+        method: 'DELETE'
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/users', user?.id, 'goals'] });
+      toast({
+        title: "Goal deleted!",
+        description: "Your goal has been removed."
+      });
+    }
+  });
+  
+  // Vision Board mutations
+  const createVisionBoardItemMutation = useMutation({
+    mutationFn: async (itemData: { content: string, type: 'quote' | 'image' | 'goal' }) => {
+      return await apiRequest(`/api/users/${user?.id}/vision-board`, {
+        method: 'POST',
+        body: JSON.stringify(itemData)
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/users', user?.id, 'vision-board'] });
+      toast({
+        title: "Item added!",
+        description: "Your vision board has been updated."
+      });
+    }
+  });
+  
+  const deleteVisionBoardItemMutation = useMutation({
+    mutationFn: async (id: number) => {
+      return await apiRequest(`/api/users/${user?.id}/vision-board/${id}`, {
+        method: 'DELETE'
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/users', user?.id, 'vision-board'] });
+    }
+  });
 
   // Handle adding new goals
   const addShortTermGoal = () => {
-    if (newShortTermGoal.trim()) {
-      setShortTermGoals([...shortTermGoals, { id: `stg-${Date.now()}`, text: newShortTermGoal }]);
+    if (newShortTermGoal.trim() && isAuthenticated) {
+      createGoalMutation.mutate({
+        text: newShortTermGoal,
+        type: 'short-term'
+      });
       setNewShortTermGoal("");
       
       // Update progress after adding a goal
@@ -214,22 +248,40 @@ const PlanYourFuture: React.FC = () => {
         category: "planning",
         date: new Date().toISOString()
       });
+    } else if (!isAuthenticated) {
+      toast({
+        title: "Login required",
+        description: "Please log in to save your goals.",
+        variant: "destructive"
+      });
     }
   };
   
   const addMidTermGoal = () => {
-    if (newMidTermGoal.trim()) {
-      setMidTermGoals([...midTermGoals, { id: `mtg-${Date.now()}`, text: newMidTermGoal }]);
+    if (newMidTermGoal.trim() && isAuthenticated) {
+      createGoalMutation.mutate({
+        text: newMidTermGoal,
+        type: 'mid-term'
+      });
       setNewMidTermGoal("");
       
       // Update progress after adding a goal
       updateCategoryProgress("personal-development", 2, 3);
+    } else if (!isAuthenticated) {
+      toast({
+        title: "Login required",
+        description: "Please log in to save your goals.",
+        variant: "destructive"
+      });
     }
   };
   
   const addLongTermGoal = () => {
-    if (newLongTermGoal.trim()) {
-      setLongTermGoals([...longTermGoals, { id: `ltg-${Date.now()}`, text: newLongTermGoal }]);
+    if (newLongTermGoal.trim() && isAuthenticated) {
+      createGoalMutation.mutate({
+        text: newLongTermGoal,
+        type: 'long-term'
+      });
       setNewLongTermGoal("");
       
       // Update progress and unlock a badge
@@ -241,49 +293,77 @@ const PlanYourFuture: React.FC = () => {
         category: "planning",
         date: new Date().toISOString()
       });
+    } else if (!isAuthenticated) {
+      toast({
+        title: "Login required",
+        description: "Please log in to save your goals.",
+        variant: "destructive"
+      });
     }
   };
   
   // Handle editing goals
-  const startEditGoal = (id: string, type: 'short' | 'mid' | 'long') => {
-    const setGoals = type === 'short' ? setShortTermGoals : type === 'mid' ? setMidTermGoals : setLongTermGoals;
-    const goals = type === 'short' ? shortTermGoals : type === 'mid' ? midTermGoals : longTermGoals;
-    
-    setGoals(goals.map(goal => 
-      goal.id === id ? { ...goal, isEditing: true } : goal
-    ));
+  const startEditGoal = (goalId: string) => {
+    // Find the goal and set its text to be edited
+    const goal = goals.find(g => g.id.toString() === goalId);
+    if (goal) {
+      setEditingGoalId(goalId);
+      setEditingText(goal.text);
+    }
   };
   
-  const saveGoal = (id: string, text: string, type: 'short' | 'mid' | 'long') => {
-    const setGoals = type === 'short' ? setShortTermGoals : type === 'mid' ? setMidTermGoals : setLongTermGoals;
-    const goals = type === 'short' ? shortTermGoals : type === 'mid' ? midTermGoals : longTermGoals;
-    
-    setGoals(goals.map(goal => 
-      goal.id === id ? { id, text, isEditing: false } : goal
-    ));
+  const saveEditedGoal = (goalId: string) => {
+    if (editingText.trim() && isAuthenticated) {
+      const goalIdNum = parseInt(goalId, 10);
+      if (!isNaN(goalIdNum)) {
+        updateGoalMutation.mutate({
+          id: goalIdNum,
+          text: editingText
+        });
+        setEditingGoalId(null);
+        setEditingText('');
+      }
+    }
   };
   
-  const deleteGoal = (id: string, type: 'short' | 'mid' | 'long') => {
-    const setGoals = type === 'short' ? setShortTermGoals : type === 'mid' ? setMidTermGoals : setLongTermGoals;
-    const goals = type === 'short' ? shortTermGoals : type === 'mid' ? midTermGoals : longTermGoals;
-    
-    setGoals(goals.filter(goal => goal.id !== id));
+  const cancelEditGoal = () => {
+    setEditingGoalId(null);
+    setEditingText('');
+  };
+  
+  const deleteGoal = (goalId: string) => {
+    if (isAuthenticated) {
+      const goalIdNum = parseInt(goalId, 10);
+      if (!isNaN(goalIdNum)) {
+        deleteGoalMutation.mutate(goalIdNum);
+      }
+    }
   };
   
   // Handle vision board
   const addQuoteToVisionBoard = () => {
-    if (newQuote.trim()) {
-      setVisionBoardItems([...visionBoardItems, { 
-        id: `vb-${Date.now()}`, 
-        type: "quote", 
-        content: newQuote 
-      }]);
+    if (newQuote.trim() && isAuthenticated) {
+      createVisionBoardItemMutation.mutate({
+        type: "quote",
+        content: newQuote
+      });
       setNewQuote("");
+    } else if (!isAuthenticated) {
+      toast({
+        title: "Login required",
+        description: "Please log in to save items to your vision board.",
+        variant: "destructive"
+      });
     }
   };
   
   const removeFromVisionBoard = (id: string) => {
-    setVisionBoardItems(visionBoardItems.filter(item => item.id !== id));
+    if (isAuthenticated) {
+      const idNum = parseInt(id, 10);
+      if (!isNaN(idNum)) {
+        deleteVisionBoardItemMutation.mutate(idNum);
+      }
+    }
   };
 
   // Render skill level indicators
@@ -330,8 +410,8 @@ const PlanYourFuture: React.FC = () => {
             <Card key={career.id} className="hover:shadow-md transition-all border border-neutral-200">
               <CardHeader className="pb-2">
                 <div className="flex justify-between">
-                  <div className={`p-3 rounded-lg ${career.color} mb-3`}>
-                    {career.icon}
+                  <div className={`p-3 rounded-lg ${getColorStyle(career.color)} mb-3`}>
+                    {getIconComponent(career.iconName)}
                   </div>
                   <Badge variant="outline" className="h-fit">
                     {career.education}
@@ -346,7 +426,7 @@ const PlanYourFuture: React.FC = () => {
                 <div>
                   <h4 className="font-medium text-sm mb-2 text-neutral-700">Example Tasks:</h4>
                   <ul className="space-y-1">
-                    {career.tasks.map((task, index) => (
+                    {career.tasks.map((task: string, index: number) => (
                       <li key={index} className="flex items-start text-sm">
                         <Check className="h-4 w-4 text-green-500 mt-0.5 mr-2 flex-shrink-0" />
                         <span className="text-neutral-600">{task}</span>
@@ -411,33 +491,38 @@ const PlanYourFuture: React.FC = () => {
                 <div className="space-y-2">
                   {shortTermGoals.map((goal) => (
                     <div key={goal.id} className="flex items-center justify-between p-3 bg-neutral-50 rounded-md">
-                      {goal.isEditing ? (
+                      {editingGoalId === goal.id.toString() ? (
                         <Input 
-                          value={goal.text}
-                          onChange={(e) => {
-                            setShortTermGoals(shortTermGoals.map(g => 
-                              g.id === goal.id ? { ...g, text: e.target.value } : g
-                            ));
-                          }}
+                          value={editingText}
+                          onChange={(e) => setEditingText(e.target.value)}
                           className="flex-1 mr-2"
                         />
                       ) : (
                         <span className="flex-1">{goal.text}</span>
                       )}
                       <div className="flex space-x-1">
-                        {goal.isEditing ? (
-                          <Button 
-                            size="sm" 
-                            variant="ghost" 
-                            onClick={() => saveGoal(goal.id, goal.text, 'short')}
-                          >
-                            <Save className="h-4 w-4" />
-                          </Button>
+                        {editingGoalId === goal.id.toString() ? (
+                          <>
+                            <Button 
+                              size="sm" 
+                              variant="ghost" 
+                              onClick={() => saveEditedGoal(goal.id.toString())}
+                            >
+                              <Save className="h-4 w-4" />
+                            </Button>
+                            <Button 
+                              size="sm" 
+                              variant="ghost" 
+                              onClick={cancelEditGoal}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </>
                         ) : (
                           <Button 
                             size="sm" 
                             variant="ghost" 
-                            onClick={() => startEditGoal(goal.id, 'short')}
+                            onClick={() => startEditGoal(goal.id.toString())}
                           >
                             <Edit className="h-4 w-4" />
                           </Button>
@@ -446,7 +531,7 @@ const PlanYourFuture: React.FC = () => {
                           size="sm" 
                           variant="ghost" 
                           className="text-red-500 hover:text-red-700" 
-                          onClick={() => deleteGoal(goal.id, 'short')}
+                          onClick={() => deleteGoal(goal.id.toString())}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -473,33 +558,38 @@ const PlanYourFuture: React.FC = () => {
                 <div className="space-y-2">
                   {midTermGoals.map((goal) => (
                     <div key={goal.id} className="flex items-center justify-between p-3 bg-neutral-50 rounded-md">
-                      {goal.isEditing ? (
+                      {editingGoalId === goal.id.toString() ? (
                         <Input 
-                          value={goal.text}
-                          onChange={(e) => {
-                            setMidTermGoals(midTermGoals.map(g => 
-                              g.id === goal.id ? { ...g, text: e.target.value } : g
-                            ));
-                          }}
+                          value={editingText}
+                          onChange={(e) => setEditingText(e.target.value)}
                           className="flex-1 mr-2"
                         />
                       ) : (
                         <span className="flex-1">{goal.text}</span>
                       )}
                       <div className="flex space-x-1">
-                        {goal.isEditing ? (
-                          <Button 
-                            size="sm" 
-                            variant="ghost" 
-                            onClick={() => saveGoal(goal.id, goal.text, 'mid')}
-                          >
-                            <Save className="h-4 w-4" />
-                          </Button>
+                        {editingGoalId === goal.id.toString() ? (
+                          <>
+                            <Button 
+                              size="sm" 
+                              variant="ghost" 
+                              onClick={() => saveEditedGoal(goal.id.toString())}
+                            >
+                              <Save className="h-4 w-4" />
+                            </Button>
+                            <Button 
+                              size="sm" 
+                              variant="ghost" 
+                              onClick={cancelEditGoal}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </>
                         ) : (
                           <Button 
                             size="sm" 
                             variant="ghost" 
-                            onClick={() => startEditGoal(goal.id, 'mid')}
+                            onClick={() => startEditGoal(goal.id.toString())}
                           >
                             <Edit className="h-4 w-4" />
                           </Button>
@@ -508,7 +598,7 @@ const PlanYourFuture: React.FC = () => {
                           size="sm" 
                           variant="ghost" 
                           className="text-red-500 hover:text-red-700" 
-                          onClick={() => deleteGoal(goal.id, 'mid')}
+                          onClick={() => deleteGoal(goal.id.toString())}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -535,33 +625,38 @@ const PlanYourFuture: React.FC = () => {
                 <div className="space-y-2">
                   {longTermGoals.map((goal) => (
                     <div key={goal.id} className="flex items-center justify-between p-3 bg-neutral-50 rounded-md">
-                      {goal.isEditing ? (
+                      {editingGoalId === goal.id.toString() ? (
                         <Input 
-                          value={goal.text}
-                          onChange={(e) => {
-                            setLongTermGoals(longTermGoals.map(g => 
-                              g.id === goal.id ? { ...g, text: e.target.value } : g
-                            ));
-                          }}
+                          value={editingText}
+                          onChange={(e) => setEditingText(e.target.value)}
                           className="flex-1 mr-2"
                         />
                       ) : (
                         <span className="flex-1">{goal.text}</span>
                       )}
                       <div className="flex space-x-1">
-                        {goal.isEditing ? (
-                          <Button 
-                            size="sm" 
-                            variant="ghost" 
-                            onClick={() => saveGoal(goal.id, goal.text, 'long')}
-                          >
-                            <Save className="h-4 w-4" />
-                          </Button>
+                        {editingGoalId === goal.id.toString() ? (
+                          <>
+                            <Button 
+                              size="sm" 
+                              variant="ghost" 
+                              onClick={() => saveEditedGoal(goal.id.toString())}
+                            >
+                              <Save className="h-4 w-4" />
+                            </Button>
+                            <Button 
+                              size="sm" 
+                              variant="ghost" 
+                              onClick={cancelEditGoal}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </>
                         ) : (
                           <Button 
                             size="sm" 
                             variant="ghost" 
-                            onClick={() => startEditGoal(goal.id, 'long')}
+                            onClick={() => startEditGoal(goal.id.toString())}
                           >
                             <Edit className="h-4 w-4" />
                           </Button>
@@ -570,7 +665,7 @@ const PlanYourFuture: React.FC = () => {
                           size="sm" 
                           variant="ghost" 
                           className="text-red-500 hover:text-red-700" 
-                          onClick={() => deleteGoal(goal.id, 'long')}
+                          onClick={() => deleteGoal(goal.id.toString())}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>

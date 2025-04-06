@@ -5,7 +5,8 @@ import {
   insertUserSchema, insertCourseSchema, insertCategorySchema, 
   insertTestimonialSchema, insertFeatureSchema,
   insertBadgeSchema, insertCategoryProgressSchema, 
-  insertTimelineEventSchema, insertUserProgressSummarySchema 
+  insertTimelineEventSchema, insertUserProgressSummarySchema,
+  insertCareerPathSchema, insertGoalSchema, insertVisionBoardItemSchema
 } from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -395,6 +396,200 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(updatedSummary);
     } catch (error) {
       res.status(400).json({ message: "Invalid progress summary update data" });
+    }
+  });
+
+  // Career paths endpoints
+  app.get("/api/career-paths", async (req, res) => {
+    try {
+      const careerPaths = await storage.getAllCareerPaths();
+      res.json(careerPaths);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch career paths" });
+    }
+  });
+
+  app.get("/api/career-paths/:id", async (req, res) => {
+    try {
+      const careerPath = await storage.getCareerPath(Number(req.params.id));
+      if (!careerPath) {
+        return res.status(404).json({ message: "Career path not found" });
+      }
+      res.json(careerPath);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch career path" });
+    }
+  });
+
+  app.post("/api/career-paths", express.json(), async (req, res) => {
+    try {
+      const validatedData = insertCareerPathSchema.parse(req.body);
+      const newCareerPath = await storage.createCareerPath(validatedData);
+      res.status(201).json(newCareerPath);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid career path data" });
+    }
+  });
+
+  // Goals endpoints
+  app.get("/api/users/:userId/goals", async (req, res) => {
+    try {
+      const userId = Number(req.params.userId);
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      const goals = await storage.getUserGoals(userId);
+      res.json(goals);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch goals" });
+    }
+  });
+
+  app.post("/api/users/:userId/goals", express.json(), async (req, res) => {
+    try {
+      const userId = Number(req.params.userId);
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      const validatedData = insertGoalSchema.parse({
+        ...req.body,
+        userId
+      });
+      
+      const newGoal = await storage.createGoal(validatedData);
+      res.status(201).json(newGoal);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid goal data" });
+    }
+  });
+
+  app.patch("/api/users/:userId/goals/:goalId", express.json(), async (req, res) => {
+    try {
+      const userId = Number(req.params.userId);
+      const goalId = Number(req.params.goalId);
+      
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      const { text, completed } = req.body;
+      const updateData: { text?: string; completed?: boolean } = {};
+      
+      if (text !== undefined) {
+        updateData.text = text;
+      }
+      
+      if (completed !== undefined) {
+        updateData.completed = Boolean(completed);
+      }
+      
+      const updatedGoal = await storage.updateGoal(goalId, updateData);
+      res.json(updatedGoal);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid goal update data" });
+    }
+  });
+
+  app.delete("/api/users/:userId/goals/:goalId", async (req, res) => {
+    try {
+      const userId = Number(req.params.userId);
+      const goalId = Number(req.params.goalId);
+      
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      await storage.deleteGoal(goalId);
+      res.status(204).end();
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete goal" });
+    }
+  });
+
+  // Vision Board Items endpoints
+  app.get("/api/users/:userId/vision-board", async (req, res) => {
+    try {
+      const userId = Number(req.params.userId);
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      const visionBoardItems = await storage.getUserVisionBoardItems(userId);
+      res.json(visionBoardItems);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch vision board items" });
+    }
+  });
+
+  app.post("/api/users/:userId/vision-board", express.json(), async (req, res) => {
+    try {
+      const userId = Number(req.params.userId);
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      const validatedData = insertVisionBoardItemSchema.parse({
+        ...req.body,
+        userId
+      });
+      
+      const newVisionBoardItem = await storage.createVisionBoardItem(validatedData);
+      res.status(201).json(newVisionBoardItem);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid vision board item data" });
+    }
+  });
+
+  app.patch("/api/users/:userId/vision-board/:itemId", express.json(), async (req, res) => {
+    try {
+      const userId = Number(req.params.userId);
+      const itemId = Number(req.params.itemId);
+      
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      const { content, position } = req.body;
+      const updateData: { content?: string; position?: any } = {};
+      
+      if (content !== undefined) {
+        updateData.content = content;
+      }
+      
+      if (position !== undefined) {
+        updateData.position = position;
+      }
+      
+      const updatedItem = await storage.updateVisionBoardItem(itemId, updateData);
+      res.json(updatedItem);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid vision board item update data" });
+    }
+  });
+
+  app.delete("/api/users/:userId/vision-board/:itemId", async (req, res) => {
+    try {
+      const userId = Number(req.params.userId);
+      const itemId = Number(req.params.itemId);
+      
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      await storage.deleteVisionBoardItem(itemId);
+      res.status(204).end();
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete vision board item" });
     }
   });
 

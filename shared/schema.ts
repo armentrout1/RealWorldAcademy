@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, json } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { relations } from "drizzle-orm";
@@ -10,15 +10,12 @@ export const users = pgTable("users", {
   fullName: text("full_name").notNull(),
   email: text("email").notNull().unique(),
   avatar: text("avatar"),
-  bio: text("bio")
+  bio: text("bio"),
+  firstName: text("first_name"),
+  lastName: text("last_name"),
+  ageGroup: text("age_group"),
+  interests: text("interests").array()
 });
-
-export const usersRelations = relations(users, ({ many, one }) => ({
-  badges: many(badges),
-  categoryProgress: many(categoryProgress),
-  timelineEvents: many(timelineEvents),
-  progressSummary: one(userProgressSummary),
-}));
 
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
@@ -26,7 +23,11 @@ export const insertUserSchema = createInsertSchema(users).pick({
   fullName: true,
   email: true,
   avatar: true,
-  bio: true
+  bio: true,
+  firstName: true,
+  lastName: true,
+  ageGroup: true,
+  interests: true
 });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -174,3 +175,70 @@ export const userProgressSummaryRelations = relations(userProgressSummary, ({ on
 export const insertUserProgressSummarySchema = createInsertSchema(userProgressSummary).omit({ id: true });
 export type InsertUserProgressSummary = z.infer<typeof insertUserProgressSummarySchema>;
 export type UserProgressSummary = typeof userProgressSummary.$inferSelect;
+
+// Career Paths model
+export const careerPaths = pgTable("career_paths", {
+  id: serial("id").primaryKey(),
+  title: text("title").notNull(),
+  description: text("description"),
+  iconName: text("icon_name").notNull(),
+  color: text("color").notNull(),
+  whyLoveIt: text("why_love_it").notNull(),
+  tasks: json("tasks").notNull(), // Store as JSON
+  education: text("education").notNull(),
+  skills: json("skills").notNull() // Store as JSON
+});
+
+export const insertCareerPathSchema = createInsertSchema(careerPaths).omit({ id: true });
+export type InsertCareerPath = z.infer<typeof insertCareerPathSchema>;
+export type CareerPath = typeof careerPaths.$inferSelect;
+
+// Goals model
+export const goals = pgTable("goals", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id),
+  type: text("type").notNull(), // short-term, mid-term, long-term
+  text: text("text").notNull(),
+  completed: boolean("completed").default(false).notNull()
+});
+
+export const goalsRelations = relations(goals, ({ one }) => ({
+  user: one(users, {
+    fields: [goals.userId],
+    references: [users.id],
+  }),
+}));
+
+export const insertGoalSchema = createInsertSchema(goals).omit({ id: true });
+export type InsertGoal = z.infer<typeof insertGoalSchema>;
+export type Goal = typeof goals.$inferSelect;
+
+// Vision Board Items model
+export const visionBoardItems = pgTable("vision_board_items", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id),
+  type: text("type").notNull(), // quote, image, goal
+  content: text("content").notNull(),
+  position: json("position")
+});
+
+export const visionBoardItemsRelations = relations(visionBoardItems, ({ one }) => ({
+  user: one(users, {
+    fields: [visionBoardItems.userId],
+    references: [users.id],
+  }),
+}));
+
+export const insertVisionBoardItemSchema = createInsertSchema(visionBoardItems).omit({ id: true });
+export type InsertVisionBoardItem = z.infer<typeof insertVisionBoardItemSchema>;
+export type VisionBoardItem = typeof visionBoardItems.$inferSelect;
+
+// Define the user relations after all models are defined
+export const usersRelations = relations(users, ({ many, one }) => ({
+  badges: many(badges),
+  categoryProgress: many(categoryProgress),
+  timelineEvents: many(timelineEvents),
+  progressSummary: one(userProgressSummary),
+  goals: many(goals),
+  visionBoardItems: many(visionBoardItems),
+}));
