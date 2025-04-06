@@ -1,0 +1,42 @@
+Create a page called “Plan Your Future” that helps students explore careers, goals, and real-world paths based on their interests and self-discovery results.
+
+The page should include:
+
+1. **Intro Section**:
+   - Title: “What Could Your Future Look Like?”
+   - Short paragraph: “Based on your strengths and interests, here are some paths you might love. Explore careers, skills, and goals that match you.”
+
+2. **Suggested Career Cards**:
+   - Show a grid or carousel of 6–8 career cards based on categories like:
+     - Creator (e.g., Graphic Designer, Architect)
+     - Builder (e.g., Engineer, Mechanic)
+     - Planner (e.g., Project Manager, Event Organizer)
+     - Helper (e.g., Nurse, Social Worker)
+     - Tech Explorer (e.g., Web Developer, Data Analyst)
+
+   Each career card should include:
+   - Job title
+   - A short “Why you might love this” blurb
+   - Example tasks
+   - Education needed (e.g., “High school + certification”)
+   - “Skills You’ll Need” list (connect back to modules or projects in the app)
+
+3. **Personal Goals Section**:
+   - Add a section titled “Your Personal Goals”
+   - Let students enter short-, mid-, and long-term goals using text inputs:
+     - Short-term: “What do you want to learn this year?”
+     - Mid-term: “What career would you like to explore?”
+     - Long-term: “Where do you see yourself in 10 years?”
+
+4. **Vision Board (Optional)**:
+   - Add a visual “vision board” area where students can:
+     - Select or upload images (placeholder for now)
+     - Add motivational quotes
+     - Arrange career icons, goals, or interests into a collage
+   - This part can be static or simulated for now — real uploads can be added later with APIs
+
+5. **Reflection Prompt**:
+   - End the page with a reflection question:
+     - “How are you growing toward the future you want?”
+
+Design the entire page with a warm, inspiring feel. Use icons, color tags, and encouraging language to help students feel excited — not overwhelmed — about their future.

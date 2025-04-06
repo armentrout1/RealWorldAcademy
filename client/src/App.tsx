@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import Layout from "@/components/layout/Layout";
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import { ProgressProvider } from "@/contexts/ProgressContext";
 
 // Import pages
 import Home from "@/pages/Home";
@@ -16,6 +17,7 @@ import TeamProjects from "@/pages/TeamProjects";
 import About from "@/pages/About";
 import FinancialLiteracy from "@/pages/FinancialLiteracy";
 import HowWeLearn from "@/pages/HowWeLearn";
+import PlanYourFuture from "@/pages/PlanYourFuture";
 import NotFound from "@/pages/not-found";
 
 // Page transition variants
@@ -140,6 +142,11 @@ function Router() {
                 <TeamProjects />
               </PageWrapper>
             </Route>
+            <Route path="/plan-your-future">
+              <PageWrapper>
+                <PlanYourFuture />
+              </PageWrapper>
+            </Route>
             <Route>
               <PageWrapper>
                 <NotFound />
@@ -155,8 +162,10 @@ function Router() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <Router />
-      <Toaster />
+      <ProgressProvider>
+        <Router />
+        <Toaster />
+      </ProgressProvider>
     </QueryClientProvider>
   );
 }
