@@ -169,7 +169,7 @@ export class DatabaseStorage implements IStorage {
       userName: "Michelle Chen",
       userTitle: "Freelance Consultant",
       userAvatar: "https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?ixlib=rb-1.2.1&auto=format&fit=crop&w=100&q=80",
-      rating: 4.5
+      rating: 4
     });
     
     // Create features

@@ -16,8 +16,8 @@ const FeaturedCourses: React.FC = () => {
         <div className="container mx-auto px-4">
           <div className="flex justify-between items-center mb-8">
             <h2 className="font-inter font-bold text-2xl md:text-3xl text-neutral-900">Featured Courses</h2>
-            <Link href="/learn">
-              <a className="text-primary font-medium hover:underline">View All</a>
+            <Link href="/learn" className="text-primary font-medium hover:underline">
+              View All
             </Link>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -59,8 +59,8 @@ const FeaturedCourses: React.FC = () => {
       <div className="container mx-auto px-4">
         <div className="flex justify-between items-center mb-8">
           <h2 className="font-inter font-bold text-2xl md:text-3xl text-neutral-900">Featured Courses</h2>
-          <Link href="/learn">
-            <a className="text-primary font-medium hover:underline">View All</a>
+          <Link href="/learn" className="text-primary font-medium hover:underline">
+            View All
           </Link>
         </div>
         
