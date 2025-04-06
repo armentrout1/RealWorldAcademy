@@ -10,6 +10,7 @@ import Dashboard from "@/pages/Dashboard";
 import Learn from "@/pages/Learn";
 import SelfDiscovery from "@/pages/SelfDiscovery";
 import Projects from "@/pages/Projects";
+import TeamProjects from "@/pages/TeamProjects";
 import About from "@/pages/About";
 import FinancialLiteracy from "@/pages/FinancialLiteracy";
 import HowWeLearn from "@/pages/HowWeLearn";
@@ -30,6 +31,7 @@ function Router() {
         <Route path="/financial-literacy" component={FinancialLiteracy} />
         <Route path="/financial-literacy/:moduleId" component={FinancialLiteracy} />
         <Route path="/how-we-learn" component={HowWeLearn} />
+        <Route path="/team-projects" component={TeamProjects} />
         <Route component={NotFound} />
       </Switch>
     </Layout>
