@@ -1,6 +1,7 @@
 import { pgTable, text, serial, integer, boolean, timestamp } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
+import { relations } from "drizzle-orm";
 
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
@@ -11,6 +12,10 @@ export const users = pgTable("users", {
   avatar: text("avatar"),
   bio: text("bio")
 });
+
+export const usersRelations = relations(users, ({ many }) => ({
+  // A user could have enrollments or other related entities in the future
+}));
 
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
@@ -45,9 +50,21 @@ export const courses = pgTable("courses", {
   isFeatured: boolean("is_featured").default(false)
 });
 
+export const coursesRelations = relations(courses, ({ one }) => ({
+  category: one(categories, {
+    fields: [courses.categoryId],
+    references: [categories.id]
+  })
+}));
+
 export const insertCourseSchema = createInsertSchema(courses);
 export type InsertCourse = z.infer<typeof insertCourseSchema>;
 export type Course = typeof courses.$inferSelect;
+
+// Now define the categories relations after courses is defined
+export const categoriesRelations = relations(categories, ({ many }) => ({
+  courses: many(courses)
+}));
 
 export const testimonials = pgTable("testimonials", {
   id: serial("id").primaryKey(),
