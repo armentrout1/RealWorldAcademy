@@ -3,7 +3,11 @@ import {
   courses, type Course, type InsertCourse,
   categories, type Category, type InsertCategory,
   testimonials, type Testimonial, type InsertTestimonial,
-  features, type Feature, type InsertFeature
+  features, type Feature, type InsertFeature,
+  badges, type Badge, type InsertBadge,
+  categoryProgress, type CategoryProgress, type InsertCategoryProgress,
+  timelineEvents, type TimelineEvent, type InsertTimelineEvent,
+  userProgressSummary, type UserProgressSummary, type InsertUserProgressSummary
 } from "@shared/schema";
 import { db } from "./db";
 import { eq } from "drizzle-orm";
@@ -32,6 +36,26 @@ export interface IStorage {
   // Feature operations 
   getAllFeatures(): Promise<Feature[]>;
   createFeature(feature: InsertFeature): Promise<Feature>;
+  
+  // Progress tracking operations
+  // Badge operations
+  getUserBadges(userId: number): Promise<Badge[]>;
+  createBadge(badge: InsertBadge): Promise<Badge>;
+  updateBadge(id: number, badge: Partial<Badge>): Promise<Badge>;
+  
+  // Category progress operations
+  getUserCategoryProgress(userId: number): Promise<CategoryProgress[]>;
+  createCategoryProgress(progress: InsertCategoryProgress): Promise<CategoryProgress>;
+  updateCategoryProgress(id: number, progress: Partial<CategoryProgress>): Promise<CategoryProgress>;
+  
+  // Timeline operations
+  getUserTimelineEvents(userId: number): Promise<TimelineEvent[]>;
+  createTimelineEvent(event: InsertTimelineEvent): Promise<TimelineEvent>;
+  
+  // Overall progress operations
+  getUserProgressSummary(userId: number): Promise<UserProgressSummary | undefined>;
+  createUserProgressSummary(summary: InsertUserProgressSummary): Promise<UserProgressSummary>;
+  updateUserProgressSummary(userId: number, summary: Partial<UserProgressSummary>): Promise<UserProgressSummary>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -104,12 +128,97 @@ export class DatabaseStorage implements IStorage {
     const results = await db.insert(features).values(insertFeature).returning();
     return results[0];
   }
+  
+  // Badge operations
+  async getUserBadges(userId: number): Promise<Badge[]> {
+    return await db.select().from(badges).where(eq(badges.userId, userId));
+  }
+  
+  async createBadge(badge: InsertBadge): Promise<Badge> {
+    const results = await db.insert(badges).values(badge).returning();
+    return results[0];
+  }
+  
+  async updateBadge(id: number, badge: Partial<Badge>): Promise<Badge> {
+    const results = await db
+      .update(badges)
+      .set(badge)
+      .where(eq(badges.id, id))
+      .returning();
+    return results[0];
+  }
+  
+  // Category progress operations
+  async getUserCategoryProgress(userId: number): Promise<CategoryProgress[]> {
+    return await db.select().from(categoryProgress).where(eq(categoryProgress.userId, userId));
+  }
+  
+  async createCategoryProgress(progress: InsertCategoryProgress): Promise<CategoryProgress> {
+    const results = await db.insert(categoryProgress).values(progress).returning();
+    return results[0];
+  }
+  
+  async updateCategoryProgress(id: number, progress: Partial<CategoryProgress>): Promise<CategoryProgress> {
+    const results = await db
+      .update(categoryProgress)
+      .set(progress)
+      .where(eq(categoryProgress.id, id))
+      .returning();
+    return results[0];
+  }
+  
+  // Timeline operations
+  async getUserTimelineEvents(userId: number): Promise<TimelineEvent[]> {
+    return await db.select().from(timelineEvents).where(eq(timelineEvents.userId, userId));
+  }
+  
+  async createTimelineEvent(event: InsertTimelineEvent): Promise<TimelineEvent> {
+    const results = await db.insert(timelineEvents).values(event).returning();
+    return results[0];
+  }
+  
+  // Overall progress operations
+  async getUserProgressSummary(userId: number): Promise<UserProgressSummary | undefined> {
+    const results = await db.select().from(userProgressSummary).where(eq(userProgressSummary.userId, userId));
+    return results.length > 0 ? results[0] : undefined;
+  }
+  
+  async createUserProgressSummary(summary: InsertUserProgressSummary): Promise<UserProgressSummary> {
+    const results = await db.insert(userProgressSummary).values(summary).returning();
+    return results[0];
+  }
+  
+  async updateUserProgressSummary(userId: number, summary: Partial<UserProgressSummary>): Promise<UserProgressSummary> {
+    // First check if summary exists
+    const existing = await this.getUserProgressSummary(userId);
+    
+    if (existing) {
+      const results = await db
+        .update(userProgressSummary)
+        .set(summary)
+        .where(eq(userProgressSummary.userId, userId))
+        .returning();
+      return results[0];
+    } else {
+      // Create new summary if it doesn't exist
+      const newSummary: InsertUserProgressSummary = {
+        userId,
+        overallProgress: summary.overallProgress || 0,
+        lastUpdated: summary.lastUpdated || new Date(),
+      };
+      return await this.createUserProgressSummary(newSummary);
+    }
+  }
 
   // Initialize with sample data
   async initializeData() {
     // First check if there's already data in the database
     const existingCategories = await this.getAllCategories();
-    if (existingCategories.length > 0) return; // Skip initialization if data exists
+    if (existingCategories.length > 0) {
+      // Check if we need to initialize progress data
+      await this.initializeProgressData();
+      return; // Skip initialization if categories exist
+    }
     
     // Create categories
     const techCategory = await this.createCategory({ name: "Technology", color: "bg-secondary/10 text-secondary" });
@@ -200,6 +309,147 @@ export class DatabaseStorage implements IStorage {
       icon: "puzzle-piece",
       colorClass: "bg-green-100 text-green-600"
     });
+  }
+  
+  // Initialize progress data for the default user
+  async initializeProgressData() {
+    // Check if we have a default user
+    let defaultUser;
+    const existingUsers = await db.select().from(users);
+    
+    if (existingUsers.length === 0) {
+      // Create a default user if none exists
+      defaultUser = await this.createUser({
+        username: "student",
+        password: "password", // In a real app, you'd hash this
+        fullName: "Student User",
+        email: "student@realworldacademy.com",
+        avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?ixlib=rb-1.2.1&auto=format&fit=crop&w=100&q=80",
+        bio: "Learning at Real World Academy"
+      });
+    } else {
+      defaultUser = existingUsers[0];
+    }
+    
+    // Check if default user already has badge data
+    const existingBadges = await this.getUserBadges(defaultUser.id);
+    if (existingBadges.length > 0) return; // Progress data already exists
+    
+    // Initialize badges
+    const badges = [
+      {
+        userId: defaultUser.id,
+        title: "First Quiz Completed",
+        description: "You completed your first self-discovery quiz!",
+        icon: "🎯",
+        unlocked: false,
+      },
+      {
+        userId: defaultUser.id,
+        title: "Budget Master",
+        description: "You created your first budget plan!",
+        icon: "💰",
+        unlocked: false,
+      },
+      {
+        userId: defaultUser.id,
+        title: "First Project Built",
+        description: "You completed your first hands-on project!",
+        icon: "🛠️",
+        unlocked: false,
+      },
+      {
+        userId: defaultUser.id,
+        title: "Knowledge Explorer",
+        description: "You finished a complete subject module!",
+        icon: "📘",
+        unlocked: false,
+      },
+      {
+        userId: defaultUser.id,
+        title: "Teamwork Champion",
+        description: "You completed a team project simulation!",
+        icon: "🤝",
+        unlocked: false,
+      },
+      {
+        userId: defaultUser.id,
+        title: "Financial Wizard",
+        description: "You mastered all financial literacy modules!",
+        icon: "✨",
+        unlocked: false,
+      }
+    ];
+    
+    for (const badge of badges) {
+      await this.createBadge(badge);
+    }
+    
+    // Initialize category progress
+    const categories = [
+      {
+        userId: defaultUser.id,
+        title: "Self Discovery",
+        completed: 0,
+        total: 1,
+        color: "hsl(280, 90%, 65%)",
+        icon: "🧠",
+      },
+      {
+        userId: defaultUser.id,
+        title: "Subject Modules",
+        completed: 0,
+        total: 5,
+        color: "hsl(220, 90%, 65%)",
+        icon: "📚",
+      },
+      {
+        userId: defaultUser.id,
+        title: "Projects",
+        completed: 0,
+        total: 5,
+        color: "hsl(160, 90%, 40%)",
+        icon: "🛠️",
+      },
+      {
+        userId: defaultUser.id,
+        title: "Financial Literacy",
+        completed: 0,
+        total: 4,
+        color: "hsl(40, 90%, 55%)",
+        icon: "💰",
+      },
+      {
+        userId: defaultUser.id,
+        title: "Team Projects",
+        completed: 0,
+        total: 3,
+        color: "hsl(340, 90%, 65%)",
+        icon: "👥",
+      }
+    ];
+    
+    for (const category of categories) {
+      await this.createCategoryProgress(category);
+    }
+    
+    // Initialize timeline
+    await this.createTimelineEvent({
+      userId: defaultUser.id,
+      title: "Started learning journey",
+      date: new Date(),
+      completed: true,
+      category: "general",
+    });
+    
+    // Initialize overall progress
+    await this.createUserProgressSummary({
+      userId: defaultUser.id,
+      overallProgress: 0,
+      lastUpdated: new Date(),
+    });
+    
+    console.log("Progress data initialized for user:", defaultUser.username);
   }
 }
 

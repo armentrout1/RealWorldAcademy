@@ -1,7 +1,12 @@
 import express, { type Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertUserSchema, insertCourseSchema, insertCategorySchema, insertTestimonialSchema, insertFeatureSchema } from "@shared/schema";
+import { 
+  insertUserSchema, insertCourseSchema, insertCategorySchema, 
+  insertTestimonialSchema, insertFeatureSchema,
+  insertBadgeSchema, insertCategoryProgressSchema, 
+  insertTimelineEventSchema, insertUserProgressSummarySchema 
+} from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Courses endpoints
@@ -147,6 +152,249 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(userWithoutPassword);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch user" });
+    }
+  });
+
+  // Progress tracking endpoints
+  // Badges endpoints
+  app.get("/api/users/:userId/badges", async (req, res) => {
+    try {
+      const userId = Number(req.params.userId);
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      const badges = await storage.getUserBadges(userId);
+      res.json(badges);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch badges" });
+    }
+  });
+
+  app.post("/api/users/:userId/badges", express.json(), async (req, res) => {
+    try {
+      const userId = Number(req.params.userId);
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      const validatedData = insertBadgeSchema.parse({
+        ...req.body,
+        userId
+      });
+      
+      const newBadge = await storage.createBadge(validatedData);
+      res.status(201).json(newBadge);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid badge data" });
+    }
+  });
+
+  app.patch("/api/users/:userId/badges/:badgeId", express.json(), async (req, res) => {
+    try {
+      const userId = Number(req.params.userId);
+      const badgeId = Number(req.params.badgeId);
+      
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      // Only allow updating unlocked status and dateUnlocked
+      const { unlocked, dateUnlocked } = req.body;
+      const updateData: { unlocked?: boolean; dateUnlocked?: Date } = {};
+      
+      if (unlocked !== undefined) {
+        updateData.unlocked = Boolean(unlocked);
+      }
+      
+      if (unlocked && !dateUnlocked) {
+        updateData.dateUnlocked = new Date();
+      } else if (dateUnlocked) {
+        updateData.dateUnlocked = new Date(dateUnlocked);
+      }
+      
+      const updatedBadge = await storage.updateBadge(badgeId, updateData);
+      res.json(updatedBadge);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid badge update data" });
+    }
+  });
+
+  // Category progress endpoints
+  app.get("/api/users/:userId/category-progress", async (req, res) => {
+    try {
+      const userId = Number(req.params.userId);
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      const categoryProgress = await storage.getUserCategoryProgress(userId);
+      res.json(categoryProgress);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch category progress" });
+    }
+  });
+
+  app.post("/api/users/:userId/category-progress", express.json(), async (req, res) => {
+    try {
+      const userId = Number(req.params.userId);
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      const validatedData = insertCategoryProgressSchema.parse({
+        ...req.body,
+        userId
+      });
+      
+      const newCategoryProgress = await storage.createCategoryProgress(validatedData);
+      res.status(201).json(newCategoryProgress);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid category progress data" });
+    }
+  });
+
+  app.patch("/api/users/:userId/category-progress/:progressId", express.json(), async (req, res) => {
+    try {
+      const userId = Number(req.params.userId);
+      const progressId = Number(req.params.progressId);
+      
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      // Only allow updating completed and total
+      const { completed, total } = req.body;
+      const updateData: { completed?: number; total?: number } = {};
+      
+      if (completed !== undefined) {
+        updateData.completed = Number(completed);
+      }
+      
+      if (total !== undefined) {
+        updateData.total = Number(total);
+      }
+      
+      const updatedProgress = await storage.updateCategoryProgress(progressId, updateData);
+      res.json(updatedProgress);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid category progress update data" });
+    }
+  });
+
+  // Timeline events endpoints
+  app.get("/api/users/:userId/timeline", async (req, res) => {
+    try {
+      const userId = Number(req.params.userId);
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      const timelineEvents = await storage.getUserTimelineEvents(userId);
+      // Sort by date, newest first
+      timelineEvents.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      res.json(timelineEvents);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch timeline events" });
+    }
+  });
+
+  app.post("/api/users/:userId/timeline", express.json(), async (req, res) => {
+    try {
+      const userId = Number(req.params.userId);
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      const validatedData = insertTimelineEventSchema.parse({
+        ...req.body,
+        userId,
+        date: req.body.date || new Date()
+      });
+      
+      const newTimelineEvent = await storage.createTimelineEvent(validatedData);
+      res.status(201).json(newTimelineEvent);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid timeline event data" });
+    }
+  });
+
+  // Progress summary endpoints
+  app.get("/api/users/:userId/progress-summary", async (req, res) => {
+    try {
+      const userId = Number(req.params.userId);
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      const progressSummary = await storage.getUserProgressSummary(userId);
+      if (!progressSummary) {
+        return res.status(404).json({ message: "Progress summary not found" });
+      }
+      
+      res.json(progressSummary);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch progress summary" });
+    }
+  });
+
+  app.post("/api/users/:userId/progress-summary", express.json(), async (req, res) => {
+    try {
+      const userId = Number(req.params.userId);
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      // Check if summary already exists
+      const existingSummary = await storage.getUserProgressSummary(userId);
+      if (existingSummary) {
+        return res.status(409).json({ message: "Progress summary already exists. Use PATCH to update." });
+      }
+      
+      const validatedData = insertUserProgressSummarySchema.parse({
+        ...req.body,
+        userId,
+        lastUpdated: new Date()
+      });
+      
+      const newProgressSummary = await storage.createUserProgressSummary(validatedData);
+      res.status(201).json(newProgressSummary);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid progress summary data" });
+    }
+  });
+
+  app.patch("/api/users/:userId/progress-summary", express.json(), async (req, res) => {
+    try {
+      const userId = Number(req.params.userId);
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      const { overallProgress } = req.body;
+      const updateData: { overallProgress?: number; lastUpdated: Date } = {
+        lastUpdated: new Date()
+      };
+      
+      if (overallProgress !== undefined) {
+        updateData.overallProgress = Number(overallProgress);
+      }
+      
+      const updatedSummary = await storage.updateUserProgressSummary(userId, updateData);
+      res.json(updatedSummary);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid progress summary update data" });
     }
   });
 
