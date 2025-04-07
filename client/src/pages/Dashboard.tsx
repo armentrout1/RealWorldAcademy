@@ -69,9 +69,9 @@ const Dashboard: React.FC = () => {
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
                   <span>Progress</span>
-                  <span className="font-medium">{Math.round(user?.progress?.financialLiteracy * 100 || 0)}%</span>
+                  <span className="font-medium">{Math.round((user?.progress?.financialLiteracy || 0) * 100)}%</span>
                 </div>
-                <Progress value={user?.progress?.financialLiteracy * 100 || 0} className="h-2" />
+                <Progress value={(user?.progress?.financialLiteracy || 0) * 100} className="h-2" />
               </div>
             </CardContent>
           </Card>
@@ -87,9 +87,9 @@ const Dashboard: React.FC = () => {
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
                   <span>Progress</span>
-                  <span className="font-medium">{Math.round(user?.progress?.selfDiscovery * 100 || 0)}%</span>
+                  <span className="font-medium">{Math.round((user?.progress?.selfDiscovery || 0) * 100)}%</span>
                 </div>
-                <Progress value={user?.progress?.selfDiscovery * 100 || 0} className="h-2" />
+                <Progress value={(user?.progress?.selfDiscovery || 0) * 100} className="h-2" />
               </div>
             </CardContent>
           </Card>

@@ -1,8 +1,9 @@
-import React from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Progress } from "@/components/ui/progress";
-import { Award, Zap, Star } from "lucide-react";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Progress } from '@/components/ui/progress';
+import { Badge } from '@/components/ui/badge';
+import { Loader2, Star, Flame, Award, XCircle } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface User {
   id: number;
@@ -19,88 +20,121 @@ interface UserXPProps {
 }
 
 export function UserXP({ userId }: UserXPProps) {
-  const { data: user, isLoading } = useQuery<User>({
+  // Fetch user data
+  const { data: user, isLoading, error } = useQuery<User>({
     queryKey: ['/api/users', userId],
+    staleTime: 1000 * 60 * 5, // 5 minutes
     enabled: !!userId,
   });
 
-  // XP thresholds for each level
-  const calculateXpToNextLevel = (level: number) => {
-    return level * 500; // Simple calculation: 500 XP per level
+  // Calculate XP needed for next level (simplified formula)
+  const getNextLevelXP = (level: number) => {
+    return level * 500; // Each level requires 500 more XP than the previous
   };
 
-  const calculateProgress = (xp: number, level: number) => {
-    const nextLevelXp = calculateXpToNextLevel(level);
-    const previousLevelXp = calculateXpToNextLevel(level - 1);
-    const levelProgress = xp - previousLevelXp;
-    const totalLevelXp = nextLevelXp - previousLevelXp;
-    return Math.min(100, Math.max(0, (levelProgress / totalLevelXp) * 100));
+  // Calculate XP progress as percentage
+  const calculateXPProgress = (xp: number, level: number) => {
+    const currentLevelXP = (level - 1) * 500;
+    const nextLevelXP = level * 500;
+    const levelProgress = xp - currentLevelXP;
+    const levelRange = nextLevelXP - currentLevelXP;
+    return Math.min(Math.floor((levelProgress / levelRange) * 100), 100);
   };
 
-  if (isLoading || !user) {
+  // Format large numbers with k suffix
+  const formatNumber = (num: number) => {
+    return num >= 1000 ? `${(num / 1000).toFixed(1)}k` : num.toString();
+  };
+
+  // Handle loading state
+  if (isLoading) {
     return (
-      <div className="flex items-center space-x-2 animate-pulse">
-        <div className="h-6 w-6 rounded-full bg-muted"></div>
-        <div className="h-4 w-20 bg-muted rounded"></div>
-      </div>
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle>Your Progress</CardTitle>
+        </CardHeader>
+        <CardContent className="flex items-center justify-center py-4">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        </CardContent>
+      </Card>
     );
   }
 
-  const progress = calculateProgress(user.xp, user.level);
-  const nextLevelXp = calculateXpToNextLevel(user.level);
-  const previousLevelXp = calculateXpToNextLevel(user.level - 1);
-  const xpToNextLevel = nextLevelXp - user.xp;
+  // Handle error state
+  if (error || !user) {
+    return (
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle>Your Progress</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col items-center justify-center py-4 text-center">
+          <XCircle className="h-6 w-6 text-destructive" />
+          <p className="mt-2 text-sm text-muted-foreground">Failed to load your progress</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const xpProgress = calculateXPProgress(user.xp, user.level);
+  const nextLevelXP = getNextLevelXP(user.level);
+  const currentLevelXP = getNextLevelXP(user.level - 1);
+  const xpForNextLevel = nextLevelXP - user.xp;
 
   return (
-    <div className="flex flex-col">
-      <div className="flex items-center justify-between mb-1">
-        <div className="flex items-center space-x-2">
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div className="flex items-center">
-                  <Award className="h-5 w-5 text-primary mr-1.5" />
-                  <span className="font-medium text-sm">Level {user.level}</span>
-                </div>
-              </TooltipTrigger>
-              <TooltipContent side="bottom">
-                <p>Your current level: {user.levelTitle}</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-          
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div className="flex items-center">
-                  <Zap className="h-5 w-5 text-amber-500 mr-1" />
-                  <span className="text-xs text-neutral-600">{user.xp} XP</span>
-                </div>
-              </TooltipTrigger>
-              <TooltipContent side="bottom">
-                <p>{xpToNextLevel} XP to next level</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-          
-          {user.streakCount > 0 && (
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <div className="flex items-center">
-                    <Star className="h-5 w-5 text-orange-500 mr-1" />
-                    <span className="text-xs text-neutral-600">{user.streakCount} day streak</span>
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent side="bottom">
-                  <p>You've been learning for {user.streakCount} days in a row!</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          )}
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="flex items-center gap-2">
+          <Star className="h-5 w-5 text-primary" /> 
+          Your Progress
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="grid grid-cols-3 gap-2 text-center">
+          <div className="space-y-1">
+            <span className="text-3xl font-bold text-primary">{formatNumber(user.xp)}</span>
+            <p className="text-xs text-muted-foreground">XP Points</p>
+          </div>
+          <div className="space-y-1">
+            <span className="text-3xl font-bold">{user.level}</span>
+            <p className="text-xs text-muted-foreground">Level</p>
+          </div>
+          <div className="space-y-1">
+            <div className="flex items-center justify-center gap-1">
+              <Flame className={cn("h-5 w-5", user.streakCount > 0 ? "text-orange-500" : "text-muted-foreground")} />
+              <span className="text-3xl font-bold">{user.streakCount}</span>
+            </div>
+            <p className="text-xs text-muted-foreground">Day Streak</p>
+          </div>
         </div>
-      </div>
-      <Progress value={progress} className="h-1.5 w-full" />
-    </div>
+
+        <div>
+          <div className="mb-1 flex items-center justify-between">
+            <span className="text-sm font-medium">{user.levelTitle}</span>
+            <Badge variant="secondary" className="font-normal">
+              {xpForNextLevel} XP to Level {user.level + 1}
+            </Badge>
+          </div>
+          <div className="relative">
+            <Progress value={xpProgress} className="h-2.5" />
+            <span className="absolute right-0 top-3 text-xs text-muted-foreground">
+              {formatNumber(user.xp - currentLevelXP)}/{formatNumber(nextLevelXP - currentLevelXP)} XP
+            </span>
+          </div>
+        </div>
+
+        {user.streakCount > 0 && (
+          <div className="flex items-center rounded-md border bg-muted/50 p-2 text-sm">
+            <Flame className="mr-2 h-4 w-4 text-orange-500" />
+            <span>
+              {user.streakCount === 1
+                ? "1 day streak! Keep going!"
+                : user.streakCount >= 7
+                ? `${user.streakCount} day streak! Amazing consistency!`
+                : `${user.streakCount} day streak! Keep it up!`}
+            </span>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }

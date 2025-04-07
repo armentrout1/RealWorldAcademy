@@ -1,14 +1,14 @@
-import React from 'react';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Check, Timer, Award } from "lucide-react";
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
-import { Progress } from "@/components/ui/progress";
-import { toast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
+import { cn } from '@/lib/utils';
+import { Loader2, CheckCircle, Medal, Star, Trophy, XCircle } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Progress } from '@/components/ui/progress';
+import { Badge } from '@/components/ui/badge';
 
-// Define types based on the schema
 interface DailyChallenge {
   id: number;
   title: string;
@@ -34,129 +34,180 @@ interface DailyChallengeCardProps {
 
 export function DailyChallengeCard({ userId }: DailyChallengeCardProps) {
   const queryClient = useQueryClient();
+  const [hasRefreshError, setHasRefreshError] = useState(false);
 
-  // Fetch daily challenges
-  const { data: challenges = [], isLoading: challengesLoading } = useQuery<DailyChallenge[]>({
+  // Fetch active challenges
+  const { data: challenges = [], isLoading: challengesLoading, error: challengesError } = useQuery<DailyChallenge[]>({
     queryKey: ['/api/challenges/daily'],
-    enabled: true,
+    staleTime: 1000 * 60 * 10, // 10 minutes
   });
 
   // Fetch completed challenges for today
   const { data: completedChallenges = [], isLoading: completedLoading } = useQuery<UserChallenge[]>({
     queryKey: ['/api/users', userId, 'challenges/today'],
+    staleTime: 1000 * 60 * 5, // 5 minutes
     enabled: !!userId,
   });
 
-  // Mutation for completing a challenge
-  const completeChallengeMutation = useMutation({
+  // Complete challenge mutation
+  const { mutate: completeChallenge, isPending: isCompleting } = useMutation({
     mutationFn: async (challengeId: number) => {
-      return apiRequest(`/api/users/${userId}/challenges/complete`, {
+      return apiRequest('/api/users/' + userId + '/challenges/complete', {
         method: 'POST',
         body: JSON.stringify({ challengeId }),
       });
     },
     onSuccess: () => {
-      // Invalidate challenges queries to refresh data
+      // Invalidate relevant queries to refresh data
       queryClient.invalidateQueries({ queryKey: ['/api/users', userId, 'challenges/today'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/users', userId] }); // Refresh user XP/level
-      toast({
-        title: "Challenge completed!",
-        description: "You've earned XP and made progress on your learning journey.",
-      });
-    },
-    onError: () => {
-      toast({
-        title: "Failed to complete challenge",
-        description: "Please try again later.",
-        variant: "destructive",
-      });
+      queryClient.invalidateQueries({ queryKey: ['/api/users', userId] });
     },
   });
 
+  // Check if challenge is already completed
   const isChallengeCompleted = (challengeId: number) => {
-    if (!completedChallenges) return false;
     return completedChallenges.some((completed: UserChallenge) => completed.challengeId === challengeId);
   };
 
-  // Calculate completion percentage
-  const calculateProgress = () => {
-    if (!challenges || !completedChallenges) return 0;
-    return (completedChallenges.length / challenges.length) * 100;
+  // Handle refresh
+  const handleRefresh = () => {
+    setHasRefreshError(false);
+    queryClient.invalidateQueries({ queryKey: ['/api/challenges/daily'] });
+    queryClient.invalidateQueries({ queryKey: ['/api/users', userId, 'challenges/today'] });
   };
 
-  if (challengesLoading || completedLoading) {
-    return <Card className="mb-6 shadow-md">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Timer className="h-5 w-5 text-primary" />
-          Loading Daily Challenges...
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="h-24 animate-pulse bg-muted rounded-md"></div>
-      </CardContent>
-    </Card>;
+  // Show error if needed
+  if (challengesError && !hasRefreshError) {
+    setHasRefreshError(true);
   }
 
-  if (!challenges || challenges.length === 0) {
-    return <Card className="mb-6 shadow-md">
-      <CardHeader>
-        <CardTitle>No challenges today</CardTitle>
-        <CardDescription>Check back tomorrow for new challenges!</CardDescription>
-      </CardHeader>
-    </Card>;
+  // Get challenge icon based on type
+  const getChallengeIcon = (type: string) => {
+    switch (type) {
+      case 'login':
+        return <CheckCircle className="h-6 w-6 text-primary" />;
+      case 'streak':
+        return <Medal className="h-6 w-6 text-amber-500" />;
+      case 'lesson':
+        return <Star className="h-6 w-6 text-indigo-500" />;
+      case 'quiz':
+        return <Trophy className="h-6 w-6 text-emerald-500" />;
+      default:
+        return <Star className="h-6 w-6 text-primary" />;
+    }
+  };
+
+  // Handle loading state
+  if (challengesLoading || completedLoading) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Daily Challenges</CardTitle>
+          <CardDescription>Complete challenges to earn XP</CardDescription>
+        </CardHeader>
+        <CardContent className="flex items-center justify-center py-8">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Handle error state
+  if (hasRefreshError) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Daily Challenges</CardTitle>
+          <CardDescription>Something went wrong</CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col items-center justify-center gap-4 py-8 text-center">
+          <XCircle className="h-10 w-10 text-destructive" />
+          <p className="text-sm text-muted-foreground">Failed to load challenges</p>
+          <Button onClick={handleRefresh}>Try Again</Button>
+        </CardContent>
+      </Card>
+    );
   }
 
   return (
-    <Card className="mb-6 shadow-md">
+    <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <Award className="h-5 w-5 text-primary" />
+          <Trophy className="h-5 w-5 text-primary" />
           Daily Challenges
         </CardTitle>
-        <CardDescription>Complete challenges to earn XP and streaks</CardDescription>
-        <Progress value={calculateProgress()} className="h-2 mt-2" />
-        <div className="text-xs text-muted-foreground mt-1">
-          {completedChallenges?.length || 0} of {challenges.length} completed
-        </div>
+        <CardDescription>Complete challenges to earn XP</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        {challenges.map((challenge: DailyChallenge) => {
-          const completed = isChallengeCompleted(challenge.id);
-          
-          return (
-            <div 
-              key={challenge.id} 
-              className={`p-3 border rounded-lg flex items-center justify-between ${
-                completed ? 'bg-green-50 border-green-200' : 'hover:bg-accent'
-              }`}
-            >
-              <div className="flex-1">
-                <div className="font-medium flex items-center gap-2">
-                  {challenge.title}
-                  {completed && <Check className="h-4 w-4 text-green-600" />}
+        {challenges.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-8 text-center">
+            <p className="text-sm text-muted-foreground">No active challenges today</p>
+          </div>
+        ) : (
+          challenges.map((challenge: DailyChallenge) => {
+            const completed = isChallengeCompleted(challenge.id);
+            
+            return (
+              <div 
+                key={challenge.id} 
+                className={cn(
+                  "relative flex items-start gap-4 rounded-lg border p-4 transition-colors",
+                  completed ? "bg-muted/50" : "hover:bg-accent"
+                )}
+              >
+                <div className="mt-1 flex-shrink-0">
+                  {getChallengeIcon(challenge.type)}
                 </div>
-                <p className="text-sm text-muted-foreground">{challenge.description}</p>
-                <div className="flex items-center gap-2 mt-1">
-                  <Badge variant="secondary">+{challenge.xpReward} XP</Badge>
-                  <Badge variant="outline">{challenge.type}</Badge>
+                <div className="flex-grow space-y-1">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-medium">{challenge.title}</h4>
+                    <Badge variant={completed ? "secondary" : "outline"} className="ml-2">
+                      +{challenge.xpReward} XP
+                    </Badge>
+                  </div>
+                  <p className="text-sm text-muted-foreground">{challenge.description}</p>
+                  {challenge.difficultyLevel > 0 && (
+                    <div className="flex items-center gap-2 pt-1">
+                      <span className="text-xs text-muted-foreground">Difficulty:</span>
+                      <Progress 
+                        value={challenge.difficultyLevel * 20} 
+                        className={cn(
+                          "h-1.5 w-20", 
+                          challenge.difficultyLevel <= 2 ? "text-emerald-500" : 
+                          challenge.difficultyLevel <= 3 ? "text-amber-500" : 
+                          "text-red-500"
+                        )}
+                      />
+                    </div>
+                  )}
+                </div>
+                <div className="ml-auto flex-shrink-0">
+                  {completed ? (
+                    <CheckCircle className="h-5 w-5 text-primary" />
+                  ) : (
+                    <Button 
+                      variant="secondary" 
+                      size="sm" 
+                      className="ml-auto"
+                      disabled={isCompleting}
+                      onClick={() => completeChallenge(challenge.id)}
+                    >
+                      {isCompleting ? (
+                        <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                      ) : null}
+                      Complete
+                    </Button>
+                  )}
                 </div>
               </div>
-              <Button
-                size="sm"
-                variant={completed ? "outline" : "default"}
-                onClick={() => !completed && completeChallengeMutation.mutate(challenge.id)}
-                disabled={completed || completeChallengeMutation.isPending}
-              >
-                {completed ? "Completed" : "Complete"}
-              </Button>
-            </div>
-          );
-        })}
+            );
+          })
+        )}
       </CardContent>
-      <CardFooter className="flex justify-between text-sm text-muted-foreground">
-        <span>Difficulty scales with your level</span>
-        <span>Refreshes daily</span>
+      <CardFooter className="justify-end border-t pt-4">
+        <Button variant="ghost" size="sm" onClick={handleRefresh} disabled={challengesLoading}>
+          Refresh
+        </Button>
       </CardFooter>
     </Card>
   );

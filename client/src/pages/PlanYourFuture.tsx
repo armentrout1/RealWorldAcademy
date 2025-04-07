@@ -437,7 +437,7 @@ const PlanYourFuture: React.FC = () => {
                 <div>
                   <h4 className="font-medium text-sm mb-2 text-neutral-700">Skills You'll Need:</h4>
                   <div className="space-y-2">
-                    {career.skills.map((skill, index) => (
+                    {career.skills.map((skill: {name: string, level: number}, index: number) => (
                       <div key={index} className="flex justify-between items-center">
                         <span className="text-sm text-neutral-600">{skill.name}</span>
                         {renderSkillLevel(skill.level)}
