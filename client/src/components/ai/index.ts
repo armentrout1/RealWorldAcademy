@@ -6,5 +6,6 @@ export { default as GrowthSnapshot } from './GrowthSnapshot';
 export { default as TeacherSmartAssist } from './TeacherSmartAssist';
 export { AIAssistant } from './AIAssistant';
 export { Buddy } from './Buddy';
+export { default as BuddyJournal } from './BuddyJournal';
 
 // Types could be exported here as well if needed for other components

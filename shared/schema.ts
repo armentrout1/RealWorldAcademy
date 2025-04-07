@@ -463,6 +463,13 @@ export const buddyProfiles = pgTable("buddy_profiles", {
   updatedAt: timestamp("updated_at").defaultNow(),
   relationshipLevel: integer("relationship_level").default(1).notNull(), // 1-10 level of bonding
   lastInteraction: timestamp("last_interaction"),
+  // New Memory Profile Fields
+  nickname: text("nickname"), // Student's nickname, if they have one
+  favoriteSubjects: text("favorite_subjects").array(), // Student's favorite subjects
+  goals: text("goals").array(), // Goals or dreams the student has shared
+  projects: json("projects"), // Current or completed projects, stored as JSON
+  preferences: json("preferences"), // Student preferences, stored as JSON
+  lastConversationSummary: text("last_conversation_summary"), // Summary of last conversation
 });
 
 export const buddyProfilesRelations = relations(buddyProfiles, ({ one }) => ({
@@ -518,6 +525,32 @@ export const insertBuddyEmotionLogSchema = createInsertSchema(buddyEmotionLogs).
 export type InsertBuddyEmotionLog = z.infer<typeof insertBuddyEmotionLogSchema>;
 export type BuddyEmotionLog = typeof buddyEmotionLogs.$inferSelect;
 
+// Journal System
+export const buddyJournalEntries = pgTable("buddy_journal_entries", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id),
+  prompt: text("prompt").notNull(), // The question or prompt
+  response: text("response").notNull(), // Student's written response
+  emotion: text("emotion"), // Associated emotion tag
+  emojiReaction: text("emoji_reaction"), // Emoji reaction to the entry
+  tags: text("tags").array(), // Tags like "creative", "proud", "stressed"
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+  isPrivate: boolean("is_private").default(true).notNull(), // Whether entry is private
+  isHighlighted: boolean("is_highlighted").default(false).notNull(), // Featured/important entry
+});
+
+export const buddyJournalEntriesRelations = relations(buddyJournalEntries, ({ one }) => ({
+  user: one(users, {
+    fields: [buddyJournalEntries.userId],
+    references: [users.id],
+  }),
+}));
+
+export const insertBuddyJournalEntrySchema = createInsertSchema(buddyJournalEntries).omit({ id: true });
+export type InsertBuddyJournalEntry = z.infer<typeof insertBuddyJournalEntrySchema>;
+export type BuddyJournalEntry = typeof buddyJournalEntries.$inferSelect;
+
 // Define the user relations after all models are defined
 export const usersRelations = relations(users, ({ many, one }) => ({
   badges: many(badges),
@@ -532,4 +565,5 @@ export const usersRelations = relations(users, ({ many, one }) => ({
   buddyProfile: one(buddyProfiles),
   buddyMessages: many(buddyMessages),
   buddyEmotionLogs: many(buddyEmotionLogs),
+  buddyJournalEntries: many(buddyJournalEntries),
 }));

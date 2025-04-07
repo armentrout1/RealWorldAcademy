@@ -8,7 +8,8 @@ import {
   insertTimelineEventSchema, insertUserProgressSummarySchema,
   insertCareerPathSchema, insertGoalSchema, insertVisionBoardItemSchema,
   insertResourceSchema, insertDailyChallengeSchema, insertUserChallengeSchema,
-  insertBuddyProfileSchema, insertBuddyMessageSchema, insertBuddyEmotionLogSchema
+  insertBuddyProfileSchema, insertBuddyMessageSchema, insertBuddyEmotionLogSchema,
+  insertBuddyJournalEntrySchema
 } from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -1014,6 +1015,155 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(emotions);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch emotion records" });
+    }
+  });
+
+  // Journal endpoints
+  
+  // Get journal entries
+  app.get("/api/users/:userId/buddy/journal", async (req, res) => {
+    try {
+      const userId = Number(req.params.userId);
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      const limit = req.query.limit ? Number(req.query.limit) : undefined;
+      const entries = await storage.getBuddyJournalEntries(userId, limit);
+      res.json(entries);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch journal entries" });
+    }
+  });
+  
+  // Create a new journal entry
+  app.post("/api/users/:userId/buddy/journal", express.json(), async (req, res) => {
+    try {
+      const userId = Number(req.params.userId);
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      const validatedData = insertBuddyJournalEntrySchema.parse({
+        ...req.body,
+        userId,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      });
+      
+      const entry = await storage.createJournalEntry(validatedData);
+      res.status(201).json(entry);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid journal entry data" });
+    }
+  });
+  
+  // Get a specific journal entry
+  app.get("/api/users/:userId/buddy/journal/:entryId", async (req, res) => {
+    try {
+      const userId = Number(req.params.userId);
+      const entryId = Number(req.params.entryId);
+      
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      const entry = await storage.getJournalEntryById(entryId);
+      if (!entry) {
+        return res.status(404).json({ message: "Journal entry not found" });
+      }
+      
+      // Ensure the entry belongs to the user
+      if (entry.userId !== userId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      res.json(entry);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch journal entry" });
+    }
+  });
+  
+  // Update a journal entry
+  app.patch("/api/users/:userId/buddy/journal/:entryId", express.json(), async (req, res) => {
+    try {
+      const userId = Number(req.params.userId);
+      const entryId = Number(req.params.entryId);
+      
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      const entry = await storage.getJournalEntryById(entryId);
+      if (!entry) {
+        return res.status(404).json({ message: "Journal entry not found" });
+      }
+      
+      // Ensure the entry belongs to the user
+      if (entry.userId !== userId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      // Update only allowed fields
+      const updates = {
+        ...req.body,
+        updatedAt: new Date()
+      };
+      
+      const updatedEntry = await storage.updateJournalEntry(entryId, updates);
+      res.json(updatedEntry);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid journal entry update data" });
+    }
+  });
+  
+  // Delete a journal entry
+  app.delete("/api/users/:userId/buddy/journal/:entryId", async (req, res) => {
+    try {
+      const userId = Number(req.params.userId);
+      const entryId = Number(req.params.entryId);
+      
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      const entry = await storage.getJournalEntryById(entryId);
+      if (!entry) {
+        return res.status(404).json({ message: "Journal entry not found" });
+      }
+      
+      // Ensure the entry belongs to the user
+      if (entry.userId !== userId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      await storage.deleteJournalEntry(entryId);
+      res.status(204).end();
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete journal entry" });
+    }
+  });
+  
+  // Get journal entries by tag
+  app.get("/api/users/:userId/buddy/journal/tags/:tag", async (req, res) => {
+    try {
+      const userId = Number(req.params.userId);
+      const tag = req.params.tag;
+      
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      const entries = await storage.getJournalEntriesByTag(userId, tag);
+      res.json(entries);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch journal entries by tag" });
     }
   });
 

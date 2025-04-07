@@ -20,7 +20,8 @@ import {
   userChallenges, type UserChallenge, type InsertUserChallenge,
   buddyProfiles, type BuddyProfile, type InsertBuddyProfile,
   buddyMessages, type BuddyMessage, type InsertBuddyMessage,
-  buddyEmotionLogs, type BuddyEmotionLog, type InsertBuddyEmotionLog
+  buddyEmotionLogs, type BuddyEmotionLog, type InsertBuddyEmotionLog,
+  buddyJournalEntries, type BuddyJournalEntry, type InsertBuddyJournalEntry
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, sql, and, inArray } from "drizzle-orm";
@@ -155,6 +156,14 @@ export interface IStorage {
   getBuddyEmotions(userId: number, limit?: number): Promise<BuddyEmotionLog[]>;
   recordBuddyEmotion(emotionLog: InsertBuddyEmotionLog): Promise<BuddyEmotionLog>;
   getLatestBuddyEmotion(userId: number): Promise<BuddyEmotionLog | undefined>;
+  
+  // Journal Entries operations
+  getBuddyJournalEntries(userId: number, limit?: number): Promise<BuddyJournalEntry[]>;
+  createJournalEntry(entry: InsertBuddyJournalEntry): Promise<BuddyJournalEntry>;
+  getJournalEntryById(entryId: number): Promise<BuddyJournalEntry | undefined>;
+  updateJournalEntry(entryId: number, updates: Partial<Omit<InsertBuddyJournalEntry, 'userId'>>): Promise<BuddyJournalEntry | undefined>;
+  deleteJournalEntry(entryId: number): Promise<void>;
+  getJournalEntriesByTag(userId: number, tag: string): Promise<BuddyJournalEntry[]>;
   
   // Initialize Buddy for new user
   initializeBuddyProfile(userId: number): Promise<BuddyProfile>;
@@ -2200,6 +2209,59 @@ export class DatabaseStorage implements IStorage {
   async getLatestBuddyEmotion(userId: number): Promise<BuddyEmotionLog | undefined> {
     const emotions = await this.getBuddyEmotions(userId, 1);
     return emotions.length > 0 ? emotions[0] : undefined;
+  }
+  
+  // Journal Entries operations
+  async getBuddyJournalEntries(userId: number, limit?: number): Promise<BuddyJournalEntry[]> {
+    let query = db.select().from(buddyJournalEntries)
+      .where(eq(buddyJournalEntries.userId, userId))
+      .orderBy(sql`${buddyJournalEntries.createdAt} DESC`);
+    
+    if (limit) {
+      query = query.limit(limit);
+    }
+    
+    return await query;
+  }
+  
+  async createJournalEntry(entry: InsertBuddyJournalEntry): Promise<BuddyJournalEntry> {
+    const results = await db.insert(buddyJournalEntries).values(entry).returning();
+    return results[0];
+  }
+  
+  async getJournalEntryById(entryId: number): Promise<BuddyJournalEntry | undefined> {
+    const [entry] = await db.select().from(buddyJournalEntries)
+      .where(eq(buddyJournalEntries.id, entryId));
+    return entry;
+  }
+  
+  async updateJournalEntry(
+    entryId: number, 
+    updates: Partial<Omit<InsertBuddyJournalEntry, 'userId'>>
+  ): Promise<BuddyJournalEntry | undefined> {
+    const [updated] = await db.update(buddyJournalEntries)
+      .set({...updates, updatedAt: new Date()})
+      .where(eq(buddyJournalEntries.id, entryId))
+      .returning();
+    return updated;
+  }
+  
+  async deleteJournalEntry(entryId: number): Promise<void> {
+    await db.delete(buddyJournalEntries)
+      .where(eq(buddyJournalEntries.id, entryId));
+  }
+  
+  async getJournalEntriesByTag(userId: number, tag: string): Promise<BuddyJournalEntry[]> {
+    // Need to use custom SQL for array contains operation
+    // This handles searching for entries where the tags array contains the specified tag
+    return await db.select().from(buddyJournalEntries)
+      .where(
+        and(
+          eq(buddyJournalEntries.userId, userId),
+          sql`${tag} = ANY(${buddyJournalEntries.tags})`
+        )
+      )
+      .orderBy(sql`${buddyJournalEntries.createdAt} DESC`);
   }
   
   // Initialize buddy profile for new user
