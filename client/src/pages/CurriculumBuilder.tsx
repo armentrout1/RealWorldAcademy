@@ -53,7 +53,10 @@ import {
   Share2,
   UserCircle,
   Layout,
-  ArrowUpDown
+  ArrowUpDown,
+  Pencil,
+  MessageSquare,
+  Filter
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -296,23 +299,34 @@ const availableModules: Module[] = [
   },
 ];
 
+type UserRole = 'Student' | 'Parent' | 'Teacher' | 'Contributor' | 'Buddy';
+
 const CurriculumBuilder: React.FC = () => {
   const { toast } = useToast();
   const [activeCategory, setActiveCategory] = useState<string>('all');
+  const [activeAgeGroup, setActiveAgeGroup] = useState<string>('all');
+  const [activeSkill, setActiveSkill] = useState<string>('all');
   const [selectedModules, setSelectedModules] = useState<Module[]>([]);
   const [curriculumTitle, setCurriculumTitle] = useState('');
   const [curriculumGoal, setCurriculumGoal] = useState('');
   const [showPreview, setShowPreview] = useState(false);
+  const [userRole, setUserRole] = useState<UserRole>('Student');
   const dragItem = useRef<number | null>(null);
   const dragOverItem = useRef<number | null>(null);
 
-  // Get unique categories for filtering
+  // Get unique categories, age groups, and skill levels for filtering
   const categories = ['all', ...Array.from(new Set(availableModules.map(m => m.category)))];
+  const ageGroups = ['all', ...Array.from(new Set(availableModules.map(m => m.ageRange)))];
+  const skillLevels = ['all', 'Beginner', 'Intermediate', 'Advanced'];
 
-  // Filter modules based on selected category
-  const filteredModules = activeCategory === 'all' 
-    ? availableModules 
-    : availableModules.filter(module => module.category === activeCategory);
+  // Filter modules based on selected filters
+  const filteredModules = availableModules.filter(module => {
+    const matchesCategory = activeCategory === 'all' || module.category === activeCategory;
+    const matchesAgeGroup = activeAgeGroup === 'all' || module.ageRange === activeAgeGroup;
+    const matchesSkill = activeSkill === 'all' || module.level === activeSkill;
+    
+    return matchesCategory && matchesAgeGroup && matchesSkill;
+  });
 
   // Add module to curriculum
   const addModule = (module: Module) => {
@@ -401,11 +415,58 @@ const CurriculumBuilder: React.FC = () => {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <div className="flex flex-col space-y-2 mb-8">
-        <h1 className="text-3xl font-bold">Build Your Learning Path</h1>
+      <div className="flex flex-col space-y-2 mb-6">
+        <h1 className="text-3xl font-bold">Create Your Own Learning Path</h1>
         <p className="text-lg text-neutral-600">
-          Choose the subjects and skills that matter most. Create a path that fits your goals.
+          Pick topics that matter to you and build a journey that fits your goals. Save it, share it, or assign it.
         </p>
+      </div>
+      
+      {/* User Role Toggle */}
+      <div className="mb-8">
+        <h2 className="text-sm font-medium mb-2">I am a:</h2>
+        <div className="flex flex-wrap gap-2">
+          <Button 
+            variant={userRole === 'Student' ? 'default' : 'outline'} 
+            size="sm" 
+            onClick={() => setUserRole('Student')}
+          >
+            <Users className="h-4 w-4 mr-1" />
+            Student
+          </Button>
+          <Button 
+            variant={userRole === 'Parent' ? 'default' : 'outline'} 
+            size="sm" 
+            onClick={() => setUserRole('Parent')}
+          >
+            <UserCircle className="h-4 w-4 mr-1" />
+            Parent
+          </Button>
+          <Button 
+            variant={userRole === 'Teacher' ? 'default' : 'outline'} 
+            size="sm" 
+            onClick={() => setUserRole('Teacher')}
+          >
+            <BookOpen className="h-4 w-4 mr-1" />
+            Teacher
+          </Button>
+          <Button 
+            variant={userRole === 'Contributor' ? 'default' : 'outline'} 
+            size="sm" 
+            onClick={() => setUserRole('Contributor')}
+          >
+            <Pencil className="h-4 w-4 mr-1" />
+            Contributor
+          </Button>
+          <Button 
+            variant={userRole === 'Buddy' ? 'default' : 'outline'} 
+            size="sm" 
+            onClick={() => setUserRole('Buddy')}
+          >
+            <MessageSquare className="h-4 w-4 mr-1" />
+            Buddy
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -419,21 +480,69 @@ const CurriculumBuilder: React.FC = () => {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              {/* Category Filters */}
-              <ScrollArea className="w-full whitespace-nowrap rounded-md border">
-                <div className="flex p-2">
-                  {categories.map(category => (
-                    <Button
-                      key={category}
-                      variant={activeCategory === category ? "default" : "outline"}
-                      className="mr-2 whitespace-nowrap"
-                      onClick={() => setActiveCategory(category)}
-                    >
-                      {category === 'all' ? 'All Categories' : category}
-                    </Button>
-                  ))}
+              {/* Filters */}
+              <div className="space-y-4">
+                <div className="flex items-center mb-2">
+                  <Filter className="h-4 w-4 mr-2" />
+                  <h3 className="text-sm font-medium">Filter by:</h3>
                 </div>
-              </ScrollArea>
+                
+                {/* Category Filter */}
+                <div>
+                  <Label className="text-xs mb-1 block">Subject</Label>
+                  <ScrollArea className="w-full whitespace-nowrap rounded-md border">
+                    <div className="flex p-2">
+                      {categories.map(category => (
+                        <Button
+                          key={category}
+                          variant={activeCategory === category ? "default" : "outline"}
+                          className="mr-2 whitespace-nowrap"
+                          size="sm"
+                          onClick={() => setActiveCategory(category)}
+                        >
+                          {category === 'all' ? 'All Subjects' : category}
+                        </Button>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                </div>
+                
+                {/* Age Group Filter */}
+                <div>
+                  <Label className="text-xs mb-1 block">Age Group</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {ageGroups.map(ageGroup => (
+                      <Button
+                        key={ageGroup}
+                        variant={activeAgeGroup === ageGroup ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setActiveAgeGroup(ageGroup)}
+                      >
+                        {ageGroup === 'all' ? 'All Ages' : `Ages ${ageGroup}`}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+                
+                {/* Skill Level Filter */}
+                <div>
+                  <Label className="text-xs mb-1 block">Skill Level</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {skillLevels.map(skill => (
+                      <Button
+                        key={skill}
+                        variant={activeSkill === skill ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setActiveSkill(skill)}
+                      >
+                        {skill === 'all' ? 'All Levels' : skill}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+                
+                <Separator />
+              </div>
 
               {/* Module Grid */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -595,7 +704,10 @@ const CurriculumBuilder: React.FC = () => {
                   onClick={saveCurriculum}
                 >
                   <SaveIcon size={16} className="mr-2" />
-                  Save Curriculum
+                  {userRole === 'Student' ? 'Save for Myself' : 
+                   userRole === 'Parent' ? 'Save for Child' :
+                   userRole === 'Teacher' ? 'Save for Class' : 
+                   userRole === 'Contributor' ? 'Save as Template' : 'Save Path'}
                 </Button>
               </div>
               <div className="flex space-x-2 w-full">
@@ -605,7 +717,7 @@ const CurriculumBuilder: React.FC = () => {
                   disabled={selectedModules.length === 0}
                 >
                   <Share2 size={16} className="mr-2" />
-                  Generate Share Link
+                  {userRole === 'Contributor' ? 'Submit to RWA' : 'Generate Printable View'}
                 </Button>
                 <Button 
                   variant="secondary" 
@@ -613,9 +725,17 @@ const CurriculumBuilder: React.FC = () => {
                   disabled={selectedModules.length === 0}
                 >
                   <UserCircle size={16} className="mr-2" />
-                  Assign to Class
+                  {userRole === 'Student' ? 'Share Path' : 
+                   userRole === 'Parent' ? 'Assign to Child' :
+                   userRole === 'Teacher' ? 'Assign to Students' : 
+                   userRole === 'Contributor' ? 'Save as Draft' : 'Recommend to Students'}
                 </Button>
               </div>
+              
+              {/* Hidden Future Hooks */}
+              {/* <!-- TODO: Save path to user profile --> */}
+              {/* <!-- TODO: Add API for sharing curriculum --> */}
+              {/* <!-- TODO: Buddy can generate curriculum suggestions from student goals --> */}
             </CardFooter>
           </Card>
         </div>
