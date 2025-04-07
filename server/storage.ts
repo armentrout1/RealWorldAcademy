@@ -17,7 +17,10 @@ import {
   userLessonProgress, type UserLessonProgress, type InsertUserLessonProgress,
   resources, type Resource, type InsertResource,
   dailyChallenges, type DailyChallenge, type InsertDailyChallenge,
-  userChallenges, type UserChallenge, type InsertUserChallenge
+  userChallenges, type UserChallenge, type InsertUserChallenge,
+  buddyProfiles, type BuddyProfile, type InsertBuddyProfile,
+  buddyMessages, type BuddyMessage, type InsertBuddyMessage,
+  buddyEmotionLogs, type BuddyEmotionLog, type InsertBuddyEmotionLog
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, sql, and, inArray } from "drizzle-orm";
@@ -138,6 +141,23 @@ export interface IStorage {
   getUserCompletedChallenges(userId: number): Promise<UserChallenge[]>;
   getUserTodayCompletedChallenges(userId: number): Promise<UserChallenge[]>;
   completeChallenge(userChallenge: InsertUserChallenge): Promise<UserChallenge>;
+  
+  // Buddy AI operations
+  getBuddyProfile(userId: number): Promise<BuddyProfile | undefined>;
+  createBuddyProfile(profile: InsertBuddyProfile): Promise<BuddyProfile>;
+  updateBuddyProfile(userId: number, profile: Partial<BuddyProfile>): Promise<BuddyProfile>;
+  
+  // Buddy Messages operations
+  getBuddyMessages(userId: number, limit?: number): Promise<BuddyMessage[]>;
+  createBuddyMessage(message: InsertBuddyMessage): Promise<BuddyMessage>;
+  
+  // Buddy Emotion operations
+  getBuddyEmotions(userId: number, limit?: number): Promise<BuddyEmotionLog[]>;
+  recordBuddyEmotion(emotionLog: InsertBuddyEmotionLog): Promise<BuddyEmotionLog>;
+  getLatestBuddyEmotion(userId: number): Promise<BuddyEmotionLog | undefined>;
+  
+  // Initialize Buddy for new user
+  initializeBuddyProfile(userId: number): Promise<BuddyProfile>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -768,6 +788,8 @@ export class DatabaseStorage implements IStorage {
     
     return results[0];
   }
+  
+  // Buddy methods moved to the end of the class
 
   // Initialize with sample data
   async initializeData() {
@@ -2091,6 +2113,108 @@ export class DatabaseStorage implements IStorage {
     });
     
     console.log("Resources data initialized");
+  }
+  
+  // Buddy AI operations
+  async getBuddyProfile(userId: number): Promise<BuddyProfile | undefined> {
+    const results = await db.select().from(buddyProfiles).where(eq(buddyProfiles.userId, userId));
+    return results.length > 0 ? results[0] : undefined;
+  }
+  
+  async createBuddyProfile(profile: InsertBuddyProfile): Promise<BuddyProfile> {
+    const results = await db.insert(buddyProfiles).values(profile).returning();
+    return results[0];
+  }
+  
+  async updateBuddyProfile(userId: number, profile: Partial<BuddyProfile>): Promise<BuddyProfile> {
+    // First check if profile exists
+    const existing = await this.getBuddyProfile(userId);
+    
+    if (existing) {
+      const results = await db
+        .update(buddyProfiles)
+        .set({
+          ...profile,
+          updatedAt: new Date(),
+        })
+        .where(eq(buddyProfiles.userId, userId))
+        .returning();
+      return results[0];
+    } else {
+      // Create new profile if it doesn't exist
+      const newProfile: InsertBuddyProfile = {
+        userId,
+        name: profile.name || "Buddy",
+        avatarType: profile.avatarType || "robot",
+        avatarColor: profile.avatarColor || "blue",
+        personalityType: profile.personalityType || "friendly",
+        relationshipLevel: profile.relationshipLevel || 1,
+        lastInteraction: profile.lastInteraction || new Date(),
+      };
+      return await this.createBuddyProfile(newProfile);
+    }
+  }
+  
+  // Buddy Messages operations
+  async getBuddyMessages(userId: number, limit?: number): Promise<BuddyMessage[]> {
+    let query = db.select().from(buddyMessages)
+      .where(eq(buddyMessages.userId, userId))
+      .orderBy(sql`${buddyMessages.sentAt} DESC`);
+    
+    if (limit) {
+      query = query.limit(limit);
+    }
+    
+    const messages = await query;
+    return messages.reverse(); // Return in chronological order
+  }
+  
+  async createBuddyMessage(message: InsertBuddyMessage): Promise<BuddyMessage> {
+    const results = await db.insert(buddyMessages).values(message).returning();
+    
+    // Update last interaction in the buddy profile
+    const userId = message.userId;
+    await this.updateBuddyProfile(userId, { lastInteraction: new Date() });
+    
+    return results[0];
+  }
+  
+  // Buddy Emotion operations
+  async getBuddyEmotions(userId: number, limit?: number): Promise<BuddyEmotionLog[]> {
+    let query = db.select().from(buddyEmotionLogs)
+      .where(eq(buddyEmotionLogs.userId, userId))
+      .orderBy(sql`${buddyEmotionLogs.loggedAt} DESC`);
+    
+    if (limit) {
+      query = query.limit(limit);
+    }
+    
+    return await query;
+  }
+  
+  async recordBuddyEmotion(emotionLog: InsertBuddyEmotionLog): Promise<BuddyEmotionLog> {
+    const results = await db.insert(buddyEmotionLogs).values(emotionLog).returning();
+    return results[0];
+  }
+  
+  async getLatestBuddyEmotion(userId: number): Promise<BuddyEmotionLog | undefined> {
+    const emotions = await this.getBuddyEmotions(userId, 1);
+    return emotions.length > 0 ? emotions[0] : undefined;
+  }
+  
+  // Initialize buddy profile for new user
+  async initializeBuddyProfile(userId: number): Promise<BuddyProfile> {
+    const defaultProfile: InsertBuddyProfile = {
+      userId,
+      name: "Buddy",
+      avatarType: "robot",
+      avatarColor: "blue",
+      personalityType: "friendly",
+      relationshipLevel: 1,
+      lastInteraction: new Date(),
+    };
+    
+    return await this.createBuddyProfile(defaultProfile);
   }
 }
 

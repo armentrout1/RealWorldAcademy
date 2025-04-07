@@ -7,7 +7,8 @@ import {
   insertBadgeSchema, insertCategoryProgressSchema, 
   insertTimelineEventSchema, insertUserProgressSummarySchema,
   insertCareerPathSchema, insertGoalSchema, insertVisionBoardItemSchema,
-  insertResourceSchema, insertDailyChallengeSchema, insertUserChallengeSchema
+  insertResourceSchema, insertDailyChallengeSchema, insertUserChallengeSchema,
+  insertBuddyProfileSchema, insertBuddyMessageSchema, insertBuddyEmotionLogSchema
 } from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -843,6 +844,176 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(userWithoutPassword);
     } catch (error) {
       res.status(400).json({ message: "Failed to update user streak" });
+    }
+  });
+  
+  // Buddy AI endpoints
+  // Get buddy profile
+  app.get("/api/users/:userId/buddy", async (req, res) => {
+    try {
+      const userId = Number(req.params.userId);
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      const buddyProfile = await storage.getBuddyProfile(userId);
+      if (!buddyProfile) {
+        // Initialize a new buddy profile if one doesn't exist
+        const newBuddyProfile = await storage.initializeBuddyProfile(userId);
+        return res.json(newBuddyProfile);
+      }
+      
+      res.json(buddyProfile);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch buddy profile" });
+    }
+  });
+  
+  // Update buddy profile
+  app.patch("/api/users/:userId/buddy", express.json(), async (req, res) => {
+    try {
+      const userId = Number(req.params.userId);
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      // Only allow updating certain buddy properties
+      const { name, avatarType, avatarColor, personalityType } = req.body;
+      const updateData: {
+        name?: string;
+        avatarType?: string;
+        avatarColor?: string;
+        personalityType?: string;
+      } = {};
+      
+      if (name !== undefined) updateData.name = String(name);
+      if (avatarType !== undefined) updateData.avatarType = String(avatarType);
+      if (avatarColor !== undefined) updateData.avatarColor = String(avatarColor);
+      if (personalityType !== undefined) updateData.personalityType = String(personalityType);
+      
+      const updatedBuddy = await storage.updateBuddyProfile(userId, updateData);
+      res.json(updatedBuddy);
+    } catch (error) {
+      res.status(400).json({ message: "Failed to update buddy profile" });
+    }
+  });
+  
+  // Get buddy chat history
+  app.get("/api/users/:userId/buddy/messages", async (req, res) => {
+    try {
+      const userId = Number(req.params.userId);
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      const limit = req.query.limit ? Number(req.query.limit) : undefined;
+      const messages = await storage.getBuddyMessages(userId, limit);
+      res.json(messages);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch buddy messages" });
+    }
+  });
+  
+  // Send message to buddy
+  app.post("/api/users/:userId/buddy/messages", express.json(), async (req, res) => {
+    try {
+      const userId = Number(req.params.userId);
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      const { content, isFromBuddy } = req.body;
+      
+      // Validate that message content exists
+      if (!content) {
+        return res.status(400).json({ message: "Message content is required" });
+      }
+      
+      // Create message
+      const validatedData = insertBuddyMessageSchema.parse({
+        userId,
+        content: String(content),
+        isFromBuddy: Boolean(isFromBuddy),
+        sentAt: new Date()
+      });
+      
+      const newMessage = await storage.createBuddyMessage(validatedData);
+      res.status(201).json(newMessage);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid message data" });
+    }
+  });
+  
+  // Record buddy emotion
+  app.post("/api/users/:userId/buddy/emotions", express.json(), async (req, res) => {
+    try {
+      const userId = Number(req.params.userId);
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      const { emotion, intensity, note } = req.body;
+      
+      // Validate that emotion exists
+      if (!emotion) {
+        return res.status(400).json({ message: "Emotion type is required" });
+      }
+      
+      // Create emotion record
+      const validatedData = insertBuddyEmotionLogSchema.parse({
+        userId,
+        emotion: String(emotion),
+        intensity: Number(intensity) || 5, // Default to middle intensity
+        note: note ? String(note) : null,
+        loggedAt: new Date()
+      });
+      
+      const newEmotionLog = await storage.recordBuddyEmotion(validatedData);
+      res.status(201).json(newEmotionLog);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid emotion data" });
+    }
+  });
+  
+  // Get latest emotion
+  app.get("/api/users/:userId/buddy/emotions/latest", async (req, res) => {
+    try {
+      const userId = Number(req.params.userId);
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      const latestEmotion = await storage.getLatestBuddyEmotion(userId);
+      if (!latestEmotion) {
+        return res.status(404).json({ message: "No emotion records found" });
+      }
+      
+      res.json(latestEmotion);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch emotion records" });
+    }
+  });
+  
+  // Get emotion history
+  app.get("/api/users/:userId/buddy/emotions", async (req, res) => {
+    try {
+      const userId = Number(req.params.userId);
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      const limit = req.query.limit ? Number(req.query.limit) : undefined;
+      const emotions = await storage.getBuddyEmotions(userId, limit);
+      res.json(emotions);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch emotion records" });
     }
   });
 

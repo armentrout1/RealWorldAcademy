@@ -1,0 +1,72 @@
+Design a full-featured, interactive AI chatbot companion that becomes the student's personal learning partner, guide, and mentor. This is more than a chat window — it’s a relationship-driven, emotionally supportive AI buddy designed for kids.
+
+1. **Create a Dedicated Chatbot Interface Panel**:
+   - Add a “Buddy” icon or avatar button on the dashboard (e.g., bottom-left corner)
+   - When clicked, open a full chatbot panel with:
+     - AI name and avatar (customizable)
+     - Welcome message
+     - Message history area
+     - Input box to chat
+     - Dropdown settings menu (see below)
+
+2. **Design the Chatbot Avatar with Personality**:
+   - Give the chatbot a fun, friendly name like “Buddy,” “Luma,” “Riley,” or let the student rename it
+   - Let students choose from 2–3 starter avatars (animal, robot, human-like)
+   - Allow students to:
+     - Pick voice/tone style (e.g., “Funny,” “Calm,” “Motivator”)
+     - Customize colors or themes
+     - Name their buddy (“This is MY version of Buddy”)
+
+3. **Add a Login Panel for the Chatbot**:
+   - Just like the student has a login, create a Buddy login screen
+     - Shows “Welcome back, [student name] — Buddy is ready to help!”
+     - Button to “Open Buddy” (goes to chat window)
+     - Settings dropdown:
+       - Change Buddy Appearance
+       - Buddy’s Personality Style
+       - Reset Buddy
+       - Privacy / Chat Logs
+
+4. **Simulate Key AI Behaviors (Placeholder Logic for Now)**:
+   - Memory: Buddy “remembers” recent interactions and repeats them back
+     - “Last time you said you wanted to be a designer — want to try a new project today?”
+   - Emotion Check-In:
+     - “How are you feeling today?” (happy, bored, stressed, excited)
+     - Respond with empathy and a suggestion: “Let’s do something creative to lift your mood!”
+   - Creative Collaboration:
+     - “Want to co-write a story?” or “Let’s design your dream room.”
+     - Show typing prompts or generate random ideas
+   - Reflection & Motivation:
+     - “What’s something you’re proud of this week?”
+     - “Here’s a quote to inspire you!”
+
+5. **Add Chat History & Interaction Styles**:
+   - Display past conversations in scrollable chat log
+   - Different message types:
+     - Text
+     - Emoji reactions
+     - Card replies (e.g., “Pick a topic: 🌍 Travel | 🎮 Gaming | 💰 Money Tips”)
+
+6. **Long-Term Growth & Bonding Features**:
+   - Show “Buddy Growth Bar” or “Trust Meter” that fills as they interact
+   - Unlock new Buddy traits or visuals as they progress
+   - Optional journal view that shows what they’ve told Buddy before
+
+7. **Design for Safety & Age Appropriateness**:
+   - Add content filtering placeholders
+   - Simulate "safe responses only" logic
+   - Add parent control in settings: “Buddy Reports Summary to Parent Weekly”
+   - Visible disclaimer: “Buddy is your learning partner, not a real person. Be kind.”
+
+8. **Design & UX Notes**:
+   - Friendly colors, soft UI, bubbly feel
+   - Full-screen on mobile for better immersion
+   - Smooth open/close transitions
+   - Works alongside other platform features — Buddy should feel like part of the world
+
+9. **Future Integration Hooks**:
+   - <!-- TODO: Connect to GPT-4 with persistent memory -->
+   - <!-- TODO: Store Buddy history in user profile -->
+   - <!-- TODO: Use mood + performance to recommend lessons or challenges -->
+
+This chatbot will **grow with the student emotionally, creatively, and intellectually**, helping them navigate not just lessons — but life. It’s the “cool AI friend” of their generation, inside the smartest platform ever built for real-world learning.

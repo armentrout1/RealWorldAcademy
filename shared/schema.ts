@@ -451,6 +451,73 @@ export const insertUserChallengeSchema = createInsertSchema(userChallenges).omit
 export type InsertUserChallenge = z.infer<typeof insertUserChallengeSchema>;
 export type UserChallenge = typeof userChallenges.$inferSelect;
 
+// Buddy AI Companion Schema
+export const buddyProfiles = pgTable("buddy_profiles", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id).unique(),
+  name: text("name").notNull().default("Buddy"),
+  avatarType: text("avatar_type").notNull().default("robot"), // "robot", "animal", "human"
+  avatarColor: text("avatar_color").notNull().default("blue"),
+  personalityType: text("personality_type").notNull().default("friendly"), // "friendly", "funny", "motivator", "calm"
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+  relationshipLevel: integer("relationship_level").default(1).notNull(), // 1-10 level of bonding
+  lastInteraction: timestamp("last_interaction"),
+});
+
+export const buddyProfilesRelations = relations(buddyProfiles, ({ one }) => ({
+  user: one(users, {
+    fields: [buddyProfiles.userId],
+    references: [users.id],
+  }),
+}));
+
+export const insertBuddyProfileSchema = createInsertSchema(buddyProfiles).omit({ id: true });
+export type InsertBuddyProfile = z.infer<typeof insertBuddyProfileSchema>;
+export type BuddyProfile = typeof buddyProfiles.$inferSelect;
+
+export const buddyMessages = pgTable("buddy_messages", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id),
+  role: text("role").notNull(), // "user" or "buddy"
+  content: text("content").notNull(),
+  sentAt: timestamp("sent_at").defaultNow(),
+  emotion: text("emotion"), // Optional emotion tag for the message
+  relatedToEntity: text("related_to_entity"), // Optional reference to what this relates to (lesson, subject, etc.)
+  relatedEntityId: integer("related_entity_id"), // Optional ID for the related entity
+});
+
+export const buddyMessagesRelations = relations(buddyMessages, ({ one }) => ({
+  user: one(users, {
+    fields: [buddyMessages.userId],
+    references: [users.id],
+  }),
+}));
+
+export const insertBuddyMessageSchema = createInsertSchema(buddyMessages).omit({ id: true });
+export type InsertBuddyMessage = z.infer<typeof insertBuddyMessageSchema>;
+export type BuddyMessage = typeof buddyMessages.$inferSelect;
+
+export const buddyEmotionLogs = pgTable("buddy_emotion_logs", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id),
+  emotion: text("emotion").notNull(), // "happy", "sad", "excited", "bored", "stressed", etc.
+  intensity: integer("intensity").default(5).notNull(), // 1-10 scale
+  loggedAt: timestamp("logged_at").defaultNow(),
+  note: text("note"), // Optional context
+});
+
+export const buddyEmotionLogsRelations = relations(buddyEmotionLogs, ({ one }) => ({
+  user: one(users, {
+    fields: [buddyEmotionLogs.userId],
+    references: [users.id],
+  }),
+}));
+
+export const insertBuddyEmotionLogSchema = createInsertSchema(buddyEmotionLogs).omit({ id: true });
+export type InsertBuddyEmotionLog = z.infer<typeof insertBuddyEmotionLogSchema>;
+export type BuddyEmotionLog = typeof buddyEmotionLogs.$inferSelect;
+
 // Define the user relations after all models are defined
 export const usersRelations = relations(users, ({ many, one }) => ({
   badges: many(badges),
@@ -462,4 +529,7 @@ export const usersRelations = relations(users, ({ many, one }) => ({
   subjectProgress: many(userSubjectProgress),
   lessonProgress: many(userLessonProgress),
   challenges: many(userChallenges),
+  buddyProfile: one(buddyProfiles),
+  buddyMessages: many(buddyMessages),
+  buddyEmotionLogs: many(buddyEmotionLogs),
 }));

@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { ProgressProvider } from "@/contexts/ProgressContext";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { Buddy } from "@/components/ai/Buddy";
 
 // Import pages
 import Home from "@/pages/Home";
@@ -220,6 +221,7 @@ function App() {
       <AuthProvider>
         <ProgressProvider>
           <Router />
+          <Buddy />
           <Toaster />
         </ProgressProvider>
       </AuthProvider>
