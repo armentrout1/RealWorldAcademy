@@ -7,7 +7,7 @@ import {
   insertBadgeSchema, insertCategoryProgressSchema, 
   insertTimelineEventSchema, insertUserProgressSummarySchema,
   insertCareerPathSchema, insertGoalSchema, insertVisionBoardItemSchema,
-  insertResourceSchema
+  insertResourceSchema, insertDailyChallengeSchema, insertUserChallengeSchema
 } from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -695,6 +695,154 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(updatedResource);
     } catch (error) {
       res.status(500).json({ message: "Failed to process download" });
+    }
+  });
+
+  // Gamification Routes
+  // Daily Challenges
+  app.get("/api/challenges/daily", async (req, res) => {
+    try {
+      const activeChallenges = await storage.getActiveDailyChallenges();
+      res.json(activeChallenges);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch daily challenges" });
+    }
+  });
+  
+  app.get("/api/challenges", async (req, res) => {
+    try {
+      const challenges = await storage.getAllDailyChallenges();
+      res.json(challenges);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch challenges" });
+    }
+  });
+  
+  app.get("/api/challenges/:id", async (req, res) => {
+    try {
+      const challenge = await storage.getDailyChallenge(Number(req.params.id));
+      if (!challenge) {
+        return res.status(404).json({ message: "Challenge not found" });
+      }
+      res.json(challenge);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch challenge" });
+    }
+  });
+  
+  app.post("/api/challenges", express.json(), async (req, res) => {
+    try {
+      const validatedData = insertDailyChallengeSchema.parse(req.body);
+      const newChallenge = await storage.createDailyChallenge(validatedData);
+      res.status(201).json(newChallenge);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid challenge data" });
+    }
+  });
+  
+  // User Challenges (completed challenges)
+  app.get("/api/users/:userId/challenges", async (req, res) => {
+    try {
+      const userId = Number(req.params.userId);
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      const userChallenges = await storage.getUserCompletedChallenges(userId);
+      res.json(userChallenges);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch user challenges" });
+    }
+  });
+  
+  app.get("/api/users/:userId/challenges/today", async (req, res) => {
+    try {
+      const userId = Number(req.params.userId);
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      const todayChallenges = await storage.getUserTodayCompletedChallenges(userId);
+      res.json(todayChallenges);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch today's completed challenges" });
+    }
+  });
+  
+  app.post("/api/users/:userId/challenges/complete", express.json(), async (req, res) => {
+    try {
+      const userId = Number(req.params.userId);
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      const { challengeId, xpEarned } = req.body;
+      
+      // Validate challenge exists
+      const challenge = await storage.getDailyChallenge(Number(challengeId));
+      if (!challenge) {
+        return res.status(404).json({ message: "Challenge not found" });
+      }
+      
+      const validatedData = insertUserChallengeSchema.parse({
+        userId,
+        challengeId: Number(challengeId),
+        completedAt: new Date(),
+        xpEarned: xpEarned || challenge.xpReward // Use provided XP or default from challenge
+      });
+      
+      const completedChallenge = await storage.completeChallenge(validatedData);
+      res.status(201).json(completedChallenge);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid challenge completion data" });
+    }
+  });
+  
+  // XP and Level endpoints
+  app.post("/api/users/:userId/xp", express.json(), async (req, res) => {
+    try {
+      const userId = Number(req.params.userId);
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      const { xp } = req.body;
+      if (xp === undefined || isNaN(Number(xp))) {
+        return res.status(400).json({ message: "Valid XP amount required" });
+      }
+      
+      const updatedUser = await storage.updateUserXP(userId, Number(xp));
+      // Don't send password back
+      const { password, ...userWithoutPassword } = updatedUser;
+      res.json(userWithoutPassword);
+    } catch (error) {
+      res.status(400).json({ message: "Failed to update user XP" });
+    }
+  });
+  
+  app.post("/api/users/:userId/streak", express.json(), async (req, res) => {
+    try {
+      const userId = Number(req.params.userId);
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      const { streak } = req.body;
+      if (streak === undefined || isNaN(Number(streak))) {
+        return res.status(400).json({ message: "Valid streak count required" });
+      }
+      
+      const updatedUser = await storage.updateUserStreak(userId, Number(streak));
+      // Don't send password back
+      const { password, ...userWithoutPassword } = updatedUser;
+      res.json(userWithoutPassword);
+    } catch (error) {
+      res.status(400).json({ message: "Failed to update user streak" });
     }
   });
 

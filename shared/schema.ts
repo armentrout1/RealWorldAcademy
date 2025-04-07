@@ -14,7 +14,16 @@ export const users = pgTable("users", {
   firstName: text("first_name"),
   lastName: text("last_name"),
   ageGroup: text("age_group"),
-  interests: text("interests").array()
+  interests: text("interests").array(),
+  // Gamification fields
+  xp: integer("xp").default(0).notNull(),
+  level: integer("level").default(1).notNull(),
+  levelTitle: text("level_title").default("Beginner").notNull(),
+  streakCount: integer("streak_count").default(0).notNull(),
+  lastLogin: timestamp("last_login"),
+  gamificationEnabled: boolean("gamification_enabled").default(true).notNull(),
+  showLeaderboard: boolean("show_leaderboard").default(true).notNull(),
+  showLevelUpNotifications: boolean("show_level_up_notifications").default(true).notNull()
 });
 
 export const insertUserSchema = createInsertSchema(users).pick({
@@ -27,7 +36,15 @@ export const insertUserSchema = createInsertSchema(users).pick({
   firstName: true,
   lastName: true,
   ageGroup: true,
-  interests: true
+  interests: true,
+  xp: true,
+  level: true,
+  levelTitle: true,
+  streakCount: true,
+  lastLogin: true,
+  gamificationEnabled: true,
+  showLeaderboard: true,
+  showLevelUpNotifications: true
 });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -370,6 +387,47 @@ export const resourcesRelations = relations(resources, ({ one }) => ({
   }),
 }));
 
+// Daily challenges model
+export const dailyChallenges = pgTable("daily_challenges", {
+  id: serial("id").primaryKey(),
+  title: text("title").notNull(),
+  description: text("description").notNull(),
+  xpReward: integer("xp_reward").notNull(),
+  type: text("type").notNull(), // "lesson", "quiz", "login", "project", etc.
+  targetId: integer("target_id"), // Optional related entity id (lesson, subject, etc.)
+  activeDate: date("active_date").notNull(), // Date this challenge is active
+  difficultyLevel: integer("difficulty_level").default(1).notNull(), // 1-5 scale
+  icon: text("icon").notNull(),
+});
+
+export const insertDailyChallengeSchema = createInsertSchema(dailyChallenges).omit({ id: true });
+export type InsertDailyChallenge = z.infer<typeof insertDailyChallengeSchema>;
+export type DailyChallenge = typeof dailyChallenges.$inferSelect;
+
+// User completed challenges
+export const userChallenges = pgTable("user_challenges", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id),
+  challengeId: integer("challenge_id").notNull().references(() => dailyChallenges.id),
+  completedAt: timestamp("completed_at").notNull(),
+  xpEarned: integer("xp_earned").notNull(),
+});
+
+export const userChallengesRelations = relations(userChallenges, ({ one }) => ({
+  user: one(users, {
+    fields: [userChallenges.userId],
+    references: [users.id],
+  }),
+  challenge: one(dailyChallenges, {
+    fields: [userChallenges.challengeId],
+    references: [dailyChallenges.id],
+  }),
+}));
+
+export const insertUserChallengeSchema = createInsertSchema(userChallenges).omit({ id: true });
+export type InsertUserChallenge = z.infer<typeof insertUserChallengeSchema>;
+export type UserChallenge = typeof userChallenges.$inferSelect;
+
 // Define the user relations after all models are defined
 export const usersRelations = relations(users, ({ many, one }) => ({
   badges: many(badges),
@@ -380,4 +438,5 @@ export const usersRelations = relations(users, ({ many, one }) => ({
   visionBoardItems: many(visionBoardItems),
   subjectProgress: many(userSubjectProgress),
   lessonProgress: many(userLessonProgress),
+  challenges: many(userChallenges),
 }));

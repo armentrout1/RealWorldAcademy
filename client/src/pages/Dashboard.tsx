@@ -16,6 +16,8 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { Progress } from "@/components/ui/progress";
 import { PersonalizedLearningPath } from "@/components/ai";
+import { DailyChallengeCard } from "@/components/challenges/DailyChallenge";
+import { UserXP } from "@/components/challenges/UserXP";
 
 const motivationalQuotes = [
   "Today is a great day to grow.",
@@ -112,6 +114,24 @@ const Dashboard: React.FC = () => {
               </div>
             </CardContent>
           </Card>
+        </div>
+      )}
+      
+      {/* User XP and Level - Only show when logged in */}
+      {isAuthenticated && user?.id && (
+        <div className="mb-6">
+          <Card className="shadow-sm">
+            <CardContent className="pt-6">
+              <UserXP userId={user.id} />
+            </CardContent>
+          </Card>
+        </div>
+      )}
+      
+      {/* Daily Challenges - Only show when logged in */}
+      {isAuthenticated && user?.id && (
+        <div className="mb-8">
+          <DailyChallengeCard userId={user.id} />
         </div>
       )}
       

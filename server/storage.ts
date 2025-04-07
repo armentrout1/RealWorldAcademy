@@ -15,10 +15,12 @@ import {
   lessons, type Lesson, type InsertLesson,
   userSubjectProgress, type UserSubjectProgress, type InsertUserSubjectProgress,
   userLessonProgress, type UserLessonProgress, type InsertUserLessonProgress,
-  resources, type Resource, type InsertResource
+  resources, type Resource, type InsertResource,
+  dailyChallenges, type DailyChallenge, type InsertDailyChallenge,
+  userChallenges, type UserChallenge, type InsertUserChallenge
 } from "@shared/schema";
 import { db } from "./db";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 
 export interface IStorage {
   // User operations
@@ -119,6 +121,23 @@ export interface IStorage {
   getAllUserLessonProgressBySubject(userId: number, subjectId: number): Promise<UserLessonProgress[]>;
   createUserLessonProgress(progress: InsertUserLessonProgress): Promise<UserLessonProgress>;
   updateUserLessonProgress(userId: number, lessonId: number, progress: Partial<UserLessonProgress>): Promise<UserLessonProgress>;
+  
+  // User operations - Gamification
+  updateUserXP(userId: number, xpToAdd: number): Promise<User>;
+  updateUserStreak(userId: number, streak: number): Promise<User>;
+  updateUserLevel(userId: number, level: number, title?: string): Promise<User>;
+  
+  // Daily Challenge operations
+  getAllDailyChallenges(): Promise<DailyChallenge[]>;
+  getActiveDailyChallenges(): Promise<DailyChallenge[]>;
+  getDailyChallenge(id: number): Promise<DailyChallenge | undefined>;
+  createDailyChallenge(challenge: InsertDailyChallenge): Promise<DailyChallenge>;
+  updateDailyChallenge(id: number, challenge: Partial<DailyChallenge>): Promise<DailyChallenge>;
+  
+  // User Challenge operations
+  getUserCompletedChallenges(userId: number): Promise<UserChallenge[]>;
+  getUserTodayCompletedChallenges(userId: number): Promise<UserChallenge[]>;
+  completeChallenge(userChallenge: InsertUserChallenge): Promise<UserChallenge>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -550,6 +569,200 @@ export class DatabaseStorage implements IStorage {
     return await this.updateResource(id, {
       downloadCount: resource.downloadCount + 1
     });
+  }
+  
+  // User operations - Gamification
+  async updateUserXP(userId: number, xpToAdd: number): Promise<User> {
+    const user = await this.getUser(userId);
+    if (!user) throw new Error(`User with id ${userId} not found`);
+    
+    // Add XP and check if we need to level up
+    const currentXP = user.xp || 0;
+    const newXP = currentXP + xpToAdd;
+    const currentLevel = user.level || 1;
+    
+    // Simple leveling formula: level = Math.floor(1 + Math.sqrt(totalXP / 100))
+    // This means approximately:
+    // Level 1: 0-99 XP
+    // Level 2: 100-399 XP
+    // Level 3: 400-899 XP
+    // Level 4: 900-1599 XP
+    // and so on
+    const newLevel = Math.floor(1 + Math.sqrt(newXP / 100));
+    const leveledUp = newLevel > currentLevel;
+    
+    // Generate level title based on level
+    let levelTitle = user.levelTitle;
+    if (leveledUp) {
+      // Simple level titles
+      const titles = [
+        "Novice Explorer", // Level 1
+        "Curious Apprentice", // Level 2
+        "Knowledge Seeker", // Level 3
+        "Wisdom Gatherer", // Level 4
+        "Dedicated Scholar", // Level 5
+        "Skillful Practitioner", // Level 6
+        "Accomplished Learner", // Level 7
+        "Academic Virtuoso", // Level 8
+        "Enlightened Expert", // Level 9
+        "Master of Knowledge" // Level 10+
+      ];
+      levelTitle = titles[Math.min(newLevel - 1, titles.length - 1)];
+    }
+    
+    // Update user with new XP and possibly new level
+    const results = await db
+      .update(users)
+      .set({ 
+        xp: newXP,
+        level: newLevel,
+        levelTitle: levelTitle
+      })
+      .where(eq(users.id, userId))
+      .returning();
+    
+    // If user leveled up, we could create a timeline event or notification here
+    if (leveledUp) {
+      await this.createTimelineEvent({
+        userId,
+        title: `Leveled up to ${levelTitle}!`,
+        date: new Date(),
+        completed: true,
+        category: 'achievement'
+      });
+    }
+    
+    return results[0];
+  }
+  
+  async updateUserStreak(userId: number, streak: number): Promise<User> {
+    const user = await this.getUser(userId);
+    if (!user) throw new Error(`User with id ${userId} not found`);
+    
+    const results = await db
+      .update(users)
+      .set({ 
+        streakCount: streak,
+        lastLogin: new Date()
+      })
+      .where(eq(users.id, userId))
+      .returning();
+    
+    // If the streak hits certain milestones (7, 30, 100 days), we could award badges
+    const streakMilestones = [7, 30, 100];
+    if (streakMilestones.includes(streak)) {
+      // Award streak badge
+      await this.createBadge({
+        userId,
+        title: `${streak}-Day Streak`,
+        description: `You've maintained a learning streak for ${streak} consecutive days!`,
+        icon: 'fire',
+        unlocked: true,
+        dateUnlocked: new Date()
+      });
+      
+      // Create timeline event
+      await this.createTimelineEvent({
+        userId,
+        title: `${streak}-Day Streak Achievement`,
+        date: new Date(),
+        completed: true,
+        category: 'streak'
+      });
+    }
+    
+    return results[0];
+  }
+  
+  async updateUserLevel(userId: number, level: number, title?: string): Promise<User> {
+    const user = await this.getUser(userId);
+    if (!user) throw new Error(`User with id ${userId} not found`);
+    
+    const updateData: Partial<User> = { level };
+    if (title) {
+      updateData.levelTitle = title;
+    }
+    
+    const results = await db
+      .update(users)
+      .set(updateData)
+      .where(eq(users.id, userId))
+      .returning();
+    
+    return results[0];
+  }
+  
+  // Daily Challenge operations
+  async getAllDailyChallenges(): Promise<DailyChallenge[]> {
+    return await db.select().from(dailyChallenges);
+  }
+  
+  async getActiveDailyChallenges(): Promise<DailyChallenge[]> {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    // Format date to match the date column format in the database
+    const formattedDate = today.toISOString().split('T')[0];
+    
+    return await db.select().from(dailyChallenges)
+      .where(eq(dailyChallenges.activeDate, formattedDate));
+  }
+  
+  async getDailyChallenge(id: number): Promise<DailyChallenge | undefined> {
+    const results = await db.select().from(dailyChallenges).where(eq(dailyChallenges.id, id));
+    return results.length > 0 ? results[0] : undefined;
+  }
+  
+  async createDailyChallenge(challenge: InsertDailyChallenge): Promise<DailyChallenge> {
+    const results = await db.insert(dailyChallenges).values(challenge).returning();
+    return results[0];
+  }
+  
+  async updateDailyChallenge(id: number, challenge: Partial<DailyChallenge>): Promise<DailyChallenge> {
+    const results = await db
+      .update(dailyChallenges)
+      .set(challenge)
+      .where(eq(dailyChallenges.id, id))
+      .returning();
+    return results[0];
+  }
+  
+  // User Challenge operations
+  async getUserCompletedChallenges(userId: number): Promise<UserChallenge[]> {
+    return await db.select().from(userChallenges).where(eq(userChallenges.userId, userId));
+  }
+  
+  async getUserTodayCompletedChallenges(userId: number): Promise<UserChallenge[]> {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    
+    return await db.select().from(userChallenges)
+      .where(eq(userChallenges.userId, userId))
+      .where(sql`${userChallenges.completedAt} >= ${today.toISOString()}`)
+      .where(sql`${userChallenges.completedAt} < ${tomorrow.toISOString()}`);
+  }
+  
+  async completeChallenge(userChallenge: InsertUserChallenge): Promise<UserChallenge> {
+    const results = await db.insert(userChallenges).values(userChallenge).returning();
+    
+    // Also award XP to the user
+    await this.updateUserXP(userChallenge.userId, userChallenge.xpEarned);
+    
+    // Create a timeline event for completing the challenge
+    const challenge = await this.getDailyChallenge(userChallenge.challengeId);
+    if (challenge) {
+      await this.createTimelineEvent({
+        userId: userChallenge.userId,
+        title: `Completed challenge: ${challenge.title}`,
+        date: new Date(),
+        completed: true,
+        category: 'challenge'
+      });
+    }
+    
+    return results[0];
   }
 
   // Initialize with sample data
@@ -1637,6 +1850,77 @@ export class DatabaseStorage implements IStorage {
     
     // Initialize resources data
     await this.initializeResourcesData();
+    
+    // Initialize gamification data
+    await this.initializeGamificationData();
+  }
+  
+  // Initialize gamification elements like daily challenges
+  async initializeGamificationData() {
+    // Check if challenges already exist
+    const existingChallenges = await db.select().from(dailyChallenges);
+    if (existingChallenges.length > 0) return; // Skip if data exists
+    
+    console.log("Initializing gamification data...");
+    
+    // Get today's date for the challenges
+    const today = new Date();
+    const todayFormatted = today.toISOString().split('T')[0];
+    
+    // Create daily challenges
+    const challenges = [
+      {
+        title: "Study Streak",
+        description: "Complete at least one lesson today to maintain your streak",
+        xpReward: 50,
+        type: "login",
+        activeDate: todayFormatted,
+        difficultyLevel: 1,
+        icon: "calendar-check"
+      },
+      {
+        title: "Financial Quiz Master",
+        description: "Complete today's financial literacy quiz with at least 80% accuracy",
+        xpReward: 100,
+        type: "quiz",
+        activeDate: todayFormatted,
+        difficultyLevel: 2,
+        icon: "award"
+      },
+      {
+        title: "Goal Setter",
+        description: "Set at least one new goal in your Plan Your Future page",
+        xpReward: 75,
+        type: "goal",
+        activeDate: todayFormatted,
+        difficultyLevel: 1,
+        icon: "target"
+      },
+      {
+        title: "Learning Explorer",
+        description: "Explore a new subject area you haven't started yet",
+        xpReward: 60,
+        type: "subject",
+        activeDate: todayFormatted,
+        difficultyLevel: 1,
+        icon: "compass"
+      },
+      {
+        title: "Resource Collector",
+        description: "Download or save at least 3 resources from the Resource Center",
+        xpReward: 80,
+        type: "resource",
+        activeDate: todayFormatted,
+        difficultyLevel: 2,
+        icon: "book-open"
+      }
+    ];
+    
+    for (const challenge of challenges) {
+      await this.createDailyChallenge(challenge);
+    }
+    
+    console.log("Gamification data initialized!");
   }
   
   // Initialize resources for the Resource Center

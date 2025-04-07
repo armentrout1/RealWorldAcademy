@@ -9,6 +9,12 @@ export interface User {
   ageGroup: 'under-9' | '9-12' | '13-15' | '16-18' | '18+';
   interests: string[];
   avatar?: string;
+  // Gamification fields
+  xp: number;
+  level: number;
+  levelTitle: string;
+  streakCount: number;
+  gamificationEnabled: boolean;
   progress: {
     selfDiscovery: number;
     financialLiteracy: number;
@@ -26,6 +32,12 @@ export const mockUser: User = {
   ageGroup: '13-15',
   interests: ['Money', 'Creativity', 'Technology'],
   avatar: '/default-avatar.png',
+  // Gamification fields
+  xp: 570,
+  level: 2,
+  levelTitle: 'Explorer',
+  streakCount: 3,
+  gamificationEnabled: true,
   progress: {
     selfDiscovery: 0.8,
     financialLiteracy: 0.6,
@@ -34,13 +46,16 @@ export const mockUser: User = {
   }
 };
 
+// Define type for signup data
+export type SignupData = Pick<User, 'firstName' | 'lastName' | 'email' | 'ageGroup' | 'interests'>;
+
 // Auth context type
 interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  signup: (userData: Omit<User, 'id' | 'progress' | 'avatar'>) => Promise<void>;
+  signup: (userData: SignupData) => Promise<void>;
   logout: () => void;
   updateProfile: (data: Partial<User>) => Promise<void>;
 }
@@ -100,7 +115,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   // Mock signup function
-  const signup = async (userData: Omit<User, 'id' | 'progress' | 'avatar'>) => {
+  const signup = async (userData: SignupData) => {
     // Simulate network request
     setIsLoading(true);
     
@@ -111,6 +126,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       ...userData,
       id: 1,
       avatar: '/default-avatar.png',
+      // Initialize gamification fields
+      xp: 0,
+      level: 1,
+      levelTitle: 'Beginner',
+      streakCount: 0,
+      gamificationEnabled: true,
       progress: {
         selfDiscovery: 0,
         financialLiteracy: 0,
