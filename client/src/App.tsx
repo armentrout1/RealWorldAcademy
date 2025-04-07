@@ -32,6 +32,8 @@ import Community from "@/pages/Community";
 import Journal from "@/pages/Journal";
 import LessonTemplate from "@/pages/LessonTemplate";
 import NotFound from "@/pages/not-found";
+import ContributeLesson from "@/pages/ContributeLesson";
+import AdminLessons from "@/pages/AdminLessons";
 
 // Page transition variants
 const pageVariants = {
@@ -213,6 +215,16 @@ function Router() {
             <Route path="/lesson/smart-money-challenge">
               <PageWrapper>
                 <LessonTemplate />
+              </PageWrapper>
+            </Route>
+            <Route path="/contribute">
+              <PageWrapper>
+                <ContributeLesson />
+              </PageWrapper>
+            </Route>
+            <Route path="/admin/lessons">
+              <PageWrapper>
+                <AdminLessons />
               </PageWrapper>
             </Route>
             <Route>
