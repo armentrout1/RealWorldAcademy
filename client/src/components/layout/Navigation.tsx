@@ -36,6 +36,12 @@ const Navigation: React.FC = () => {
             } transition-all duration-200`}>
               Learn
             </Link>
+            <Link href="/library" className={`px-4 py-3 font-medium ${isActive('/library') 
+              ? 'text-primary border-b-2 border-primary' 
+              : 'text-neutral-600 hover:text-primary border-b-2 border-transparent hover:border-primary'
+            } transition-all duration-200`}>
+              Lesson Library
+            </Link>
             <Link href="/self-discovery" className={`px-4 py-3 font-medium ${isActive('/self-discovery') 
               ? 'text-primary border-b-2 border-primary' 
               : 'text-neutral-600 hover:text-primary border-b-2 border-transparent hover:border-primary'
@@ -128,6 +134,12 @@ const Navigation: React.FC = () => {
             : 'text-neutral-600 hover:text-primary hover:bg-blue-50'
           } transition-colors duration-200`}>
             Learn
+          </Link>
+          <Link href="/library" className={`block px-4 py-2 font-medium rounded-md ${isActive('/library') 
+            ? 'text-primary bg-blue-50' 
+            : 'text-neutral-600 hover:text-primary hover:bg-blue-50'
+          } transition-colors duration-200`}>
+            Lesson Library
           </Link>
           <Link href="/self-discovery" className={`block px-4 py-2 font-medium rounded-md ${isActive('/self-discovery') 
             ? 'text-primary bg-blue-50' 

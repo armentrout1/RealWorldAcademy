@@ -34,6 +34,7 @@ import LessonTemplate from "@/pages/LessonTemplate";
 import NotFound from "@/pages/not-found";
 import ContributeLesson from "@/pages/ContributeLesson";
 import AdminLessons from "@/pages/AdminLessons";
+import LessonLibrary from "@/pages/LessonLibrary";
 
 // Page transition variants
 const pageVariants = {
@@ -225,6 +226,11 @@ function Router() {
             <Route path="/admin/lessons">
               <PageWrapper>
                 <AdminLessons />
+              </PageWrapper>
+            </Route>
+            <Route path="/library">
+              <PageWrapper>
+                <LessonLibrary />
               </PageWrapper>
             </Route>
             <Route>
