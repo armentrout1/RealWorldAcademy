@@ -26,6 +26,7 @@ import Settings from "@/pages/Settings";
 import TeacherDashboard from "@/pages/TeacherDashboard";
 import ParentDashboard from "@/pages/ParentDashboard";
 import CurriculumBuilder from "@/pages/CurriculumBuilder";
+import ResourceCenter from "@/pages/ResourceCenter";
 import NotFound from "@/pages/not-found";
 
 // Page transition variants
@@ -188,6 +189,11 @@ function Router() {
             <Route path="/curriculum-builder">
               <PageWrapper>
                 <CurriculumBuilder />
+              </PageWrapper>
+            </Route>
+            <Route path="/resource-center">
+              <PageWrapper>
+                <ResourceCenter />
               </PageWrapper>
             </Route>
             <Route>

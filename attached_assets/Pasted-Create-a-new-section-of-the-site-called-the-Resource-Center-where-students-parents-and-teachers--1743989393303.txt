@@ -1,0 +1,50 @@
+Create a new section of the site called the “Resource Center” where students, parents, and teachers can browse learning materials related to the platform’s modules. This can include PDFs, worksheets, how-to guides, and embedded videos.
+
+1. **Create a “Resource Center” Page**:
+   - Title: “Resource Center”
+   - Add a brief intro:
+     “Explore downloadable worksheets, helpful guides, and videos to support learning at home, in class, or on the go.”
+
+2. **Add Filterable Resource Categories**:
+   Include filter buttons or a dropdown menu to sort resources by category:
+   - Financial Literacy
+   - Projects & Activities
+   - Health & Wellness
+   - Communication
+   - Tech Skills
+   - Parent & Teacher Guides
+
+3. **Display Resource Cards**:
+   Create a grid layout showing each resource as a card that includes:
+   - Title
+   - Short description
+   - File type icon (📄 PDF, 🎥 Video, 🧩 Worksheet)
+   - “Download” or “View” button
+
+   Example resources:
+   - “Monthly Teen Budget Worksheet” (PDF)
+   - “How to Build a Simple Business Plan” (Guide)
+   - “Communication Challenge Cards” (Printable)
+   - “What is a Mortgage?” (Video)
+
+4. **Embed or Link to Videos**:
+   - For video-based resources, embed YouTube or use placeholder thumbnails with play buttons
+   - Display as a video player in a modal or on a new page
+
+5. **Resource Viewer / Modal**:
+   - When a user clicks “View Resource,” show the resource in a modal or full-page view
+   - If it’s a PDF, show an inline viewer or icon with a “Download PDF” button
+   - If it’s a video, play inline in a lightbox
+
+6. **Add Upload/Admin Hooks (for future use)**:
+   - Add placeholders for future admin tools:
+     - “Upload New Resource”
+     - “Assign Resource to Module”
+     - <!-- TODO: Connect to cloud storage -->
+
+7. **Design Tips**:
+   - Use consistent card styles across all resources
+   - Color-code or tag each resource with the subject or audience (e.g., 👩‍🏫 Teacher, 👨‍👧 Parent, 🎓 Student)
+   - Mobile users should be able to tap and download easily
+
+Make this feel like a toolkit that supports the main experience — giving your platform true **depth and offline usability** for every learning style and environment.

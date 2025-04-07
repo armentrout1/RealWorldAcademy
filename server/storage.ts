@@ -14,7 +14,8 @@ import {
   subjects, type Subject, type InsertSubject,
   lessons, type Lesson, type InsertLesson,
   userSubjectProgress, type UserSubjectProgress, type InsertUserSubjectProgress,
-  userLessonProgress, type UserLessonProgress, type InsertUserLessonProgress
+  userLessonProgress, type UserLessonProgress, type InsertUserLessonProgress,
+  resources, type Resource, type InsertResource
 } from "@shared/schema";
 import { db } from "./db";
 import { eq } from "drizzle-orm";
@@ -80,6 +81,17 @@ export interface IStorage {
   createVisionBoardItem(item: InsertVisionBoardItem): Promise<VisionBoardItem>;
   updateVisionBoardItem(id: number, item: Partial<VisionBoardItem>): Promise<VisionBoardItem>;
   deleteVisionBoardItem(id: number): Promise<void>;
+  
+  // Resource Center operations
+  getAllResources(): Promise<Resource[]>;
+  getResourcesByCategory(category: string): Promise<Resource[]>;
+  getResourcesByAudience(audience: string): Promise<Resource[]>;
+  getResourcesByType(type: string): Promise<Resource[]>;
+  getFeaturedResources(): Promise<Resource[]>;
+  getResource(id: number): Promise<Resource | undefined>;
+  createResource(resource: InsertResource): Promise<Resource>;
+  updateResource(id: number, resource: Partial<Resource>): Promise<Resource>;
+  incrementDownloadCount(id: number): Promise<Resource>;
   
   // Subject operations
   getAllSubjects(): Promise<Subject[]>;
@@ -484,6 +496,60 @@ export class DatabaseStorage implements IStorage {
       };
       return await this.createUserLessonProgress(newProgress);
     }
+  }
+  
+  // Resource Center operations
+  async getAllResources(): Promise<Resource[]> {
+    return await db.select().from(resources);
+  }
+
+  async getResourcesByCategory(category: string): Promise<Resource[]> {
+    return await db.select().from(resources).where(eq(resources.category, category));
+  }
+
+  async getResourcesByAudience(audience: string): Promise<Resource[]> {
+    // We need a different approach for array fields
+    // Since audience is an array, we need to find resources where the audience array includes the requested audience
+    const allResources = await this.getAllResources();
+    return allResources.filter(resource => resource.audience.includes(audience));
+  }
+
+  async getResourcesByType(type: string): Promise<Resource[]> {
+    return await db.select().from(resources).where(eq(resources.resourceType, type));
+  }
+
+  async getFeaturedResources(): Promise<Resource[]> {
+    return await db.select().from(resources).where(eq(resources.featured, true));
+  }
+
+  async getResource(id: number): Promise<Resource | undefined> {
+    const results = await db.select().from(resources).where(eq(resources.id, id));
+    return results.length > 0 ? results[0] : undefined;
+  }
+
+  async createResource(resource: InsertResource): Promise<Resource> {
+    const results = await db.insert(resources).values(resource).returning();
+    return results[0];
+  }
+
+  async updateResource(id: number, resource: Partial<Resource>): Promise<Resource> {
+    const results = await db
+      .update(resources)
+      .set(resource)
+      .where(eq(resources.id, id))
+      .returning();
+    return results[0];
+  }
+
+  async incrementDownloadCount(id: number): Promise<Resource> {
+    const resource = await this.getResource(id);
+    if (!resource) {
+      throw new Error(`Resource with id ${id} not found`);
+    }
+    
+    return await this.updateResource(id, {
+      downloadCount: resource.downloadCount + 1
+    });
   }
 
   // Initialize with sample data
@@ -1568,6 +1634,175 @@ export class DatabaseStorage implements IStorage {
     }
     
     console.log("Career paths data initialized");
+    
+    // Initialize resources data
+    await this.initializeResourcesData();
+  }
+  
+  // Initialize resources for the Resource Center
+  async initializeResourcesData() {
+    // Check if resources already exist
+    const existingResources = await this.getAllResources();
+    if (existingResources.length > 0) return; // Skip if data exists
+    
+    console.log("Initializing resources data...");
+    
+    // Get subjects to link resources
+    const allSubjects = await this.getAllSubjects();
+    const financialLiteracySubject = allSubjects.find(subject => subject.slug === "financial-literacy");
+    const communicationSubject = allSubjects.find(subject => subject.slug === "communication-relationships");
+    const mathSubject = allSubjects.find(subject => subject.slug === "real-world-math");
+    
+    // Financial Literacy Resources
+    await this.createResource({
+      title: "Monthly Teen Budget Worksheet",
+      description: "A printable worksheet for teenagers to track income, expenses, and savings goals.",
+      resourceType: "pdf",
+      category: "financial-literacy",
+      audience: ["student", "parent"],
+      fileUrl: "/resources/budget-worksheet.pdf",
+      thumbnailUrl: "/resources/thumbnails/budget-worksheet.jpg",
+      downloadCount: 0,
+      relatedSubjectId: financialLiteracySubject?.id,
+      featured: true
+    });
+    
+    await this.createResource({
+      title: "What is a Mortgage?",
+      description: "A short explainer video that breaks down how mortgages work, interest rates, and the home buying process.",
+      resourceType: "video",
+      category: "financial-literacy",
+      audience: ["student", "parent"],
+      embedUrl: "https://www.youtube.com/embed/dummylink1",
+      thumbnailUrl: "/resources/thumbnails/mortgage-video.jpg",
+      downloadCount: 0,
+      relatedSubjectId: financialLiteracySubject?.id,
+      featured: false
+    });
+    
+    await this.createResource({
+      title: "Emergency Fund Planning Guide",
+      description: "Learn how to build financial security with this step-by-step guide to creating an emergency fund.",
+      resourceType: "guide",
+      category: "financial-literacy",
+      audience: ["student", "parent", "teacher"],
+      fileUrl: "/resources/emergency-fund-guide.pdf",
+      thumbnailUrl: "/resources/thumbnails/emergency-fund.jpg",
+      downloadCount: 0,
+      relatedSubjectId: financialLiteracySubject?.id,
+      featured: false
+    });
+    
+    // Communication Resources
+    await this.createResource({
+      title: "Communication Challenge Cards",
+      description: "Printable cards with communication scenarios and exercises to practice healthy dialogue.",
+      resourceType: "worksheet",
+      category: "communication",
+      audience: ["student", "teacher"],
+      fileUrl: "/resources/communication-cards.pdf",
+      thumbnailUrl: "/resources/thumbnails/communication-cards.jpg",
+      downloadCount: 0,
+      relatedSubjectId: communicationSubject?.id,
+      featured: true
+    });
+    
+    await this.createResource({
+      title: "Active Listening Techniques",
+      description: "A poster highlighting the key components of active listening with practical examples.",
+      resourceType: "pdf",
+      category: "communication",
+      audience: ["student", "teacher", "parent"],
+      fileUrl: "/resources/active-listening.pdf",
+      thumbnailUrl: "/resources/thumbnails/active-listening.jpg",
+      downloadCount: 0,
+      relatedSubjectId: communicationSubject?.id,
+      featured: false
+    });
+    
+    // Project Resources
+    await this.createResource({
+      title: "How to Build a Simple Business Plan",
+      description: "Step-by-step guide to creating a business plan for your first entrepreneurial venture.",
+      resourceType: "guide",
+      category: "projects",
+      audience: ["student", "teacher"],
+      fileUrl: "/resources/business-plan-guide.pdf",
+      thumbnailUrl: "/resources/thumbnails/business-plan.jpg",
+      downloadCount: 0,
+      relatedSubjectId: null,
+      featured: true
+    });
+    
+    await this.createResource({
+      title: "Project Presentation Template",
+      description: "A customizable template for creating professional project presentations.",
+      resourceType: "worksheet",
+      category: "projects",
+      audience: ["student", "teacher"],
+      fileUrl: "/resources/presentation-template.pptx",
+      thumbnailUrl: "/resources/thumbnails/presentation-template.jpg",
+      downloadCount: 0,
+      relatedSubjectId: null,
+      featured: false
+    });
+    
+    // Math Resources
+    await this.createResource({
+      title: "Real-World Math Problems",
+      description: "A collection of practice problems that apply mathematical concepts to everyday scenarios.",
+      resourceType: "worksheet",
+      category: "tech-skills",
+      audience: ["student", "teacher"],
+      fileUrl: "/resources/math-problems.pdf",
+      thumbnailUrl: "/resources/thumbnails/math-problems.jpg",
+      downloadCount: 0,
+      relatedSubjectId: mathSubject?.id,
+      featured: false
+    });
+    
+    // Teacher Resources
+    await this.createResource({
+      title: "Classroom Implementation Guide",
+      description: "For educators: How to integrate Real World Academy modules into your classroom curriculum.",
+      resourceType: "guide",
+      category: "teacher-guides",
+      audience: ["teacher"],
+      fileUrl: "/resources/classroom-implementation.pdf",
+      thumbnailUrl: "/resources/thumbnails/classroom-guide.jpg",
+      downloadCount: 0,
+      relatedSubjectId: null,
+      featured: true
+    });
+    
+    await this.createResource({
+      title: "Assessment Rubrics",
+      description: "Evaluation templates for projects and assignments across all subject areas.",
+      resourceType: "worksheet",
+      category: "teacher-guides",
+      audience: ["teacher"],
+      fileUrl: "/resources/assessment-rubrics.pdf",
+      thumbnailUrl: "/resources/thumbnails/rubrics.jpg",
+      downloadCount: 0,
+      relatedSubjectId: null,
+      featured: false
+    });
+    
+    // Parent Resources
+    await this.createResource({
+      title: "Supporting Your Child's Learning",
+      description: "Tips and strategies for parents to reinforce real-world skills at home.",
+      resourceType: "guide",
+      category: "parent-guides",
+      audience: ["parent"],
+      fileUrl: "/resources/parent-support-guide.pdf",
+      thumbnailUrl: "/resources/thumbnails/parent-guide.jpg",
+      downloadCount: 0,
+      relatedSubjectId: null,
+      featured: true
+    });
+    
+    console.log("Resources data initialized");
   }
 }
 

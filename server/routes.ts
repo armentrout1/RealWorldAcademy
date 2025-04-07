@@ -6,7 +6,8 @@ import {
   insertTestimonialSchema, insertFeatureSchema,
   insertBadgeSchema, insertCategoryProgressSchema, 
   insertTimelineEventSchema, insertUserProgressSummarySchema,
-  insertCareerPathSchema, insertGoalSchema, insertVisionBoardItemSchema
+  insertCareerPathSchema, insertGoalSchema, insertVisionBoardItemSchema,
+  insertResourceSchema
 } from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -590,6 +591,110 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(204).end();
     } catch (error) {
       res.status(500).json({ message: "Failed to delete vision board item" });
+    }
+  });
+
+  // Resource Center endpoints
+  app.get("/api/resources", async (req, res) => {
+    try {
+      const resources = await storage.getAllResources();
+      res.json(resources);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch resources" });
+    }
+  });
+
+  app.get("/api/resources/featured", async (req, res) => {
+    try {
+      const featuredResources = await storage.getFeaturedResources();
+      res.json(featuredResources);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch featured resources" });
+    }
+  });
+
+  app.get("/api/resources/category/:category", async (req, res) => {
+    try {
+      const { category } = req.params;
+      const resources = await storage.getResourcesByCategory(category);
+      res.json(resources);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch resources by category" });
+    }
+  });
+
+  app.get("/api/resources/audience/:audience", async (req, res) => {
+    try {
+      const { audience } = req.params;
+      const resources = await storage.getResourcesByAudience(audience);
+      res.json(resources);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch resources by audience" });
+    }
+  });
+
+  app.get("/api/resources/type/:type", async (req, res) => {
+    try {
+      const { type } = req.params;
+      const resources = await storage.getResourcesByType(type);
+      res.json(resources);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch resources by type" });
+    }
+  });
+
+  app.get("/api/resources/:id", async (req, res) => {
+    try {
+      const resource = await storage.getResource(Number(req.params.id));
+      if (!resource) {
+        return res.status(404).json({ message: "Resource not found" });
+      }
+      res.json(resource);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch resource" });
+    }
+  });
+
+  app.post("/api/resources", express.json(), async (req, res) => {
+    try {
+      const validatedData = insertResourceSchema.parse(req.body);
+      const newResource = await storage.createResource(validatedData);
+      res.status(201).json(newResource);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid resource data" });
+    }
+  });
+
+  app.patch("/api/resources/:id", express.json(), async (req, res) => {
+    try {
+      const resourceId = Number(req.params.id);
+      const resource = await storage.getResource(resourceId);
+      
+      if (!resource) {
+        return res.status(404).json({ message: "Resource not found" });
+      }
+      
+      const updatedResource = await storage.updateResource(resourceId, req.body);
+      res.json(updatedResource);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid resource update data" });
+    }
+  });
+
+  app.post("/api/resources/:id/download", async (req, res) => {
+    try {
+      const resourceId = Number(req.params.id);
+      const resource = await storage.getResource(resourceId);
+      
+      if (!resource) {
+        return res.status(404).json({ message: "Resource not found" });
+      }
+      
+      // Increment the download count
+      const updatedResource = await storage.incrementDownloadCount(resourceId);
+      res.json(updatedResource);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to process download" });
     }
   });
 

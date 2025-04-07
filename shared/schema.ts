@@ -341,6 +341,35 @@ export const userLessonProgressRelations = relations(userLessonProgress, ({ one 
   }),
 }));
 
+// Resources for the Resource Center
+export const resources = pgTable("resources", {
+  id: serial("id").primaryKey(),
+  title: text("title").notNull(),
+  description: text("description").notNull(),
+  resourceType: text("resource_type").notNull(), // "pdf", "video", "worksheet", "guide"
+  category: text("category").notNull(), // "financial-literacy", "projects", "health", etc.
+  audience: text("audience").array(), // ["teacher", "parent", "student"]
+  fileUrl: text("file_url"), // URL to file (PDF, etc.)
+  embedUrl: text("embed_url"), // URL for embedded content (videos)
+  thumbnailUrl: text("thumbnail_url"), // URL to thumbnail image
+  downloadCount: integer("download_count").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+  relatedSubjectId: integer("related_subject_id").references(() => subjects.id),
+  featured: boolean("featured").default(false),
+});
+
+export const insertResourceSchema = createInsertSchema(resources).omit({ id: true });
+export type InsertResource = z.infer<typeof insertResourceSchema>;
+export type Resource = typeof resources.$inferSelect;
+
+export const resourcesRelations = relations(resources, ({ one }) => ({
+  subject: one(subjects, {
+    fields: [resources.relatedSubjectId],
+    references: [subjects.id],
+  }),
+}));
+
 // Define the user relations after all models are defined
 export const usersRelations = relations(users, ({ many, one }) => ({
   badges: many(badges),
