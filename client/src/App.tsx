@@ -22,7 +22,9 @@ import PlanYourFuture from "@/pages/PlanYourFuture";
 import Login from "@/pages/Login";
 import Signup from "@/pages/Signup";
 import Profile from "@/pages/Profile";
+import Settings from "@/pages/Settings";
 import TeacherDashboard from "@/pages/TeacherDashboard";
+import ParentDashboard from "@/pages/ParentDashboard";
 import NotFound from "@/pages/not-found";
 
 // Page transition variants
@@ -167,9 +169,19 @@ function Router() {
                 <Profile />
               </PageWrapper>
             </Route>
+            <Route path="/settings">
+              <PageWrapper>
+                <Settings />
+              </PageWrapper>
+            </Route>
             <Route path="/teacher-dashboard">
               <PageWrapper>
                 <TeacherDashboard />
+              </PageWrapper>
+            </Route>
+            <Route path="/parent-dashboard">
+              <PageWrapper>
+                <ParentDashboard />
               </PageWrapper>
             </Route>
             <Route>

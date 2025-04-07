@@ -1,0 +1,47 @@
+Create a “Parent Dashboard” that gives homeschool families tools to guide and track their children’s learning. This version is focused on parent/guardian users — not formal teachers — and should have a supportive, family-friendly design.
+
+1. **Create a “Parent Dashboard” Page**:
+   - Title: “Welcome, Parent!” or “Homeschool Hub”
+   - Include a short friendly message like:  
+     “Track your child’s learning, assign topics, and encourage real-world growth.”
+
+2. **Add Student Management Section**:
+   - Show cards or rows for each child (use 2–3 mock profiles for now)
+   - Each card includes:
+     - Student name, age group
+     - Recent activity summary (e.g., “Completed 1 Project this week”)
+     - A “View Progress” button
+
+3. **Progress View (Reuse from Teacher View)**:
+   - When a parent clicks “View Progress,” show a page or modal with:
+     - Module completion percentages
+     - Self Discovery results
+     - Project and budgeting activity status
+     - Notes or encouragement field (optional static textarea)
+
+4. **Daily or Weekly Planner Tool (Static)**:
+   - Add a simple scheduling component where parents can:
+     - Select days of the week
+     - Choose learning modules or projects to “assign”
+     - Add time goals (e.g., “30 mins for budgeting module”)
+   - Can be a static grid with dropdowns for now — no saving required yet
+
+5. **Motivation Tools**:
+   - Add a small “Motivations” section where parents can:
+     - Write a short message of encouragement for their child
+     - Choose a virtual reward (e.g., 🌟 “Earned a star!”, 🎉 “Celebration unlocked!”)
+     - Display these in the student’s dashboard later (placeholder only)
+
+6. **Homeschool Mode Toggle (Visual Only)**:
+   - Create a toggle/switch in the Settings page to enable “Homeschool Mode”
+   - When active, this can:
+     - Simplify some UI (fewer distractions)
+     - Highlight parent notes or messages
+     - Label teacher areas as “Parent Tools”
+
+7. **Style & Tone**:
+   - Use soft, welcoming colors (light yellows, greens, or purples)
+   - Include family-themed icons (house, heart, stars)
+   - Keep all language simple and encouraging
+
+This phase builds the foundation for family-led learning, where parents are partners in growth. Keep all functionality static or simulated for now — APIs can be plugged in later to make everything dynamic.

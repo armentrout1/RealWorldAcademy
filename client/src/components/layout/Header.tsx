@@ -6,7 +6,11 @@ import {
   ChevronDownIcon, 
   GraduationCapIcon, 
   BookOpenIcon, 
-  Users 
+  Users,
+  Home,
+  UserCircle,
+  BarChart as ChartBarIcon,
+  Settings as SettingsIcon
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -49,17 +53,35 @@ const Header: React.FC = () => {
                 <DropdownMenuContent align="end" className="w-56">
                   <DropdownMenuLabel>My Account</DropdownMenuLabel>
                   <DropdownMenuItem>
-                    <Link href="/profile" className="flex w-full">Profile</Link>
+                    <Link href="/profile" className="flex w-full items-center">
+                      <UserCircle className="mr-2 h-4 w-4" />
+                      Profile
+                    </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem>
-                    <Link href="/dashboard" className="flex w-full">Dashboard</Link>
+                    <Link href="/dashboard" className="flex w-full items-center">
+                      <ChartBarIcon className="mr-2 h-4 w-4" />
+                      Dashboard
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem>
+                    <Link href="/settings" className="flex w-full items-center">
+                      <SettingsIcon className="mr-2 h-4 w-4" />
+                      Settings
+                    </Link>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuLabel>Teacher Tools</DropdownMenuLabel>
+                  <DropdownMenuLabel>Educational Tools</DropdownMenuLabel>
                   <DropdownMenuItem>
                     <Link href="/teacher-dashboard" className="flex w-full items-center">
                       <Users className="mr-2 h-4 w-4" />
                       <span>Educator Dashboard</span>
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem>
+                    <Link href="/parent-dashboard" className="flex w-full items-center">
+                      <Home className="mr-2 h-4 w-4" />
+                      <span>Homeschool Hub</span>
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
