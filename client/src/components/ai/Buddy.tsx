@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { MessageCircle, X, Send, Smile, Sparkles, Settings, Edit, RefreshCw, Check, ActivitySquare, Brain, Heart, Timer, ExternalLink, PenTool, Lightbulb, Briefcase, Globe, Shuffle, Star, GraduationCap, Rocket, Wand } from 'lucide-react';
+import { MessageCircle, X, Send, Smile, Sparkles, Settings, Edit, RefreshCw, Check, ActivitySquare, Brain, Heart, Timer, ExternalLink, PenTool, Lightbulb, Briefcase, Globe, Shuffle, Star, GraduationCap, Rocket, Wand, BookOpen, TrendingUp, Zap, ArrowRight, Target, Award, Calendar } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import {
   Tooltip,
   TooltipContent,
@@ -169,6 +170,130 @@ const surprisePrompts = [
   "Design a perfect day from morning to night"
 ];
 
+// Student learning profile for personalized recommendations
+const studentProgress = {
+  name: "Alex",
+  ageGroup: "13-15",
+  completedModules: ["Self Discovery", "Intro to Money"],
+  inProgressModules: ["Financial Literacy"],
+  favoriteSubjects: ["Entrepreneurship", "Technology"],
+  goals: ["Start a side hustle", "Learn to code"],
+  strengths: ["Creative thinking", "Problem solving"],
+  areasToImprove: ["Time management", "Long-term planning"],
+  tone: "Motivational"
+};
+
+// Available modules data model
+const availableModules = [
+  { 
+    id: 1, 
+    title: "Financial Literacy: Advanced", 
+    description: "Learn about budgeting, saving, and making financial decisions", 
+    path: "/learn/financial-literacy-advanced",
+    level: "intermediate",
+    category: "Financial Literacy",
+    matchesGoal: "Start a side hustle"
+  },
+  { 
+    id: 2, 
+    title: "How to Make a Budget", 
+    description: "Step-by-step guide to creating and sticking to a budget", 
+    path: "/learn/how-to-make-a-budget",
+    level: "beginner",
+    category: "Financial Literacy",
+    matchesGoal: "Start a side hustle"
+  },
+  { 
+    id: 3, 
+    title: "Introduction to Web Development", 
+    description: "Learn the basics of HTML, CSS, and JavaScript", 
+    path: "/learn/intro-to-web-development",
+    level: "beginner",
+    category: "Technology",
+    matchesGoal: "Learn to code"
+  },
+  { 
+    id: 4, 
+    title: "Entrepreneurship Fundamentals", 
+    description: "Learn the basics of starting and running a business", 
+    path: "/learn/entrepreneurship-fundamentals",
+    level: "beginner",
+    category: "Entrepreneurship",
+    matchesGoal: "Start a side hustle"
+  },
+  { 
+    id: 5, 
+    title: "Self-Discovery: Goals & Dreams", 
+    description: "Explore what matters to you and set meaningful life goals", 
+    path: "/learn/self-discovery-goals",
+    level: "intermediate",
+    category: "Self Discovery",
+    matchesGoal: "Start a side hustle"
+  }
+];
+
+// Projects data model
+const availableProjects = [
+  {
+    id: 1,
+    title: "Plan a Party on a Budget",
+    description: "Apply financial planning skills to organize an event within budget constraints",
+    path: "/projects/party-budget",
+    category: "Financial Literacy",
+    skills: ["Budgeting", "Planning"],
+    timeNeeded: "3-5 hours",
+    difficulty: "Medium"
+  },
+  {
+    id: 2,
+    title: "Create Your First Webpage",
+    description: "Build a personal webpage using HTML and CSS",
+    path: "/projects/first-webpage",
+    category: "Technology",
+    skills: ["Coding", "Design"],
+    timeNeeded: "2-3 hours",
+    difficulty: "Easy"
+  },
+  {
+    id: 3,
+    title: "Design a Mini Business Plan",
+    description: "Create a business plan for a simple product or service",
+    path: "/projects/mini-business-plan",
+    category: "Entrepreneurship",
+    skills: ["Planning", "Research"],
+    timeNeeded: "4-6 hours",
+    difficulty: "Medium"
+  }
+];
+
+// Quick challenges data model
+const quickChallenges = [
+  {
+    id: 1,
+    title: "Track your spending for 2 days",
+    description: "Write down everything you spend money on for two days",
+    category: "Financial Literacy",
+    timeNeeded: "10 minutes",
+    requirement: "Financial Literacy"
+  },
+  {
+    id: 2,
+    title: "Identify three ways to earn money with your skills",
+    description: "Brainstorm three ways you could use your current skills to earn money",
+    category: "Entrepreneurship",
+    timeNeeded: "15 minutes",
+    requirement: "Entrepreneurship"
+  },
+  {
+    id: 3,
+    title: "Find and fix one bug in some code",
+    description: "Find a simple bug in provided code and fix it",
+    category: "Technology",
+    timeNeeded: "20 minutes",
+    requirement: "Technology"
+  }
+];
+
 // Buddy response patterns based on personality
 const getBuddyResponse = (message: string, personalityType: string): string => {
   const normalizedMsg = message.toLowerCase().trim();
@@ -332,6 +457,16 @@ export function Buddy() {
   const [futureLocation, setFutureLocation] = useState('');
   const [futureDreamJob, setFutureDreamJob] = useState('');
   const [selectedSurprisePrompt, setSelectedSurprisePrompt] = useState('');
+  
+  // Recommendation feature states
+  const [isRecommending, setIsRecommending] = useState(false);
+  const [recommendationType, setRecommendationType] = useState<'all' | 'lesson' | 'project' | 'challenge'>('all');
+  const [recommendedLesson, setRecommendedLesson] = useState<any | null>(null);
+  const [recommendedProject, setRecommendedProject] = useState<any | null>(null);
+  const [recommendedChallenge, setRecommendedChallenge] = useState<any | null>(null);
+  const [recommendationReason, setRecommendationReason] = useState('');
+  const [dayOfWeek, setDayOfWeek] = useState<string>('');
+  const [showWeeklyChallenge, setShowWeeklyChallenge] = useState(false);
   
   const inputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -830,6 +965,22 @@ export function Buddy() {
           <CardFooter className="flex-col gap-2 p-3 pt-2">
             <div className="flex items-center justify-between w-full mb-2">
               <div className="flex gap-2">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button 
+                      variant="outline" 
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => setIsRecommending(true)}
+                    >
+                      <BookOpen size={14} />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">
+                    <p className="text-xs">Suggest Something to Learn</p>
+                  </TooltipContent>
+                </Tooltip>
+                
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button 
@@ -2036,6 +2187,426 @@ export function Buddy() {
                 {selectedCreativeOption && !creativeResponse ? "Back to Options" : "Close"}
               </Button>
             </DialogFooter>
+          )}
+        </DialogContent>
+      </Dialog>
+      
+      {/* Recommendation Dialog */}
+      <Dialog open={isRecommending} onOpenChange={setIsRecommending}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <BookOpen className="h-5 w-5 text-primary" />
+              What Should I Do Next?
+            </DialogTitle>
+            <DialogDescription>
+              Let me suggest some learning activities based on your progress and interests.
+            </DialogDescription>
+          </DialogHeader>
+          
+          {!recommendedLesson && !recommendedProject && !recommendedChallenge ? (
+            <div className="space-y-4 py-4">
+              <div className="bg-primary/5 p-3 rounded-md border">
+                <h3 className="font-medium text-sm flex items-center gap-2">
+                  <TrendingUp className="h-4 w-4 text-primary" />
+                  Personalized Recommendations
+                </h3>
+                <p className="text-xs text-muted-foreground mt-1">
+                  I'll find the perfect next step in your learning journey based on what you've been working on.
+                </p>
+              </div>
+              
+              <div className="space-y-3">
+                <Label>What type of activity would you like me to suggest?</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  <Button
+                    variant="outline"
+                    className={cn("justify-start h-auto p-3", recommendationType === 'all' && "border-primary bg-primary/5")}
+                    onClick={() => setRecommendationType('all')}
+                  >
+                    <div className="flex flex-col items-center justify-center mr-3">
+                      <GraduationCap className="h-5 w-5 text-primary mb-1" />
+                    </div>
+                    <div className="text-left">
+                      <div className="font-medium">Show Me Everything</div>
+                      <div className="text-xs text-muted-foreground">Lesson, project & challenge</div>
+                    </div>
+                  </Button>
+                  
+                  <Button
+                    variant="outline"
+                    className={cn("justify-start h-auto p-3", recommendationType === 'lesson' && "border-primary bg-primary/5")}
+                    onClick={() => setRecommendationType('lesson')}
+                  >
+                    <div className="flex flex-col items-center justify-center mr-3">
+                      <BookOpen className="h-5 w-5 text-primary mb-1" />
+                    </div>
+                    <div className="text-left">
+                      <div className="font-medium">Suggest a Lesson</div>
+                      <div className="text-xs text-muted-foreground">Learn something new</div>
+                    </div>
+                  </Button>
+                  
+                  <Button
+                    variant="outline"
+                    className={cn("justify-start h-auto p-3", recommendationType === 'project' && "border-primary bg-primary/5")}
+                    onClick={() => setRecommendationType('project')}
+                  >
+                    <div className="flex flex-col items-center justify-center mr-3">
+                      <Rocket className="h-5 w-5 text-primary mb-1" />
+                    </div>
+                    <div className="text-left">
+                      <div className="font-medium">Suggest a Project</div>
+                      <div className="text-xs text-muted-foreground">Apply what you've learned</div>
+                    </div>
+                  </Button>
+                  
+                  <Button
+                    variant="outline"
+                    className={cn("justify-start h-auto p-3", recommendationType === 'challenge' && "border-primary bg-primary/5")}
+                    onClick={() => setRecommendationType('challenge')}
+                  >
+                    <div className="flex flex-col items-center justify-center mr-3">
+                      <Zap className="h-5 w-5 text-primary mb-1" />
+                    </div>
+                    <div className="text-left">
+                      <div className="font-medium">Quick Challenge</div>
+                      <div className="text-xs text-muted-foreground">Something brief but helpful</div>
+                    </div>
+                  </Button>
+                </div>
+                
+                <div className="flex justify-end pt-2">
+                  <Button 
+                    onClick={() => {
+                      // Select recommendations based on student profile
+                      // This would normally come from a database but we're simulating here
+                      
+                      // Determine day of week for weekly challenge
+                      const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+                      const today = new Date();
+                      setDayOfWeek(days[today.getDay()]);
+                      setShowWeeklyChallenge(today.getDay() === 1); // Show special challenge on Mondays
+                      
+                      // Find a lesson that matches student interests or goals
+                      let lesson = null;
+                      if (recommendationType === 'all' || recommendationType === 'lesson') {
+                        // Get modules that match favorite subjects or goals
+                        const relevantModules = availableModules.filter(module => 
+                          studentProgress.favoriteSubjects.includes(module.category) || 
+                          studentProgress.goals.some(goal => module.matchesGoal === goal)
+                        );
+                        
+                        if (relevantModules.length > 0) {
+                          // Pick one based on personalized criteria
+                          const inProgressModuleNames = studentProgress.inProgressModules || [];
+                          
+                          // First try to find a module related to in-progress modules
+                          const relatedModules = relevantModules.filter(module => 
+                            inProgressModuleNames.some(name => module.category.includes(name))
+                          );
+                          
+                          if (relatedModules.length > 0) {
+                            lesson = relatedModules[0];
+                            setRecommendationReason(`You've been working on ${inProgressModuleNames[0]}, and this lesson builds on that knowledge!`);
+                          } else {
+                            // Otherwise choose based on goals
+                            const goalRelatedModules = relevantModules.filter(module => 
+                              studentProgress.goals.some(goal => module.matchesGoal === goal)
+                            );
+                            
+                            if (goalRelatedModules.length > 0) {
+                              lesson = goalRelatedModules[0];
+                              setRecommendationReason(`This aligns perfectly with your goal to ${lesson.matchesGoal}!`);
+                            } else {
+                              // Fallback to a favorite subject
+                              lesson = relevantModules[0];
+                              setRecommendationReason(`Since you enjoy ${lesson.category}, I thought you might like this!`);
+                            }
+                          }
+                        } else {
+                          // If no matching modules, pick the first beginner one as default
+                          lesson = availableModules.find(m => m.level === "beginner") || availableModules[0];
+                          setRecommendationReason("I think this would be a great next step in your learning journey!");
+                        }
+                      }
+                      
+                      // Find a project that matches student interests or completed modules
+                      let project = null;
+                      if (recommendationType === 'all' || recommendationType === 'project') {
+                        const relevantProjects = availableProjects.filter(project => 
+                          studentProgress.favoriteSubjects.includes(project.category) || 
+                          studentProgress.completedModules.some(module => project.category.includes(module))
+                        );
+                        
+                        if (relevantProjects.length > 0) {
+                          project = relevantProjects[0];
+                        } else {
+                          // Default project
+                          project = availableProjects[0];
+                        }
+                      }
+                      
+                      // Find a quick challenge that matches student profile
+                      let challenge = null;
+                      if (recommendationType === 'all' || recommendationType === 'challenge') {
+                        // Check if there's a challenge that matches the student's favorite subjects
+                        const relevantChallenges = quickChallenges.filter(challenge => 
+                          studentProgress.favoriteSubjects.includes(challenge.category)
+                        );
+                        
+                        if (relevantChallenges.length > 0) {
+                          challenge = relevantChallenges[0];
+                        } else {
+                          // Default challenge
+                          challenge = quickChallenges[0];
+                        }
+                      }
+                      
+                      // Set the recommendations based on the selected type
+                      setRecommendedLesson(lesson);
+                      setRecommendedProject(project);
+                      setRecommendedChallenge(challenge);
+                    }}
+                  >
+                    Get Recommendations
+                  </Button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-5 py-4">
+              <div className="bg-primary/5 p-3 rounded-md">
+                <div className="flex items-start">
+                  <span role="img" aria-label="buddy avatar" className="text-xl mr-2">
+                    {avatarDisplay.emoji}
+                  </span>
+                  <div>
+                    <p className="text-sm">
+                      {(() => {
+                        const personalityType = buddyProfile?.personalityType || 'friendly_supportive';
+                        let message = '';
+                        
+                        switch(personalityType) {
+                          case 'friendly_supportive':
+                            message = `You've been doing so well with your learning journey! Here are some suggestions I think you'll enjoy.`;
+                            break;
+                          case 'chill_funny':
+                            message = `Hey, look at you crushing it! No pressure, but here are some cool options if you're in the mood to level up.`;
+                            break;
+                          case 'focused_motivational':
+                            message = `Time to push your skills to the next level! I've identified these high-impact activities to help you reach your goals faster.`;
+                            break;
+                          case 'curious_reflective':
+                            message = `I've been thinking about your learning path... these activities might help you explore some interesting new areas.`;
+                            break;
+                          default:
+                            message = `Based on your progress, here are some personalized recommendations for your next learning activities!`;
+                        }
+                        
+                        return message;
+                      })()}
+                    </p>
+                    {recommendationReason && (
+                      <p className="text-xs text-muted-foreground mt-1">{recommendationReason}</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+              
+              {/* Display Weekly Challenge on Mondays */}
+              {showWeeklyChallenge && (
+                <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-md p-3 space-y-2">
+                  <div className="flex items-center">
+                    <Calendar className="h-5 w-5 text-blue-500 mr-2" />
+                    <h3 className="font-medium text-sm">Challenge of the Week</h3>
+                  </div>
+                  <p className="text-sm">It's a new week — your mission, if you choose to accept it:</p>
+                  <p className="text-sm font-medium">Design a 3-day budget for a school trip. 💼🎒</p>
+                  <p className="text-xs text-muted-foreground">This special weekly challenge refreshes every Monday!</p>
+                </div>
+              )}
+              
+              {/* Lesson Recommendation */}
+              {recommendedLesson && (recommendationType === 'all' || recommendationType === 'lesson') && (
+                <div className="border rounded-md overflow-hidden">
+                  <div className="bg-amber-50 dark:bg-amber-950 border-b border-amber-100 dark:border-amber-900 p-3 flex justify-between items-center">
+                    <div className="flex items-center">
+                      <BookOpen className="h-5 w-5 text-amber-500 mr-2" />
+                      <h3 className="font-medium text-sm">Suggested Lesson</h3>
+                    </div>
+                    <Badge variant="outline" className="text-xs bg-white dark:bg-black">
+                      {recommendedLesson.level}
+                    </Badge>
+                  </div>
+                  <div className="p-3 space-y-2">
+                    <h4 className="font-medium">{recommendedLesson.title}</h4>
+                    <p className="text-sm text-muted-foreground">{recommendedLesson.description}</p>
+                    
+                    <div className="pt-2 flex space-x-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-xs h-8 gap-1"
+                        asChild
+                      >
+                        <Link href={recommendedLesson.path}>
+                          <BookOpen className="h-3 w-3" />
+                          Start Lesson
+                        </Link>
+                      </Button>
+                      
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-xs h-8"
+                        onClick={() => {
+                          // Send a message with this recommendation
+                          sendMessageMutation.mutate({
+                            content: `I recommend checking out the "${recommendedLesson.title}" lesson! It's about ${recommendedLesson.description.toLowerCase()}`,
+                            isFromBuddy: true
+                          });
+                          setIsRecommending(false);
+                        }}
+                      >
+                        Save to Chat
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              {/* Project Recommendation */}
+              {recommendedProject && (recommendationType === 'all' || recommendationType === 'project') && (
+                <div className="border rounded-md overflow-hidden">
+                  <div className="bg-emerald-50 dark:bg-emerald-950 border-b border-emerald-100 dark:border-emerald-900 p-3 flex justify-between items-center">
+                    <div className="flex items-center">
+                      <Rocket className="h-5 w-5 text-emerald-500 mr-2" />
+                      <h3 className="font-medium text-sm">Suggested Project</h3>
+                    </div>
+                    <Badge variant="outline" className="text-xs bg-white dark:bg-black">
+                      {recommendedProject.difficulty}
+                    </Badge>
+                  </div>
+                  <div className="p-3 space-y-2">
+                    <h4 className="font-medium">{recommendedProject.title}</h4>
+                    <p className="text-sm text-muted-foreground">{recommendedProject.description}</p>
+                    
+                    <div className="flex flex-wrap gap-1 pt-1">
+                      {recommendedProject.skills.map((skill, index) => (
+                        <Badge key={index} variant="secondary" className="text-xs">
+                          {skill}
+                        </Badge>
+                      ))}
+                    </div>
+                    
+                    <div className="text-xs text-muted-foreground">
+                      <Timer className="h-3 w-3 inline mr-1" />
+                      Estimated time: {recommendedProject.timeNeeded}
+                    </div>
+                    
+                    <div className="pt-2 flex space-x-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-xs h-8 gap-1"
+                        asChild
+                      >
+                        <Link href={recommendedProject.path}>
+                          <Rocket className="h-3 w-3" />
+                          Start Project
+                        </Link>
+                      </Button>
+                      
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-xs h-8"
+                        onClick={() => {
+                          // Send a message with this recommendation
+                          sendMessageMutation.mutate({
+                            content: `I suggest working on the "${recommendedProject.title}" project! This hands-on project will help you apply what you've learned about ${recommendedProject.category.toLowerCase()}.`,
+                            isFromBuddy: true
+                          });
+                          setIsRecommending(false);
+                        }}
+                      >
+                        Save to Chat
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              {/* Quick Challenge Recommendation */}
+              {recommendedChallenge && (recommendationType === 'all' || recommendationType === 'challenge') && (
+                <div className="border rounded-md overflow-hidden">
+                  <div className="bg-purple-50 dark:bg-purple-950 border-b border-purple-100 dark:border-purple-900 p-3">
+                    <div className="flex items-center">
+                      <Zap className="h-5 w-5 text-purple-500 mr-2" />
+                      <h3 className="font-medium text-sm">Quick Challenge</h3>
+                    </div>
+                  </div>
+                  <div className="p-3 space-y-2">
+                    <h4 className="font-medium">{recommendedChallenge.title}</h4>
+                    <p className="text-sm text-muted-foreground">{recommendedChallenge.description}</p>
+                    
+                    <div className="text-xs text-muted-foreground">
+                      <Timer className="h-3 w-3 inline mr-1" />
+                      Estimated time: {recommendedChallenge.timeNeeded}
+                    </div>
+                    
+                    <div className="pt-2 flex space-x-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-xs h-8 gap-1"
+                        onClick={() => {
+                          sendMessageMutation.mutate({
+                            content: `Here's a quick challenge for you: ${recommendedChallenge.title}. ${recommendedChallenge.description}`,
+                            isFromBuddy: true
+                          });
+                          setIsRecommending(false);
+                        }}
+                      >
+                        <Target className="h-3 w-3 mr-1" />
+                        Accept Challenge
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              <div className="flex justify-between pt-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setRecommendedLesson(null);
+                    setRecommendedProject(null);
+                    setRecommendedChallenge(null);
+                    setRecommendationType('all');
+                  }}
+                >
+                  <ArrowRight className="h-4 w-4 rotate-180 mr-1" />
+                  Different Recommendations
+                </Button>
+                
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => {
+                    setIsRecommending(false);
+                    setRecommendedLesson(null);
+                    setRecommendedProject(null);
+                    setRecommendedChallenge(null);
+                    setRecommendationType('all');
+                  }}
+                >
+                  Close
+                </Button>
+              </div>
+            </div>
           )}
         </DialogContent>
       </Dialog>
