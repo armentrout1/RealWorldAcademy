@@ -2209,7 +2209,7 @@ export class DatabaseStorage implements IStorage {
       name: "Buddy",
       avatarType: "robot",
       avatarColor: "blue",
-      personalityType: "friendly",
+      personalityType: "friendly_supportive",
       relationshipLevel: 1,
       lastInteraction: new Date(),
     };

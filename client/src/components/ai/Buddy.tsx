@@ -82,11 +82,14 @@ const avatarColors = [
 ];
 
 const personalityTypes = [
-  { value: 'encouraging', label: 'Encouraging' },
-  { value: 'analytical', label: 'Analytical' },
-  { value: 'creative', label: 'Creative' },
-  { value: 'motivational', label: 'Motivational' },
-  { value: 'friendly', label: 'Friendly' }
+  { value: 'friendly_supportive', label: 'Friendly & Supportive', 
+    description: 'Warm, nurturing, and encourages your growth with gentle guidance and positive reinforcement.' },
+  { value: 'chill_funny', label: 'Chill & Funny', 
+    description: 'Relaxed, uses humor to make learning fun, and keeps the mood light while still being helpful.' },
+  { value: 'focused_motivational', label: 'Focused & Motivational', 
+    description: 'Goal-oriented, energetic, and pushes you to achieve your full potential through clear action steps.' },
+  { value: 'curious_reflective', label: 'Curious & Reflective', 
+    description: 'Thoughtful, asks deep questions, and helps you explore ideas and feelings with a sense of wonder.' }
 ];
 
 // Emotion options
@@ -107,65 +110,119 @@ const getBuddyResponse = (message: string, personalityType: string): string => {
   
   // Generic responses based on personality type
   const personalityResponses: Record<string, string[]> = {
-    encouraging: [
-      "You're doing great! Keep going!",
-      "I believe in you. You can tackle this challenge!",
-      "Every step you take is progress. You should be proud!",
-      "That's an interesting thought. What else are you thinking about?"
-    ],
-    analytical: [
-      "Let's break this down step by step.",
-      "Interesting. Have you considered looking at it from this angle?",
-      "Let me analyze this situation for you.",
-      "The data suggests a few different approaches we could take."
-    ],
-    creative: [
-      "What if we try something completely new?",
-      "Let's think outside the box on this one!",
-      "Your ideas are so creative! Here's another perspective to consider.",
-      "Imagination is the key to learning. Let's explore this together!"
-    ],
-    motivational: [
-      "You've got this! Just focus on your next step.",
-      "Remember why you started this journey. You're making real progress!",
-      "Challenges help us grow. This is how you become even better!",
-      "I'm here to support you every step of the way."
-    ],
+    // Legacy type handling for backward compatibility
     friendly: [
       "Hey friend! That's a great question.",
       "I'm so glad you asked me about that!",
       "We make a great team, don't we?",
       "I'm enjoying our conversation! Tell me more about what you're learning."
+    ],
+    
+    // New personality types
+    friendly_supportive: [
+      "I'm really proud of how you're tackling this! What can I help with next?",
+      "You're making wonderful progress. Remember, it's okay to take your time with difficult concepts.",
+      "I believe in you! Every question you ask shows your commitment to learning.",
+      "Learning together is so rewarding. I'm here to support you every step of the way!"
+    ],
+    chill_funny: [
+      "No stress, we've got this! Learning is a marathon, not a sprint.",
+      "Hmm, that's an interesting challenge. Let's tackle it with a smile!",
+      "Knowledge is power... and also pretty fun when you get the hang of it!",
+      "Think of this as a puzzle we're solving together. No pressure, just exploration."
+    ],
+    focused_motivational: [
+      "Let's set a clear goal for today's session. What specific skill do you want to master?",
+      "I see your potential! Let's channel that energy into mastering this concept.",
+      "Every minute of focused practice brings you closer to your goals. Let's make this count!",
+      "You're developing skills that will serve you for a lifetime. Let's keep building your momentum!"
+    ],
+    curious_reflective: [
+      "That's fascinating... I wonder how this connects to what you learned earlier?",
+      "What aspects of this topic intrigue you the most? Let's explore those deeper questions.",
+      "Sometimes the best learning happens when we pause to reflect. What patterns are you noticing?",
+      "The questions you're asking show real depth of thought. Let's unpack this together."
     ]
   };
   
-  // Content-specific responses
+  // Content-specific responses - greeting messages
   if (normalizedMsg.includes("hello") || normalizedMsg.includes("hi ")) {
-    return `Hello there! I'm your learning buddy. What would you like to chat about today?`;
+    switch(personalityType) {
+      case 'friendly_supportive':
+        return "Hello there! I'm so happy to see you! How can I support your learning journey today?";
+      case 'chill_funny':
+        return "Hey there! Good to see you! Ready to make some progress today? No pressure, we'll take it at your pace.";
+      case 'focused_motivational':
+        return "Hi there! Ready to make today count? What learning goals are we conquering today?";
+      case 'curious_reflective':
+        return "Hello! I was just wondering what interesting questions might be on your mind today. What would you like to explore?";
+      default:
+        return "Hello there! I'm your learning buddy. What would you like to chat about today?";
+    }
   }
   
+  // Help, stuck, or confused
   if (normalizedMsg.includes("help") || normalizedMsg.includes("stuck") || normalizedMsg.includes("confused")) {
-    if (personalityType === 'analytical') {
-      return "I understand you're feeling stuck. Let's identify exactly what's confusing you so we can solve it step by step. What specific concept or task are you working on?";
-    } else if (personalityType === 'encouraging') {
-      return "It's completely normal to feel stuck sometimes! Everyone encounters challenges while learning. Tell me more about what you're struggling with, and we'll work through it together.";
-    } else {
-      return "I'm here to help! Let me know what you're finding difficult, and we can figure it out together.";
+    switch(personalityType) {
+      case 'friendly_supportive':
+        return "It's completely normal to feel stuck sometimes! Everyone encounters challenges while learning. Tell me more about what you're struggling with, and we'll work through it together with patience.";
+      case 'chill_funny':
+        return "Hitting a wall? No worries—even Einstein got stumped sometimes! Let's break this down into bite-sized pieces that are easier to digest. What part has you scratching your head?";
+      case 'focused_motivational':
+        return "This is just a temporary roadblock, not a dead end! Let's identify exactly what's challenging you, create a clear plan to overcome it, and get you back on track toward your goals.";
+      case 'curious_reflective':
+        return "Interesting... confusion often signals we're at the edge of our understanding. What specifically feels unclear? And what insights have you gained so far that might help us explore this puzzle?";
+      default:
+        return "I'm here to help! Let me know what you're finding difficult, and we can figure it out together.";
     }
   }
   
+  // Learning and studying
   if (normalizedMsg.includes("learn") || normalizedMsg.includes("study") || normalizedMsg.includes("course")) {
-    if (personalityType === 'motivational') {
-      return "Learning new things is an exciting journey! Your dedication to improving yourself is inspiring. What specific subject are you focusing on right now?";
-    } else if (personalityType === 'creative') {
-      return "The world of knowledge is like a playground for your mind! Let's explore this topic in a way that makes it come alive for you. What aspects interest you the most?";
-    } else {
-      return "I'm excited to help you with your learning journey! What specific area would you like to explore together?";
+    switch(personalityType) {
+      case 'friendly_supportive':
+        return "I'm really proud of you for focusing on your education! Learning takes courage and persistence. What subject are you exploring, and how can I support you with it?";
+      case 'chill_funny':
+        return "Cool! Let's make this study session actually enjoyable—I know, shocking concept, right? What are we diving into today? I promise we'll find the interesting parts!";
+      case 'focused_motivational':
+        return "Excellent choice to invest in your education! Each study session builds your knowledge foundation and brings you closer to your goals. What specific subject are you tackling today?";
+      case 'curious_reflective':
+        return "The pursuit of knowledge is such a fascinating journey. What aspects of this subject spark your curiosity the most? What questions are you hoping to answer?";
+      default:
+        return "I'm excited to help you with your learning journey! What specific area would you like to explore together?";
     }
   }
   
+  // Tired or needing a break
   if (normalizedMsg.includes("tired") || normalizedMsg.includes("break") || normalizedMsg.includes("rest")) {
-    return "Taking breaks is an important part of effective learning! Your brain needs time to process information. Maybe try a 10-minute walk or some quick stretches before coming back to your studies.";
+    switch(personalityType) {
+      case 'friendly_supportive':
+        return "I completely understand that feeling! Listening to your body and mind is so important. Taking restful breaks actually helps your brain process what you've learned. Maybe try a short walk or some deep breathing?";
+      case 'chill_funny':
+        return "Brain asking for a timeout? Totally fair! Even computers need to restart sometimes. Grab a snack, do a quick dance party, or just stare at a wall for a bit—whatever recharges your battery!";
+      case 'focused_motivational':
+        return "Strategic breaks are part of peak performance! Try a 10-minute active break—a quick walk or stretch session will increase your blood flow and help you return with renewed focus and energy.";
+      case 'curious_reflective':
+        return "Interesting how our minds signal when they need rest. Have you noticed patterns in when you feel tired while learning? A short break doing something completely different might give your mind the space it needs to process.";
+      default:
+        return "Taking breaks is an important part of effective learning! Your brain needs time to process information. Maybe try a 10-minute walk or some quick stretches before coming back to your studies.";
+    }
+  }
+  
+  // Creative ideas or inspiration
+  if (normalizedMsg.includes("idea") || normalizedMsg.includes("creative") || normalizedMsg.includes("inspiration")) {
+    switch(personalityType) {
+      case 'friendly_supportive':
+        return "Your creative thinking is one of your greatest strengths! What if you try connecting different concepts you've learned? Sometimes the most insightful ideas come from unexpected connections.";
+      case 'chill_funny':
+        return "Need a creativity boost? Try the 'worst idea' technique—think of the most ridiculous solutions possible, then work backward to something practical. Plus, it's pretty entertaining!";
+      case 'focused_motivational':
+        return "Creative challenges are opportunities to distinguish yourself! Try setting a timer for 10 minutes and rapidly generate as many ideas as possible without judgment. Quantity often leads to quality!";
+      case 'curious_reflective':
+        return "I wonder what would happen if you looked at this from a completely different perspective? Perhaps consider how someone from a different field might approach this challenge. What patterns or principles might transfer?";
+      default:
+        return "Let's spark some creativity! Try looking at the problem from a different angle, or take a short break to let your mind wander. Sometimes our best ideas come when we're not actively searching for them.";
+    }
   }
   
   // Default: Return a random response based on personality
@@ -460,6 +517,11 @@ export function Buddy() {
               </div>
             </div>
             <CardDescription>
+              {buddyProfile?.personalityType === 'friendly_supportive' && 'Your warm and encouraging learning companion'}
+              {buddyProfile?.personalityType === 'chill_funny' && 'Your laid-back, fun-loving study partner'}
+              {buddyProfile?.personalityType === 'focused_motivational' && 'Your goal-oriented achievement coach'}
+              {buddyProfile?.personalityType === 'curious_reflective' && 'Your thoughtful, questioning guide'}
+              {/* Legacy types for backward compatibility */}
               {buddyProfile?.personalityType === 'encouraging' && 'Your supportive learning companion'}
               {buddyProfile?.personalityType === 'analytical' && 'Your problem-solving assistant'}
               {buddyProfile?.personalityType === 'creative' && 'Your imaginative learning partner'}
@@ -636,11 +698,7 @@ export function Buddy() {
                           {type.label}
                         </Label>
                         <p className="text-xs text-muted-foreground">
-                          {type.value === 'encouraging' && 'Supportive and positive. Celebrates your wins and encourages during challenges.'}
-                          {type.value === 'analytical' && 'Logical and detail-oriented. Helps break down complex problems step by step.'}
-                          {type.value === 'creative' && 'Imaginative and inspirational. Offers unique perspectives and creative approaches.'}
-                          {type.value === 'motivational' && 'Energetic and goal-focused. Keeps you motivated and on track with your objectives.'}
-                          {type.value === 'friendly' && 'Warm and conversational. Makes learning feel like chatting with a friend.'}
+                          {type.description}
                         </p>
                       </div>
                     </div>

@@ -456,9 +456,9 @@ export const buddyProfiles = pgTable("buddy_profiles", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull().references(() => users.id).unique(),
   name: text("name").notNull().default("Buddy"),
-  avatarType: text("avatar_type").notNull().default("robot"), // "robot", "animal", "human"
+  avatarType: text("avatar_type").notNull().default("robot"), // "robot", "animal", "human", "fantasy"
   avatarColor: text("avatar_color").notNull().default("blue"),
-  personalityType: text("personality_type").notNull().default("friendly"), // "friendly", "funny", "motivator", "calm"
+  personalityType: text("personality_type").notNull().default("friendly_supportive"), // "friendly_supportive", "chill_funny", "focused_motivational", "curious_reflective"
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
   relationshipLevel: integer("relationship_level").default(1).notNull(), // 1-10 level of bonding
