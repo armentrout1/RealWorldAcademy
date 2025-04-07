@@ -10,7 +10,11 @@ import {
   userProgressSummary, type UserProgressSummary, type InsertUserProgressSummary,
   careerPaths, type CareerPath, type InsertCareerPath,
   goals, type Goal, type InsertGoal,
-  visionBoardItems, type VisionBoardItem, type InsertVisionBoardItem
+  visionBoardItems, type VisionBoardItem, type InsertVisionBoardItem,
+  subjects, type Subject, type InsertSubject,
+  lessons, type Lesson, type InsertLesson,
+  userSubjectProgress, type UserSubjectProgress, type InsertUserSubjectProgress,
+  userLessonProgress, type UserLessonProgress, type InsertUserLessonProgress
 } from "@shared/schema";
 import { db } from "./db";
 import { eq } from "drizzle-orm";
@@ -76,6 +80,33 @@ export interface IStorage {
   createVisionBoardItem(item: InsertVisionBoardItem): Promise<VisionBoardItem>;
   updateVisionBoardItem(id: number, item: Partial<VisionBoardItem>): Promise<VisionBoardItem>;
   deleteVisionBoardItem(id: number): Promise<void>;
+  
+  // Subject operations
+  getAllSubjects(): Promise<Subject[]>;
+  getFeaturedSubjects(): Promise<Subject[]>;
+  getSubject(id: number): Promise<Subject | undefined>;
+  getSubjectBySlug(slug: string): Promise<Subject | undefined>;
+  createSubject(subject: InsertSubject): Promise<Subject>;
+  updateSubject(id: number, subject: Partial<Subject>): Promise<Subject>;
+  
+  // Lesson operations
+  getLessonsBySubject(subjectId: number): Promise<Lesson[]>;
+  getLesson(id: number): Promise<Lesson | undefined>;
+  getLessonBySlug(subjectSlug: string, lessonSlug: string): Promise<Lesson | undefined>;
+  createLesson(lesson: InsertLesson): Promise<Lesson>;
+  updateLesson(id: number, lesson: Partial<Lesson>): Promise<Lesson>;
+  
+  // User Subject Progress operations
+  getUserSubjectProgress(userId: number, subjectId: number): Promise<UserSubjectProgress | undefined>;
+  getAllUserSubjectProgress(userId: number): Promise<UserSubjectProgress[]>;
+  createUserSubjectProgress(progress: InsertUserSubjectProgress): Promise<UserSubjectProgress>;
+  updateUserSubjectProgress(userId: number, subjectId: number, progress: Partial<UserSubjectProgress>): Promise<UserSubjectProgress>;
+  
+  // User Lesson Progress operations
+  getUserLessonProgress(userId: number, lessonId: number): Promise<UserLessonProgress | undefined>;
+  getAllUserLessonProgressBySubject(userId: number, subjectId: number): Promise<UserLessonProgress[]>;
+  createUserLessonProgress(progress: InsertUserLessonProgress): Promise<UserLessonProgress>;
+  updateUserLessonProgress(userId: number, lessonId: number, progress: Partial<UserLessonProgress>): Promise<UserLessonProgress>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -290,6 +321,170 @@ export class DatabaseStorage implements IStorage {
   async deleteVisionBoardItem(id: number): Promise<void> {
     await db.delete(visionBoardItems).where(eq(visionBoardItems.id, id));
   }
+  
+  // Subject operations
+  async getAllSubjects(): Promise<Subject[]> {
+    return await db.select().from(subjects).orderBy(subjects.order);
+  }
+  
+  async getFeaturedSubjects(): Promise<Subject[]> {
+    return await db.select().from(subjects).where(eq(subjects.featured, true)).orderBy(subjects.order);
+  }
+  
+  async getSubject(id: number): Promise<Subject | undefined> {
+    const results = await db.select().from(subjects).where(eq(subjects.id, id));
+    return results.length > 0 ? results[0] : undefined;
+  }
+  
+  async getSubjectBySlug(slug: string): Promise<Subject | undefined> {
+    const results = await db.select().from(subjects).where(eq(subjects.slug, slug));
+    return results.length > 0 ? results[0] : undefined;
+  }
+  
+  async createSubject(subject: InsertSubject): Promise<Subject> {
+    const results = await db.insert(subjects).values(subject).returning();
+    return results[0];
+  }
+  
+  async updateSubject(id: number, subject: Partial<Subject>): Promise<Subject> {
+    const results = await db
+      .update(subjects)
+      .set(subject)
+      .where(eq(subjects.id, id))
+      .returning();
+    return results[0];
+  }
+  
+  // Lesson operations
+  async getLessonsBySubject(subjectId: number): Promise<Lesson[]> {
+    return await db.select().from(lessons)
+      .where(eq(lessons.subjectId, subjectId))
+      .orderBy(lessons.order);
+  }
+  
+  async getLesson(id: number): Promise<Lesson | undefined> {
+    const results = await db.select().from(lessons).where(eq(lessons.id, id));
+    return results.length > 0 ? results[0] : undefined;
+  }
+  
+  async getLessonBySlug(subjectSlug: string, lessonSlug: string): Promise<Lesson | undefined> {
+    const subject = await this.getSubjectBySlug(subjectSlug);
+    if (!subject) return undefined;
+    
+    const results = await db.select().from(lessons)
+      .where(eq(lessons.subjectId, subject.id))
+      .where(eq(lessons.slug, lessonSlug));
+    return results.length > 0 ? results[0] : undefined;
+  }
+  
+  async createLesson(lesson: InsertLesson): Promise<Lesson> {
+    const results = await db.insert(lessons).values(lesson).returning();
+    return results[0];
+  }
+  
+  async updateLesson(id: number, lesson: Partial<Lesson>): Promise<Lesson> {
+    const results = await db
+      .update(lessons)
+      .set(lesson)
+      .where(eq(lessons.id, id))
+      .returning();
+    return results[0];
+  }
+  
+  // User Subject Progress operations
+  async getUserSubjectProgress(userId: number, subjectId: number): Promise<UserSubjectProgress | undefined> {
+    const results = await db.select().from(userSubjectProgress)
+      .where(eq(userSubjectProgress.userId, userId))
+      .where(eq(userSubjectProgress.subjectId, subjectId));
+    return results.length > 0 ? results[0] : undefined;
+  }
+  
+  async getAllUserSubjectProgress(userId: number): Promise<UserSubjectProgress[]> {
+    return await db.select().from(userSubjectProgress)
+      .where(eq(userSubjectProgress.userId, userId));
+  }
+  
+  async createUserSubjectProgress(progress: InsertUserSubjectProgress): Promise<UserSubjectProgress> {
+    const results = await db.insert(userSubjectProgress).values(progress).returning();
+    return results[0];
+  }
+  
+  async updateUserSubjectProgress(userId: number, subjectId: number, progress: Partial<UserSubjectProgress>): Promise<UserSubjectProgress> {
+    const existing = await this.getUserSubjectProgress(userId, subjectId);
+    
+    if (existing) {
+      const results = await db
+        .update(userSubjectProgress)
+        .set(progress)
+        .where(eq(userSubjectProgress.userId, userId))
+        .where(eq(userSubjectProgress.subjectId, subjectId))
+        .returning();
+      return results[0];
+    } else {
+      // Create new progress if it doesn't exist
+      const newProgress: InsertUserSubjectProgress = {
+        userId,
+        subjectId,
+        status: progress.status || 'not_started',
+        currentLessonId: progress.currentLessonId,
+        startedAt: progress.startedAt || new Date(),
+        completedAt: progress.completedAt,
+        percentComplete: progress.percentComplete || 0,
+      };
+      return await this.createUserSubjectProgress(newProgress);
+    }
+  }
+  
+  // User Lesson Progress operations
+  async getUserLessonProgress(userId: number, lessonId: number): Promise<UserLessonProgress | undefined> {
+    const results = await db.select().from(userLessonProgress)
+      .where(eq(userLessonProgress.userId, userId))
+      .where(eq(userLessonProgress.lessonId, lessonId));
+    return results.length > 0 ? results[0] : undefined;
+  }
+  
+  async getAllUserLessonProgressBySubject(userId: number, subjectId: number): Promise<UserLessonProgress[]> {
+    const subjectLessons = await this.getLessonsBySubject(subjectId);
+    const lessonIds = subjectLessons.map(lesson => lesson.id);
+    
+    // If no lessons found, return empty array
+    if (lessonIds.length === 0) return [];
+    
+    return await db.select().from(userLessonProgress)
+      .where(eq(userLessonProgress.userId, userId))
+      .where(userLessonProgress.lessonId.in(lessonIds));
+  }
+  
+  async createUserLessonProgress(progress: InsertUserLessonProgress): Promise<UserLessonProgress> {
+    const results = await db.insert(userLessonProgress).values(progress).returning();
+    return results[0];
+  }
+  
+  async updateUserLessonProgress(userId: number, lessonId: number, progress: Partial<UserLessonProgress>): Promise<UserLessonProgress> {
+    const existing = await this.getUserLessonProgress(userId, lessonId);
+    
+    if (existing) {
+      const results = await db
+        .update(userLessonProgress)
+        .set(progress)
+        .where(eq(userLessonProgress.userId, userId))
+        .where(eq(userLessonProgress.lessonId, lessonId))
+        .returning();
+      return results[0];
+    } else {
+      // Create new progress if it doesn't exist
+      const newProgress: InsertUserLessonProgress = {
+        userId,
+        lessonId,
+        status: progress.status || 'not_started',
+        startedAt: progress.startedAt,
+        completedAt: progress.completedAt,
+        answers: progress.answers,
+        notes: progress.notes,
+      };
+      return await this.createUserLessonProgress(newProgress);
+    }
+  }
 
   // Initialize with sample data
   async initializeData() {
@@ -298,6 +493,8 @@ export class DatabaseStorage implements IStorage {
     if (existingCategories.length > 0) {
       // Check if we need to initialize progress data
       await this.initializeProgressData();
+      // Check if we need to initialize subject data
+      await this.initializeSubjectsData();
       return; // Skip initialization if categories exist
     }
     
@@ -541,6 +738,719 @@ export class DatabaseStorage implements IStorage {
     
     // Initialize career paths data
     await this.initializeCareerPathsData();
+  }
+  
+  // Initialize subject data with lessons for Phase 19
+  async initializeSubjectsData() {
+    // Check if subjects already exist
+    try {
+      const existingSubjects = await db.select().from(subjects);
+      if (existingSubjects.length > 0) return; // Skip if data exists
+      
+      console.log("Initializing subjects and lessons data...");
+      
+      // Create the three core subjects for Phase 19
+      const financialLiteracySubject = await this.createSubject({
+        title: "Financial Literacy",
+        description: "Learn essential money management skills for real-world financial success. Understand budgeting, saving, investing, and making smart financial decisions.",
+        slug: "financial-literacy",
+        iconName: "wallet",
+        color: "green",
+        featured: true,
+        order: 1,
+        summary: "You've gained critical financial skills that will serve you throughout life. You now understand budgeting, saving strategies, how to avoid debt traps, and basic investing concepts.",
+        nextSubjectIds: []
+      });
+      
+      const communicationSubject = await this.createSubject({
+        title: "Communication & Relationships",
+        description: "Develop the skills to communicate effectively, build healthy relationships, and navigate social situations with confidence.",
+        slug: "communication-relationships",
+        iconName: "message-circle",
+        color: "violet",
+        featured: true,
+        order: 2,
+        summary: "You've developed essential communication skills to express yourself clearly, listen actively, resolve conflicts, and build meaningful connections with others.",
+        nextSubjectIds: []
+      });
+      
+      const realWorldMathSubject = await this.createSubject({
+        title: "Real-World Math",
+        description: "Apply mathematical concepts to practical, everyday situations. Learn how math is used in budgeting, decision-making, and problem-solving.",
+        slug: "real-world-math",
+        iconName: "calculator",
+        color: "blue",
+        featured: true,
+        order: 3,
+        summary: "You've mastered practical mathematical skills for everyday life, from calculating tips and understanding percentages to making data-driven decisions.",
+        nextSubjectIds: []
+      });
+      
+      // Create lessons for Financial Literacy
+      const financialLiteracyLessons = [
+        {
+          subjectId: financialLiteracySubject.id,
+          title: "Budgeting Basics",
+          subtitle: "Creating a plan for your money",
+          slug: "budgeting-basics",
+          order: 1,
+          content: "Budgeting is the foundation of financial health. It's simply tracking your income and expenses to understand where your money goes and make intentional decisions about spending. A good budget helps you live within your means, save for the future, and reduce financial stress. The 50/30/20 rule suggests allocating 50% of income to needs, 30% to wants, and 20% to savings and debt repayment.",
+          scenarioTitle: "First Paycheck Planning",
+          scenarioContent: "You just got your first part-time job that pays $800 per month. You need to cover your phone bill ($50), save for a laptop ($1000), help with family expenses ($100), and have some spending money. How would you create a balanced budget?",
+          activityType: "budget-form",
+          activityContent: JSON.stringify({
+            incomeCategories: ["Job", "Allowance", "Other"],
+            expenseCategories: ["Needs", "Wants", "Savings", "Giving"]
+          }),
+          estimatedMinutes: 20,
+          ageGroupContent: JSON.stringify({
+            "9-12": {
+              scenario: "You receive $30 in allowance each month and want to save for a $60 game.",
+              terminology: "simpler"
+            },
+            "13-15": {
+              scenario: "You earn $200 monthly from babysitting and yard work, and want to save for a $400 tablet.",
+              terminology: "moderate"
+            },
+            "16-18": {
+              scenario: "You just got your first part-time job that pays $800 per month.",
+              terminology: "advanced"
+            }
+          })
+        },
+        {
+          subjectId: financialLiteracySubject.id,
+          title: "Saving Strategies",
+          subtitle: "Building your financial safety net",
+          slug: "saving-strategies",
+          order: 2,
+          content: "Saving money is crucial for financial security and reaching your goals. An emergency fund should cover 3-6 months of expenses. Automating savings makes the process easier - 'pay yourself first' by transferring money to savings immediately when you receive income. Different savings accounts serve different purposes: emergency funds should be easily accessible, while retirement savings can be in less liquid, higher-return investments.",
+          scenarioTitle: "Emergency Fund Challenge",
+          scenarioContent: "You have a part-time job making $500 monthly with $300 in monthly expenses. You currently have no savings. An unexpected car repair cost your family $600 last month, causing financial strain. How would you build an emergency fund to prepare for future surprises?",
+          activityType: "savings-calculator",
+          activityContent: JSON.stringify({
+            calculatorType: "emergency-fund",
+            fields: ["monthly-income", "monthly-expenses", "savings-goal"]
+          }),
+          estimatedMinutes: 25,
+          ageGroupContent: JSON.stringify({
+            "9-12": {
+              scenario: "Your bike needs repairs that cost $40, but you have no savings.",
+              terminology: "simpler"
+            },
+            "13-15": {
+              scenario: "Your phone broke and costs $200 to replace, but you have no savings.",
+              terminology: "moderate"
+            },
+            "16-18": {
+              scenario: "An unexpected car repair cost $600, causing financial strain.",
+              terminology: "advanced"
+            }
+          })
+        },
+        {
+          subjectId: financialLiteracySubject.id,
+          title: "Understanding Credit",
+          subtitle: "Using loans and credit cards wisely",
+          slug: "understanding-credit",
+          order: 3,
+          content: "Credit is borrowed money that you promise to repay over time, usually with interest. Your credit score (ranging from 300-850) affects your ability to borrow and the interest rates you'll receive. Building good credit requires paying bills on time, keeping credit card balances low, and avoiding unnecessary debt. Credit cards offer convenience but can lead to financial problems if not used responsibly. Always pay more than the minimum payment to avoid accumulating interest.",
+          scenarioTitle: "First Credit Card Decision",
+          scenarioContent: "You're 18 and received a credit card offer with a $1,000 limit, 22% APR, and $39 annual fee. You work part-time making $800 monthly. You're considering using it for everyday purchases and a $600 laptop. How would you decide whether to accept this offer and how to use the card responsibly?",
+          activityType: "credit-simulator",
+          activityContent: JSON.stringify({
+            simulatorType: "credit-card-payoff",
+            defaults: {
+              balance: 600,
+              interestRate: 22,
+              minimumPayment: 25
+            }
+          }),
+          estimatedMinutes: 30,
+          ageGroupContent: JSON.stringify({
+            "9-12": {
+              scenario: "Your friend lent you $20 for a game, expecting to be paid back next month.",
+              terminology: "simpler"
+            },
+            "13-15": {
+              scenario: "You borrowed $100 from your parents for concert tickets, promising to repay from your upcoming birthday money.",
+              terminology: "moderate" 
+            },
+            "16-18": {
+              scenario: "You're 18 and received a credit card offer with a $1,000 limit and 22% APR.",
+              terminology: "advanced"
+            }
+          })
+        },
+        {
+          subjectId: financialLiteracySubject.id,
+          title: "Investing Fundamentals",
+          subtitle: "Growing your money over time",
+          slug: "investing-fundamentals",
+          order: 4,
+          content: "Investing means putting money into assets with the expectation of generating income or profit over time. While investing involves risk, historically it has provided higher returns than savings accounts over long periods. The power of compound interest means earnings generate their own earnings over time. Common investment options include stocks (ownership in companies), bonds (loans to companies or governments), mutual funds (collections of investments), and real estate. Starting early, even with small amounts, gives your investments more time to grow.",
+          scenarioTitle: "First Investment Plan",
+          scenarioContent: "You've saved $1,000 and want to start investing for college, which is 5 years away. You're trying to understand different investment options, the concept of risk vs. return, and how to create a simple investment plan that aligns with your goals and timeframe.",
+          activityType: "compound-interest-calculator",
+          activityContent: JSON.stringify({
+            calculatorType: "compound-growth",
+            fields: ["initial-investment", "monthly-contribution", "years", "estimated-return"],
+            defaults: {
+              initialInvestment: 1000,
+              monthlyContribution: 50,
+              years: 5,
+              estimatedReturn: 7
+            }
+          }),
+          estimatedMinutes: 35,
+          ageGroupContent: JSON.stringify({
+            "9-12": {
+              scenario: "You have $50 saved and want to grow it for a bigger purchase in two years.",
+              terminology: "simpler"
+            },
+            "13-15": {
+              scenario: "You've saved $300 from birthdays and want to make it grow for a future car down payment.",
+              terminology: "moderate"
+            }, 
+            "16-18": {
+              scenario: "You've saved $1,000 and want to start investing for college expenses.",
+              terminology: "advanced"
+            }
+          })
+        }
+      ];
+      
+      // Create lessons for Communication & Relationships
+      const communicationLessons = [
+        {
+          subjectId: communicationSubject.id,
+          title: "Active Listening",
+          subtitle: "The foundation of effective communication",
+          slug: "active-listening",
+          order: 1,
+          content: "Active listening means fully focusing on the speaker, understanding their message, and thoughtfully responding. It's different from passive hearing - active listening requires engagement and attention. This skill strengthens relationships by showing respect, building trust, and preventing misunderstandings. Techniques include maintaining eye contact, asking clarifying questions, and paraphrasing what you've heard to confirm understanding. Avoiding distractions and not planning your response while the other person is still speaking are essential aspects of active listening.",
+          scenarioTitle: "Friend in Need",
+          scenarioContent: "Your friend seems upset and finally reaches out to talk about a difficult situation at home. They start sharing something important, but you're also expecting an important text about plans later. How do you practice active listening while managing the competing demands for your attention?",
+          activityType: "scenario-response",
+          activityContent: JSON.stringify({
+            scenarioOptions: [
+              {
+                text: "Check your phone quickly while they're talking to make sure you don't miss anything important",
+                feedback: "This shows your phone is more important than your friend's feelings. Active listening requires giving your full attention."
+              },
+              {
+                text: "Put your phone away, make eye contact, and focus completely on what they're saying",
+                feedback: "Great choice! Giving your undivided attention shows respect and helps you truly understand what they're sharing.",
+                isCorrect: true
+              },
+              {
+                text: "Tell them you're expecting an important text so they should hurry up with their story",
+                feedback: "This dismisses their feelings and rush them through something important, damaging trust in the relationship."
+              }
+            ]
+          }),
+          estimatedMinutes: 15,
+          ageGroupContent: JSON.stringify({
+            "9-12": {
+              scenario: "Your friend is telling you about something that made them sad at school today.",
+              terminology: "simpler"
+            },
+            "13-15": {
+              scenario: "Your friend is upset about something that happened with their group of friends and wants to talk.",
+              terminology: "moderate"
+            },
+            "16-18": {
+              scenario: "Your friend seems upset and finally reaches out to talk about a difficult situation at home.",
+              terminology: "advanced"
+            }
+          })
+        },
+        {
+          subjectId: communicationSubject.id,
+          title: "Conflict Resolution",
+          subtitle: "Turning disagreements into growth opportunities",
+          slug: "conflict-resolution",
+          order: 2,
+          content: "Conflict is a natural part of relationships, and resolving it constructively can strengthen connections. Effective conflict resolution focuses on finding mutually beneficial solutions rather than proving who is right. Key principles include addressing the issue promptly, focusing on the specific behavior (not attacking the person), using 'I' statements to express feelings, actively listening to understand the other perspective, and working together on solutions. Different conflict styles include avoiding, accommodating, competing, compromising, and collaborating - with collaboration generally producing the most sustainable results.",
+          scenarioTitle: "Team Project Tension",
+          scenarioContent: "You're working on an important group project with three classmates. One team member hasn't completed their portion, which is now overdue. Another member is angry and wants to report them to the teacher. The third member wants to ignore the problem and do the work themselves. As tensions rise, how would you approach this conflict?",
+          activityType: "conflict-simulation",
+          activityContent: JSON.stringify({
+            steps: [
+              {
+                name: "Identify the real issue",
+                options: [
+                  "Missing work that affects the group grade",
+                  "Laziness of one team member",
+                  "Teacher's unfair group assignment"
+                ],
+                correctIndex: 0
+              },
+              {
+                name: "Choose your approach",
+                options: [
+                  "Confront the person publicly about their failure",
+                  "Have a private, non-accusatory conversation to understand what's happening",
+                  "Immediately report to the teacher without discussion"
+                ],
+                correctIndex: 1
+              },
+              {
+                name: "Find a solution",
+                options: [
+                  "Exclude them from the project completely",
+                  "Do their work for them this time",
+                  "Create a revised plan with clear deadlines and check-ins"
+                ],
+                correctIndex: 2
+              }
+            ]
+          }),
+          estimatedMinutes: 25,
+          ageGroupContent: JSON.stringify({
+            "9-12": {
+              scenario: "Your friend took your favorite pencil without asking and now it's broken.",
+              terminology: "simpler"
+            },
+            "13-15": {
+              scenario: "You and your friend disagree about which activity to do this weekend, and you're both getting frustrated.",
+              terminology: "moderate"
+            },
+            "16-18": {
+              scenario: "You're working on an important group project and one team member hasn't completed their portion.",
+              terminology: "advanced"
+            }
+          })
+        },
+        {
+          subjectId: communicationSubject.id,
+          title: "Digital Communication",
+          subtitle: "Navigating online interactions effectively",
+          slug: "digital-communication",
+          order: 3,
+          content: "Digital communication has transformed how we connect, but presents unique challenges. Text lacks tone and body language, leading to misinterpretations. Digital etiquette includes responding in a timely manner, being clear and concise, considering the appropriate platform for different messages, and remembering that digital communications can be permanent and shareable. Social media interactions add complexity to relationships, and it's important to think carefully about what we share and how we engage with others online. Finding balance between digital and face-to-face communication is essential for maintaining healthy relationships.",
+          scenarioTitle: "Group Chat Misunderstanding",
+          scenarioContent: "You're in a group chat with friends planning a weekend activity. After someone suggests an idea, you respond with 'Yeah, that sounds great...' meaning to show sarcasm because you had a bad experience with that activity before. Several people take your message as genuine enthusiasm, and now plans are moving forward. How do you handle this miscommunication?",
+          activityType: "text-interpretation",
+          activityContent: JSON.stringify({
+            messages: [
+              {
+                text: "Let's go to that new climbing gym on Saturday!",
+                sender: "Alex",
+                emotion: "excited"
+              },
+              {
+                text: "Yeah, that sounds great...",
+                sender: "You",
+                intended: "sarcastic",
+                interpreted: "enthusiastic"
+              },
+              {
+                text: "Awesome! I'll book our spots for 2pm then!",
+                sender: "Sam",
+                emotion: "happy"
+              }
+            ],
+            options: [
+              {
+                text: "Say nothing and just go along with the plan to avoid awkwardness",
+                feedback: "This avoids temporary discomfort but creates a bigger problem - you'll end up doing something you don't want to do."
+              },
+              {
+                text: "Send a clarifying message: 'Sorry for the confusion - I was actually being sarcastic because I had a bad experience there. Can we consider other options?'",
+                feedback: "Good choice! Clear communication helps prevent misunderstandings from escalating.",
+                isCorrect: true
+              },
+              {
+                text: "Respond: 'Can't believe you all thought I was serious... I HATE climbing.'",
+                feedback: "This aggressive response blames others for a misunderstanding that resulted from your unclear communication."
+              }
+            ]
+          }),
+          estimatedMinutes: 20,
+          ageGroupContent: JSON.stringify({
+            "9-12": {
+              scenario: "Your friend sends a message that makes you feel sad, but they added a smiley face emoji.",
+              terminology: "simpler"
+            },
+            "13-15": {
+              scenario: "Your comment on a friend's social media post gets misinterpreted, and now other friends are upset with you.",
+              terminology: "moderate"
+            },
+            "16-18": {
+              scenario: "Your sarcastic message in a group chat is taken as genuine enthusiasm, and now plans are moving forward that you don't actually want.",
+              terminology: "advanced"
+            }
+          })
+        },
+        {
+          subjectId: communicationSubject.id,
+          title: "Setting Healthy Boundaries",
+          subtitle: "Balancing your needs with relationships",
+          slug: "healthy-boundaries",
+          order: 4,
+          content: "Boundaries are guidelines that define what behaviors you find acceptable and how you wish to be treated. Healthy boundaries protect your wellbeing while maintaining positive relationships. Different relationships may have different boundaries - what's appropriate with close friends differs from work relationships. Setting boundaries involves clearly communicating your limits, being consistent in enforcing them, and respecting others' boundaries. Signs of poor boundaries include feeling resentful, overwhelmed, or taken advantage of. While initially uncomfortable, establishing healthy boundaries ultimately strengthens relationships by creating mutual respect and understanding.",
+          scenarioTitle: "Friend Overload",
+          scenarioContent: "Your close friend is going through a difficult time and has been texting you constantly throughout the day and night, including during school and late hours. You want to be supportive, but it's affecting your sleep, schoolwork, and other relationships. How do you maintain the friendship while setting healthy boundaries?",
+          activityType: "boundary-builder",
+          activityContent: JSON.stringify({
+            scenario: "Friend needing excessive support",
+            steps: [
+              {
+                step: "Identify your feelings",
+                options: ["Annoyed", "Overwhelmed", "Concerned", "Resentful"],
+                reflection: "Understanding your feelings helps clarify which boundaries are being crossed."
+              },
+              {
+                step: "Clarify your boundary",
+                input: true,
+                example: "I need uninterrupted time for school and sleep to maintain my well-being",
+                tips: ["Be specific", "Focus on your needs", "Avoid blaming language"]
+              },
+              {
+                step: "Communicate your boundary",
+                options: [
+                  "I care about you, but I can't respond 24/7. Let's set specific times to talk so I can give you my full attention while still managing school and sleep.",
+                  "You're texting me too much. Please stop.",
+                  "Sorry, I'll be busy indefinitely."
+                ],
+                correctIndex: 0,
+                feedback: "This approach shows care while clearly stating your needs and offering a solution."
+              }
+            ]
+          }),
+          estimatedMinutes: 30,
+          ageGroupContent: JSON.stringify({
+            "9-12": {
+              scenario: "Your friend always wants to play the same game at recess, but you'd like to try other activities sometimes.",
+              terminology: "simpler"
+            },
+            "13-15": {
+              scenario: "Your friend gets upset when you spend time with other people and demands to know who you're with constantly.",
+              terminology: "moderate"
+            },
+            "16-18": {
+              scenario: "Your close friend is going through a difficult time and has been texting constantly throughout the day and night.",
+              terminology: "advanced"
+            }
+          })
+        }
+      ];
+      
+      // Create lessons for Real-World Math
+      const realWorldMathLessons = [
+        {
+          subjectId: realWorldMathSubject.id,
+          title: "Percentage Applications",
+          subtitle: "Using percentages in everyday situations",
+          slug: "percentage-applications",
+          order: 1,
+          content: "Percentages are fractions expressed out of 100, making them useful for comparing values. Understanding percentages is essential for shopping (discounts, sales tax), finances (interest rates, tip calculation), data analysis, and many other real-world situations. To calculate a percentage of a number, convert the percentage to a decimal (divide by 100) and multiply by the number. To find what percentage one number is of another, divide the first number by the second and multiply by 100. Mental shortcuts can make percentage calculations easier - for example, finding 10% and then multiplying or dividing to find other percentages.",
+          scenarioTitle: "Shopping Decisions",
+          scenarioContent: "You're shopping for a new pair of shoes with a budget of $80. Store A has a pair for $90 with a 20% discount. Store B has a similar pair originally priced at $100, but with a 25% discount. Both stores add 8% sales tax after discounts. Which store offers the better deal, and how much will you actually pay at checkout?",
+          activityType: "percentage-calculator",
+          activityContent: JSON.stringify({
+            steps: [
+              {
+                name: "Calculate Store A final price",
+                work: [
+                  { description: "Original price", value: 90 },
+                  { description: "Apply 20% discount", formula: "90 × 0.8", value: 72 },
+                  { description: "Add 8% sales tax", formula: "72 × 1.08", value: 77.76 }
+                ]
+              },
+              {
+                name: "Calculate Store B final price",
+                work: [
+                  { description: "Original price", value: 100 },
+                  { description: "Apply 25% discount", formula: "100 × 0.75", value: 75 },
+                  { description: "Add 8% sales tax", formula: "75 × 1.08", value: 81 }
+                ]
+              },
+              {
+                name: "Compare prices",
+                conclusion: "Store A offers the better deal at $77.76, which is $3.24 less than Store B at $81.00."
+              }
+            ]
+          }),
+          estimatedMinutes: 25,
+          ageGroupContent: JSON.stringify({
+            "9-12": {
+              scenario: "You're buying a $20 toy with your allowance. The store has a 10% discount and then adds 5% tax.",
+              terminology: "simpler",
+              numbers: "smaller"
+            },
+            "13-15": {
+              scenario: "You're buying a $50 video game. One store offers 15% off while another has a 'buy one, get one half off' deal if you buy with a friend.",
+              terminology: "moderate",
+              numbers: "moderate"
+            },
+            "16-18": {
+              scenario: "You're comparing discounted shoes with different original prices, discount percentages, and need to account for sales tax.",
+              terminology: "advanced",
+              numbers: "complex"
+            }
+          })
+        },
+        {
+          subjectId: realWorldMathSubject.id,
+          title: "Budgeting Mathematics",
+          subtitle: "Using math to plan your finances",
+          slug: "budgeting-mathematics",
+          order: 2,
+          content: "Successful budgeting requires practical mathematical skills. Key concepts include calculating income (hourly wages, salaries), estimating and categorizing expenses, determining percentages for different budget categories, and projecting savings over time. Creating a balanced budget means ensuring your expenses don't exceed your income. Fixed expenses remain constant (rent, car payment), while variable expenses change (groceries, entertainment). The 50/30/20 rule, which suggests spending 50% on needs, 30% on wants, and 20% on savings, provides a helpful framework for budget allocation. Tracking spending by category helps identify areas where you might be overspending relative to your goals.",
+          scenarioTitle: "First Apartment Budget",
+          scenarioContent: "You're planning to move into your first apartment after graduation. You have a job offer with a gross salary of $3,000 per month, but need to create a realistic budget to determine what rent you can afford. You need to account for taxes, living expenses, student loan payments, savings goals, and still have some money for entertainment.",
+          activityType: "budget-allocation",
+          activityContent: JSON.stringify({
+            income: 3000,
+            expenses: [
+              { category: "Taxes and deductions (25%)", amount: 750, editable: false },
+              { category: "Rent", amount: 0, editable: true, maxRecommended: 900 },
+              { category: "Utilities", amount: 200, editable: true },
+              { category: "Groceries", amount: 350, editable: true },
+              { category: "Transportation", amount: 200, editable: true },
+              { category: "Student loans", amount: 250, editable: false },
+              { category: "Phone/Internet", amount: 100, editable: true },
+              { category: "Entertainment", amount: 0, editable: true },
+              { category: "Savings", amount: 0, editable: true, recommended: "at least 200" }
+            ],
+            goal: "Create a balanced budget where expenses don't exceed take-home pay of $2,250"
+          }),
+          estimatedMinutes: 30,
+          ageGroupContent: JSON.stringify({
+            "9-12": {
+              scenario: "You get $25 allowance each month and want to plan how to spend and save it.",
+              terminology: "simpler",
+              numbers: "smaller"
+            },
+            "13-15": {
+              scenario: "You earn $200 monthly from a weekend job and need to budget for savings, expenses, and fun.",
+              terminology: "moderate",
+              numbers: "moderate"
+            },
+            "16-18": {
+              scenario: "You're creating a budget for your first apartment based on your new job's salary.",
+              terminology: "advanced",
+              numbers: "realistic"
+            }
+          })
+        },
+        {
+          subjectId: realWorldMathSubject.id,
+          title: "Data Interpretation",
+          subtitle: "Making sense of numbers and statistics",
+          slug: "data-interpretation",
+          order: 3,
+          content: "Data literacy is the ability to read, understand, and communicate with data - an increasingly important skill in today's world. Interpreting graphs requires understanding different visualization types: bar graphs compare quantities across categories, line graphs show trends over time, pie charts show proportions of a whole, and scatter plots display relationships between variables. Statistics provide ways to summarize data, with measures like mean (average), median (middle value), and mode (most common value) offering different insights. It's important to evaluate the source and quality of data, consider potential biases, and understand that correlation doesn't imply causation. Data can be misleading if presented with manipulated scales, selective framing, or without proper context.",
+          scenarioTitle: "Phone Plan Comparison",
+          scenarioContent: "You're choosing between three cell phone plans and have collected data on your usage patterns. You need to analyze this information to determine which plan would be most cost-effective based on your specific needs and usage habits.",
+          activityType: "data-analysis",
+          activityContent: JSON.stringify({
+            dataTable: {
+              headers: ["Plan Feature", "Economy Plan", "Standard Plan", "Unlimited Plan"],
+              rows: [
+                ["Monthly cost", "$35", "$50", "$75"],
+                ["Data included", "2 GB", "10 GB", "Unlimited"],
+                ["Overage rate", "$15/GB", "$10/GB", "None"],
+                ["Talk & text", "Unlimited", "Unlimited", "Unlimited"],
+                ["Contract length", "None", "1 year", "2 years"],
+                ["Family discount", "None", "$5/line", "$10/line"]
+              ]
+            },
+            userUsage: {
+              description: "Your average monthly usage:",
+              data: [
+                ["Data", "8.5 GB"],
+                ["Talk minutes", "120 minutes"],
+                ["Texts sent", "1500 texts"]
+              ]
+            },
+            questions: [
+              {
+                question: "Which plan would cost the most for your current usage pattern?",
+                options: ["Economy Plan", "Standard Plan", "Unlimited Plan"],
+                correctAnswer: "Economy Plan",
+                explanation: "With Economy Plan, you'd pay $35 base + $97.50 in overage charges (6.5GB × $15) = $132.50 total"
+              },
+              {
+                question: "Which plan offers the best value for your usage?",
+                options: ["Economy Plan", "Standard Plan", "Unlimited Plan"],
+                correctAnswer: "Standard Plan",
+                explanation: "Standard Plan would cost $50 base + (0 for first 10GB) = $50 total"
+              }
+            ]
+          }),
+          estimatedMinutes: 35,
+          ageGroupContent: JSON.stringify({
+            "9-12": {
+              scenario: "You're choosing between different video game subscription options based on how often you play.",
+              terminology: "simpler",
+              numbers: "smaller"
+            },
+            "13-15": {
+              scenario: "You're comparing three streaming services with different prices, content libraries, and features.",
+              terminology: "moderate",
+              numbers: "moderate"
+            },
+            "16-18": {
+              scenario: "You're analyzing cell phone plans with different pricing structures against your usage patterns.",
+              terminology: "advanced",
+              numbers: "complex"
+            }
+          })
+        },
+        {
+          subjectId: realWorldMathSubject.id,
+          title: "Financial Calculations",
+          subtitle: "Math tools for financial decisions",
+          slug: "financial-calculations",
+          order: 4,
+          content: "Financial mathematics provides tools for making informed money decisions. Simple interest (I = P × r × t) is straightforward - you earn interest only on the principal. Compound interest, calculated as A = P(1 + r)^t, is more powerful as it generates interest on previously earned interest. Understanding the Rule of 72 (years to double = 72 ÷ interest rate) helps estimate investment growth. When comparing loans, the Annual Percentage Rate (APR) accounts for interest and fees, while calculating total cost over the loan term reveals the true expense. Future value calculations help with retirement planning by estimating how investments will grow over time. Amortization schedules show how loan payments are applied to principal and interest over time, revealing how much you'll ultimately pay for financed purchases.",
+          scenarioTitle: "Car Purchase Decision",
+          scenarioContent: "You're considering buying a used car for $12,000. You have three options: pay in full using your savings, take a 3-year loan at 5% interest, or take a 5-year loan at 7% interest. You need to calculate the total cost of each option and determine which makes the most financial sense based on your situation.",
+          activityType: "loan-calculator",
+          activityContent: JSON.stringify({
+            options: [
+              {
+                name: "Cash payment",
+                calculation: {
+                  principalAmount: 12000,
+                  description: "Pay full amount from savings",
+                  totalCost: 12000,
+                  opportunity: "Lost potential investment returns on $12,000"
+                }
+              },
+              {
+                name: "3-year loan (5%)",
+                calculation: {
+                  principalAmount: 12000,
+                  interestRate: 5,
+                  termYears: 3,
+                  monthlyPayment: 359.37,
+                  totalPayments: 12937.32,
+                  totalInterest: 937.32
+                }
+              },
+              {
+                name: "5-year loan (7%)",
+                calculation: {
+                  principalAmount: 12000,
+                  interestRate: 7,
+                  termYears: 5,
+                  monthlyPayment: 237.42,
+                  totalPayments: 14245.20,
+                  totalInterest: 2245.20
+                }
+              }
+            ],
+            comparisonPoints: [
+              "Total cost difference between best and worst options: $2,245.20",
+              "Monthly payment difference between 3-year and 5-year loans: $121.95",
+              "With the 3-year loan, you'll pay off the car 2 years sooner and save $1,307.88 in interest compared to the 5-year loan"
+            ]
+          }),
+          estimatedMinutes: 40,
+          ageGroupContent: JSON.stringify({
+            "9-12": {
+              scenario: "You're saving $5 weekly for a $60 toy and want to know how long it will take.",
+              terminology: "simpler",
+              numbers: "smaller"
+            },
+            "13-15": {
+              scenario: "You're deciding between saving for a $500 phone or getting it on a payment plan of $25/month for 24 months.",
+              terminology: "moderate",
+              numbers: "moderate"
+            },
+            "16-18": {
+              scenario: "You're analyzing different payment options for a used car, including loans with different terms and interest rates.",
+              terminology: "advanced",
+              numbers: "realistic"
+            }
+          })
+        },
+        {
+          subjectId: realWorldMathSubject.id,
+          title: "Problem-Solving Logic",
+          subtitle: "Using math thinking for complex decisions",
+          slug: "problem-solving-logic",
+          order: 5,
+          content: "Mathematical thinking provides powerful tools for approaching complex problems beyond just calculation. Breaking problems into smaller components makes them more manageable - for instance, dividing a project into discrete tasks with time estimates. Decision matrices help evaluate options across multiple criteria by assigning weights and scores. Probability concepts assist in risk assessment by examining the likelihood of different outcomes. Systematic trial and error allows testing solutions and refining approaches based on results. Logical reasoning helps identify patterns, draw valid conclusions from evidence, and avoid common cognitive biases. These problem-solving approaches can be applied to everything from career decisions to travel planning to major purchases.",
+          scenarioTitle: "College Decision Matrix",
+          scenarioContent: "You've been accepted to three colleges and need to make a decision. Each option has different costs, academic programs, locations, and campus cultures. You want to make an objective decision that considers all important factors according to your personal priorities.",
+          activityType: "decision-matrix",
+          activityContent: JSON.stringify({
+            options: ["State University", "Private College", "Community College + Transfer"],
+            criteria: [
+              { name: "Total Cost (4 years)", weight: 30, description: "Lower is better" },
+              { name: "Program Strength", weight: 25, description: "Academic reputation in your field" },
+              { name: "Location", weight: 15, description: "Proximity to home/opportunities" },
+              { name: "Campus Life", weight: 10, description: "Activities, housing, community" },
+              { name: "Career Support", weight: 20, description: "Internships, job placement" }
+            ],
+            ratings: [
+              [2, 4, 5], // State University ratings for each criterion
+              [1, 5, 3], // Private College ratings
+              [5, 3, 2]  // Community College ratings
+            ],
+            instructions: "1. Rate each option on each criterion (1-5)\n2. Multiply ratings by weights\n3. Sum the weighted scores\n4. Compare total scores",
+            template: true // Allow user to input their own ratings
+          }),
+          estimatedMinutes: 35,
+          ageGroupContent: JSON.stringify({
+            "9-12": {
+              scenario: "You're choosing which of three summer camps to attend based on activities, friends attending, and location.",
+              terminology: "simpler",
+              decisions: "age-appropriate"
+            },
+            "13-15": {
+              scenario: "You're deciding between several extracurricular activities based on your interests, time commitment, and future benefits.",
+              terminology: "moderate",
+              decisions: "teenage-focused"
+            },
+            "16-18": {
+              scenario: "You're evaluating college options considering costs, programs, location, and other key factors.",
+              terminology: "advanced",
+              decisions: "young adult"
+            }
+          })
+        }
+      ];
+      
+      // Create the lessons for each subject
+      console.log("Creating Financial Literacy lessons...");
+      for (const lesson of financialLiteracyLessons) {
+        await this.createLesson(lesson);
+      }
+      
+      console.log("Creating Communication & Relationships lessons...");
+      for (const lesson of communicationLessons) {
+        await this.createLesson(lesson);
+      }
+      
+      console.log("Creating Real-World Math lessons...");
+      for (const lesson of realWorldMathLessons) {
+        await this.createLesson(lesson);
+      }
+      
+      // Update subject relations
+      await this.updateSubject(financialLiteracySubject.id, {
+        nextSubjectIds: [communicationSubject.id, realWorldMathSubject.id]
+      });
+      
+      await this.updateSubject(communicationSubject.id, {
+        nextSubjectIds: [financialLiteracySubject.id, realWorldMathSubject.id]
+      });
+      
+      await this.updateSubject(realWorldMathSubject.id, {
+        nextSubjectIds: [financialLiteracySubject.id, communicationSubject.id]
+      });
+      
+      console.log("Subjects and lessons data initialization complete!");
+      
+    } catch (error) {
+      console.error("Error initializing subjects data:", error);
+    }
   }
   
   // Initialize career paths data

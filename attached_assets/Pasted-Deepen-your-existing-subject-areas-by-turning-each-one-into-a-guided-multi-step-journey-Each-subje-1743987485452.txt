@@ -1,0 +1,47 @@
+Deepen your existing subject areas by turning each one into a guided, multi-step journey. Each subject should feel like a real course — with lessons, reflection, action steps, and mini-assessments. No login or save features required yet — just full UX structure.
+
+1. **Choose 3 Core Subjects to Expand First**:
+   Suggested subjects:
+   - Financial Literacy
+   - Communication & Relationships
+   - Real-World Math
+
+2. **Create a Modular Flow for Each Subject**:
+   Each subject should include:
+   - 4–6 core lessons in a sequence (show as a horizontal tracker or vertical list)
+   - Visual progress bar (even if simulated)
+   - Status markers: Not Started / In Progress / Complete (JS-based)
+
+3. **Each Lesson Page Includes**:
+   - Lesson title + subtitle
+   - 2–3 paragraph explanation in simple, real-world language
+   - A relatable real-life scenario or case study
+     - E.g., “You’re 16 and want to buy a used car...”
+   - A hands-on or reflective activity:
+     - Budget form
+     - Text box
+     - Drag-and-drop
+     - Multiple-choice quiz
+   - A “Mark as Complete” button (simulate with JS)
+   - Optional: “Ask Coach” button for AI-generated help (Phase 18 placeholder)
+
+4. **Add Completion Summary Pages**:
+   - At the end of each subject, show:
+     - Summary of key skills learned
+     - Suggestions for next subjects to explore
+     - Downloadable/printable PDF report placeholder (static for now)
+     - A celebration message or badge (“🎉 Budgeting Basics Complete!”)
+
+5. **Age-Based Tiering (Optional)**:
+   - Let the user pick their age group before starting (9–12, 13–15, 16–18)
+   - Adjust tone or examples for each group
+     - 9–12: “You run a lemonade stand”
+     - 16–18: “You’re managing rent, a side hustle, and school”
+
+6. **Visual & UX Details**:
+   - Show a breadcrumb or step tracker (Lesson 2 of 5)
+   - Use consistent card or panel layouts across all subjects
+   - Include icons, color-coding per subject (e.g., green = finance, orange = wellness)
+   - Allow jumping back to earlier lessons in the sequence
+
+This phase gives each subject real **depth and structure**, letting students feel like they're making real progress, while keeping everything rooted in practical, real-world skills.

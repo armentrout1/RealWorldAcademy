@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, json } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, json, date } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { relations } from "drizzle-orm";
@@ -233,6 +233,114 @@ export const insertVisionBoardItemSchema = createInsertSchema(visionBoardItems).
 export type InsertVisionBoardItem = z.infer<typeof insertVisionBoardItemSchema>;
 export type VisionBoardItem = typeof visionBoardItems.$inferSelect;
 
+// Subjects model - for our core learning areas
+export const subjects = pgTable("subjects", {
+  id: serial("id").primaryKey(),
+  title: text("title").notNull(),
+  description: text("description").notNull(),
+  slug: text("slug").notNull().unique(),
+  imageUrl: text("image_url"),
+  iconName: text("icon_name").notNull(),
+  color: text("color").notNull(),
+  featured: boolean("featured").default(false),
+  order: integer("order").notNull(),
+  summary: text("summary"), // Summary shown on completion
+  nextSubjectIds: integer("next_subject_ids").array(), // Suggested subjects to explore next
+});
+
+export const insertSubjectSchema = createInsertSchema(subjects).omit({ id: true });
+export type InsertSubject = z.infer<typeof insertSubjectSchema>;
+export type Subject = typeof subjects.$inferSelect;
+
+// Lessons model - individual lessons within a subject
+export const lessons = pgTable("lessons", {
+  id: serial("id").primaryKey(),
+  subjectId: integer("subject_id").notNull().references(() => subjects.id),
+  title: text("title").notNull(),
+  subtitle: text("subtitle"),
+  content: text("content").notNull(), // Main lesson content
+  slug: text("slug").notNull(),
+  order: integer("order").notNull(), // Order within the subject
+  scenarioTitle: text("scenario_title"), // Real-world scenario title
+  scenarioContent: text("scenario_content"), // Real-world scenario content
+  activityType: text("activity_type"), // Type of activity (quiz, reflection, etc)
+  activityContent: json("activity_content"), // Activity configuration as JSON
+  estimatedMinutes: integer("estimated_minutes"), // Estimated time to complete
+  ageGroupContent: json("age_group_content"), // Different content for different age groups
+});
+
+export const insertLessonSchema = createInsertSchema(lessons).omit({ id: true });
+export type InsertLesson = z.infer<typeof insertLessonSchema>;
+export type Lesson = typeof lessons.$inferSelect;
+
+// User-Subject junction table to track progress
+export const userSubjectProgress = pgTable("user_subject_progress", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id),
+  subjectId: integer("subject_id").notNull().references(() => subjects.id),
+  status: text("status").default('not_started').notNull(),
+  currentLessonId: integer("current_lesson_id"),
+  startedAt: timestamp("started_at"),
+  completedAt: timestamp("completed_at"),
+  percentComplete: integer("percent_complete").default(0),
+});
+
+export const insertUserSubjectProgressSchema = createInsertSchema(userSubjectProgress).omit({ id: true });
+export type InsertUserSubjectProgress = z.infer<typeof insertUserSubjectProgressSchema>;
+export type UserSubjectProgress = typeof userSubjectProgress.$inferSelect;
+
+// User-Lesson junction table to track progress
+export const userLessonProgress = pgTable("user_lesson_progress", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id),
+  lessonId: integer("lesson_id").notNull().references(() => lessons.id),
+  status: text("status").default('not_started').notNull(),
+  startedAt: timestamp("started_at"),
+  completedAt: timestamp("completed_at"),
+  answers: json("answers"), // Store user's answers/work as JSON
+  notes: text("notes"), // User's personal notes for this lesson
+});
+
+export const insertUserLessonProgressSchema = createInsertSchema(userLessonProgress).omit({ id: true });
+export type InsertUserLessonProgress = z.infer<typeof insertUserLessonProgressSchema>;
+export type UserLessonProgress = typeof userLessonProgress.$inferSelect;
+
+// Define relations
+export const subjectsRelations = relations(subjects, ({ many }) => ({
+  lessons: many(lessons),
+  userProgress: many(userSubjectProgress),
+}));
+
+export const lessonsRelations = relations(lessons, ({ one, many }) => ({
+  subject: one(subjects, {
+    fields: [lessons.subjectId],
+    references: [subjects.id],
+  }),
+  userProgress: many(userLessonProgress),
+}));
+
+export const userSubjectProgressRelations = relations(userSubjectProgress, ({ one }) => ({
+  user: one(users, {
+    fields: [userSubjectProgress.userId],
+    references: [users.id],
+  }),
+  subject: one(subjects, {
+    fields: [userSubjectProgress.subjectId],
+    references: [subjects.id],
+  }),
+}));
+
+export const userLessonProgressRelations = relations(userLessonProgress, ({ one }) => ({
+  user: one(users, {
+    fields: [userLessonProgress.userId],
+    references: [users.id],
+  }),
+  lesson: one(lessons, {
+    fields: [userLessonProgress.lessonId],
+    references: [lessons.id],
+  }),
+}));
+
 // Define the user relations after all models are defined
 export const usersRelations = relations(users, ({ many, one }) => ({
   badges: many(badges),
@@ -241,4 +349,6 @@ export const usersRelations = relations(users, ({ many, one }) => ({
   progressSummary: one(userProgressSummary),
   goals: many(goals),
   visionBoardItems: many(visionBoardItems),
+  subjectProgress: many(userSubjectProgress),
+  lessonProgress: many(userLessonProgress),
 }));
