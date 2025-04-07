@@ -263,6 +263,8 @@ export const subjects = pgTable("subjects", {
   order: integer("order").notNull(),
   summary: text("summary"), // Summary shown on completion
   nextSubjectIds: integer("next_subject_ids").array(), // Suggested subjects to explore next
+  category: text("category").notNull(), // "money", "mindset", "future", "wellness"
+  ageGroups: text("age_groups").array().notNull(), // ["9-12", "13-15", "16-18"]
 });
 
 export const insertSubjectSchema = createInsertSchema(subjects).omit({ id: true });
@@ -275,15 +277,32 @@ export const lessons = pgTable("lessons", {
   subjectId: integer("subject_id").notNull().references(() => subjects.id),
   title: text("title").notNull(),
   subtitle: text("subtitle"),
-  content: text("content").notNull(), // Main lesson content
   slug: text("slug").notNull(),
   order: integer("order").notNull(), // Order within the subject
-  scenarioTitle: text("scenario_title"), // Real-world scenario title
-  scenarioContent: text("scenario_content"), // Real-world scenario content
-  activityType: text("activity_type"), // Type of activity (quiz, reflection, etc)
-  activityContent: json("activity_content"), // Activity configuration as JSON
-  estimatedMinutes: integer("estimated_minutes"), // Estimated time to complete
-  ageGroupContent: json("age_group_content"), // Different content for different age groups
+  
+  // Standard lesson format fields
+  learningObjective: text("learning_objective").notNull(), // 🎯 Learning Objective
+  warmUpQuestion: text("warm_up_question").notNull(), // 🧠 Warm-Up Question
+  lessonExplanation: text("lesson_explanation").notNull(), // 📘 Lesson Explanation
+  
+  // Real-world scenario fields
+  scenarioTitle: text("scenario_title").notNull(), // 💬 Real-World Scenario title
+  scenarioContent: text("scenario_content").notNull(), // 💬 Real-World Scenario content
+  
+  // Activity fields
+  activityType: text("activity_type").notNull(), // 🛠️ Type of activity (quiz, reflection, budget-tool, etc)
+  activityContent: json("activity_content").notNull(), // Activity configuration as JSON
+  
+  // Reflection prompt
+  reflectionPrompt: text("reflection_prompt").notNull(), // 🔍 Reflection Prompt
+  
+  // Additional metadata
+  estimatedMinutes: integer("estimated_minutes").notNull(), // Estimated time to complete
+  xpReward: integer("xp_reward").default(50).notNull(), // XP reward for completing
+  badgeId: integer("badge_id"), // Optional badge to award
+  
+  // Age-specific content - contains different versions for different age groups
+  ageGroupContent: json("age_group_content").notNull(), // Different content for different age groups
 });
 
 export const insertLessonSchema = createInsertSchema(lessons).omit({ id: true });
@@ -312,10 +331,14 @@ export const userLessonProgress = pgTable("user_lesson_progress", {
   userId: integer("user_id").notNull().references(() => users.id),
   lessonId: integer("lesson_id").notNull().references(() => lessons.id),
   status: text("status").default('not_started').notNull(),
+  ageGroup: text("age_group").notNull(), // Which age group version the user is taking "9-12", "13-15", "16-18"
   startedAt: timestamp("started_at"),
   completedAt: timestamp("completed_at"),
   answers: json("answers"), // Store user's answers/work as JSON
+  reflectionResponse: text("reflection_response"), // User's response to the reflection prompt
   notes: text("notes"), // User's personal notes for this lesson
+  xpEarned: integer("xp_earned"), // XP earned from completing this lesson
+  badgeEarned: boolean("badge_earned").default(false), // Whether the user earned a badge from this lesson
 });
 
 export const insertUserLessonProgressSchema = createInsertSchema(userLessonProgress).omit({ id: true });

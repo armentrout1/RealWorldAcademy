@@ -1,8 +1,11 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Calculator,
   Microscope,
@@ -16,8 +19,12 @@ import {
   MessageCircle,
   Heart,
   Sparkles,
-  Code
+  Code,
+  Brain,
+  GraduationCap,
+  Globe
 } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 
 // Define a type for our subject modules
 interface SubjectModule {
@@ -290,272 +297,126 @@ const SubjectDetail: React.FC<{ subject: SubjectModule }> = ({ subject }) => {
           }
         ]
       },
-      // Entrepreneurship & Work Skills
-      'entrepreneurship': {
-        '9-12': [
-          {
-            title: "What is a Business?",
-            description: "Learn about different types of businesses and what entrepreneurs do.",
-            activity: "Spot The Business: Identify 5 different businesses in your neighborhood and what they sell."
-          },
-          {
-            title: "Problem Solvers",
-            description: "Discover how businesses solve problems that people have.",
-            activity: "Problem Detective: Find something that's annoying or difficult at home or school. How could you fix it?"
-          },
-          {
-            title: "Kid Business Ideas",
-            description: "Explore simple businesses you could start right now, like lemonade stands or craft sales.",
-            activity: "Mini Business Plan: Draw a picture of a business you could start this summer."
-          }
-        ],
-        '13-15': [
-          {
-            title: "How to Price Something You Sell",
-            description: "Learn the basics of costs, pricing, and what makes people willing to pay for something.",
-            activity: "Pricing Exercise: Calculate the right price for a custom bracelet business including materials and time."
-          },
-          {
-            title: "Marketing Basics",
-            description: "Discover how to tell people about your product or service in a way that gets them interested.",
-            activity: "Create a social media post to promote a neighborhood pet-sitting business."
-          },
-          {
-            title: "Customer Service",
-            description: "Learn why keeping customers happy is just as important as getting new ones.",
-            activity: "Role Play: Practice handling a customer complaint about a product that broke."
-          }
-        ],
-        '16-18': [
-          {
-            title: "Starting a Side Hustle or Micro-Business",
-            description: "Learn practical steps to turn your skills into income through freelancing or a small business.",
-            activity: "Side Hustle Starter: Identify three marketable skills you have and potential customers for each."
-          },
-          {
-            title: "Financial Management",
-            description: "Master the basics of business finances, record-keeping, and taxes for young entrepreneurs.",
-            activity: "Build a simple income/expense tracking spreadsheet for a small business."
-          },
-          {
-            title: "Building Your Professional Network",
-            description: "Learn how to connect with mentors, peers, and potential customers or employers.",
-            activity: "Networking Challenge: Draft an email to someone in a field you're interested in asking for advice."
-          }
-        ]
-      },
-      // Tech in the Real World
-      'tech-real-world': {
-        '9-12': [
-          {
-            title: "What is the Cloud?",
-            description: "Learn what 'the cloud' really means and how it helps us store and share information.",
-            activity: "Cloud Drawing: Illustrate how you think the cloud works, then compare to the actual explanation."
-          },
-          {
-            title: "Digital Safety Basics",
-            description: "Discover important ways to stay safe when using computers, tablets, and other devices.",
-            activity: "Password Creator: Practice making strong passwords that are easy for you to remember but hard for others to guess."
-          },
-          {
-            title: "Fun with Digital Tools",
-            description: "Explore kid-friendly apps and programs that help you create, learn, and solve problems.",
-            activity: "Digital Scavenger Hunt: Find three free tools online that can help with homework."
-          }
-        ],
-        '13-15': [
-          {
-            title: "Using Google Docs & Spreadsheets",
-            description: "Master the basics of document creation, formatting, and collaboration tools.",
-            activity: "Group Project Template: Create a shared document with sections for different team members."
-          },
-          {
-            title: "Digital Organization",
-            description: "Learn systems for organizing files, managing information, and staying productive online.",
-            activity: "Folder Challenge: Create a logical folder structure for organizing school projects and personal files."
-          },
-          {
-            title: "Finding Quality Information",
-            description: "Develop skills to evaluate online sources and find reliable information for school and life.",
-            activity: "Source Evaluator: Analyze these three websites and determine which is most trustworthy."
-          }
-        ],
-        '16-18': [
-          {
-            title: "How to Build a Simple Website",
-            description: "Learn the basics of web design, no coding required, using modern drag-and-drop tools.",
-            activity: "Site Builder: Create a one-page personal portfolio or interest site using a template."
-          },
-          {
-            title: "Digital Productivity Systems",
-            description: "Master advanced tools for task management, time tracking, and workflow optimization.",
-            activity: "Productivity Audit: Analyze your current digital habits and implement one new productivity system."
-          },
-          {
-            title: "Data Visualization Basics",
-            description: "Learn to create charts, graphs, and visual representations that communicate information clearly.",
-            activity: "Data Story: Create three different chart types from the same dataset and explain which works best."
-          }
-        ]
-      },
-      // Default lesson structure for other subjects
+      // Default empty content for other subjects
       'default': {
-        '9-12': [
-          {
-            title: "Beginner concepts",
-            description: "Age-appropriate introduction to the fundamentals of this subject.",
-            activity: "Interactive activity for younger students."
-          }
-        ],
-        '13-15': [
-          {
-            title: "Intermediate concepts",
-            description: "More advanced topics with real-world applications for teens.",
-            activity: "Practical exercise for middle teens."
-          }
-        ],
-        '16-18': [
-          {
-            title: "Advanced concepts",
-            description: "Complex topics and independent application for older teens.",
-            activity: "Challenge activity for older students."
-          }
-        ]
+        '9-12': [],
+        '13-15': [],
+        '16-18': []
       }
     };
 
-    // Return the appropriate content based on subject and age group
-    return lessons[subject.id as keyof typeof lessons] || lessons['default'];
+    // Get content for the selected subject or default empty content
+    const subjectContent = (lessons as any)[subject.id] || lessons.default;
+    return subjectContent[selectedAgeGroup] || [];
   };
-  
-  const lessonContent = getAgeGroupContent()[selectedAgeGroup] || [];
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <div className="flex items-center mb-2">
+      <div className="mb-4">
         <Link href="/learn">
-          <Button variant="ghost" className="p-0 mr-2">
-            <ChevronRight className="h-5 w-5 rotate-180" />
+          <Button variant="ghost" className="pl-0">
+            <ChevronRight className="h-4 w-4 mr-2 rotate-180" />
+            Back to Subjects
           </Button>
         </Link>
-        <span className="text-neutral-500">Back to all subjects</span>
       </div>
       
-      <div className="grid gap-8 md:grid-cols-[2fr_1fr]">
-        <div>
-          <div className="flex items-center gap-4 mb-4">
-            <div className={`${subject.color} text-white p-3 rounded-xl`}>
-              {subject.icon}
+      <div className="flex flex-col md:flex-row gap-8">
+        <div className="md:w-2/3">
+          <div className={`${subject.color} text-white p-6 rounded-lg mb-6`}>
+            <div className="flex items-start justify-between">
+              <div className="bg-white p-3 rounded-md shadow-md mb-4">
+                {subject.icon}
+              </div>
+              <div className="space-x-2">
+                {subject.modules.map(module => (
+                  <Badge key={module.title} variant={module.level === "Beginner" ? "default" : 
+                                    module.level === "Intermediate" ? "secondary" : "outline"}>
+                    {module.level}
+                  </Badge>
+                ))}
+              </div>
             </div>
-            <div>
-              <h1 className="font-sans font-bold text-3xl md:text-4xl text-neutral-900">{subject.title}</h1>
-              <p className="text-lg text-neutral-600">{subject.subtitle}</p>
-            </div>
+            <h1 className="text-3xl font-bold mb-2">{subject.title}</h1>
+            <p className="text-xl opacity-90 mb-4">{subject.subtitle}</p>
+            <p className="opacity-85">{subject.description}</p>
           </div>
           
-          <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
-            <div className="flex flex-wrap justify-between items-center mb-4">
-              <h2 className="font-semibold text-xl">Overview</h2>
-              
-              {/* Age Group Selector */}
-              <div className="bg-neutral-100 p-1 rounded-lg inline-flex my-2">
-                <button 
-                  className={`px-3 py-1.5 text-sm rounded-md transition-colors ${selectedAgeGroup === '9-12' ? 'bg-white shadow-sm text-primary' : 'text-neutral-600 hover:bg-neutral-200'}`}
+          <div className="mb-6">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-2xl font-bold">Age-Appropriate Content</h2>
+              <div className="flex space-x-2">
+                <Button 
+                  variant={selectedAgeGroup === '9-12' ? "default" : "outline"}
+                  size="sm"
                   onClick={() => setSelectedAgeGroup('9-12')}
                 >
                   Ages 9-12
-                </button>
-                <button 
-                  className={`px-3 py-1.5 text-sm rounded-md transition-colors ${selectedAgeGroup === '13-15' ? 'bg-white shadow-sm text-primary' : 'text-neutral-600 hover:bg-neutral-200'}`}
+                </Button>
+                <Button 
+                  variant={selectedAgeGroup === '13-15' ? "default" : "outline"}
+                  size="sm"
                   onClick={() => setSelectedAgeGroup('13-15')}
                 >
                   Ages 13-15
-                </button>
-                <button 
-                  className={`px-3 py-1.5 text-sm rounded-md transition-colors ${selectedAgeGroup === '16-18' ? 'bg-white shadow-sm text-primary' : 'text-neutral-600 hover:bg-neutral-200'}`}
+                </Button>
+                <Button 
+                  variant={selectedAgeGroup === '16-18' ? "default" : "outline"}
+                  size="sm"
                   onClick={() => setSelectedAgeGroup('16-18')}
                 >
                   Ages 16-18
-                </button>
+                </Button>
               </div>
             </div>
             
-            <p className="text-neutral-700 leading-relaxed mb-6">{subject.description}</p>
-            
-            <h2 className="font-semibold text-xl mb-3">Why Study This?</h2>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="bg-neutral-50 p-4 rounded-lg border border-neutral-100">
-                <h3 className="font-medium text-lg mb-2">Real-World Application</h3>
-                <p className="text-neutral-600">Learn skills you'll actually use in everyday situations, not just theoretical concepts.</p>
-              </div>
-              <div className="bg-neutral-50 p-4 rounded-lg border border-neutral-100">
-                <h3 className="font-medium text-lg mb-2">Career Relevance</h3>
-                <p className="text-neutral-600">Develop competencies that employers value regardless of your chosen field.</p>
-              </div>
-              <div className="bg-neutral-50 p-4 rounded-lg border border-neutral-100">
-                <h3 className="font-medium text-lg mb-2">Practical Focus</h3>
-                <p className="text-neutral-600">Hands-on projects and real-world scenarios instead of just theoretical readings.</p>
-              </div>
-              <div className="bg-neutral-50 p-4 rounded-lg border border-neutral-100">
-                <h3 className="font-medium text-lg mb-2">Lifelong Skills</h3>
-                <p className="text-neutral-600">Gain knowledge that remains relevant even as specific technologies change.</p>
-              </div>
-            </div>
-          </div>
-          
-          <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
-            <h2 className="font-semibold text-xl mb-4">
-              Age-Appropriate Lessons
-              <span className="ml-2 text-base font-normal text-neutral-500">
-                {
-                  selectedAgeGroup === '9-12' ? '(Beginner Level)' : 
-                  selectedAgeGroup === '13-15' ? '(Intermediate Level)' : 
-                  '(Advanced Level)'
-                }
-              </span>
-            </h2>
-            
-            <div className="space-y-6">
-              {lessonContent.map((lesson, index) => (
-                <div key={index} className="border rounded-lg overflow-hidden">
-                  <div className={`${subject.color} bg-opacity-10 p-4 border-b`}>
-                    <h3 className="font-medium text-lg">{lesson.title}</h3>
-                  </div>
-                  <div className="p-4">
-                    <p className="text-neutral-700 mb-4">{lesson.description}</p>
-                    
-                    <div className="bg-neutral-50 p-4 rounded-md border border-neutral-100">
-                      <div className="font-medium mb-2 text-neutral-800">Interactive Component</div>
-                      <p className="text-neutral-600">{lesson.activity}</p>
-                    </div>
-                    
-                    <div className="mt-4 flex justify-end">
-                      <Button variant="outline" size="sm">
-                        Start Lesson
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-          
-          <div className="bg-white rounded-xl shadow-sm p-6">
-            <h2 className="font-semibold text-xl mb-6">Learning Modules</h2>
             <div className="space-y-4">
-              {subject.modules.map((module, index) => (
-                <div key={index} className="border rounded-lg p-4 hover:border-primary/50 hover:shadow-sm transition-all">
-                  <div className="flex justify-between items-center">
-                    <h3 className="font-medium text-lg">{module.title}</h3>
-                    <Badge variant={module.level === "Beginner" ? "default" : 
+              {getAgeGroupContent().length > 0 ? (
+                getAgeGroupContent().map((lesson, idx) => (
+                  <Card key={idx}>
+                    <CardHeader>
+                      <CardTitle>{lesson.title}</CardTitle>
+                      <CardDescription>{lesson.description}</CardDescription>
+                    </CardHeader>
+                    <CardContent className="bg-gray-50 border-t">
+                      <h4 className="font-medium mb-2">Activity</h4>
+                      <p>{lesson.activity}</p>
+                    </CardContent>
+                    <CardFooter className="flex justify-between">
+                      <Badge variant="outline">Lesson {idx + 1}</Badge>
+                      <Button>Start Lesson</Button>
+                    </CardFooter>
+                  </Card>
+                ))
+              ) : (
+                <div className="text-center py-12 bg-gray-50 rounded-lg">
+                  <h3 className="text-xl font-medium mb-2">Content Coming Soon</h3>
+                  <p className="text-neutral-600">We're working on age-appropriate content for this subject.</p>
+                </div>
+              )}
+            </div>
+          </div>
+          
+          <div className="mb-6">
+            <h2 className="text-2xl font-bold mb-4">Module Overview</h2>
+            <div className="space-y-4">
+              {subject.modules.map((module, idx) => (
+                <div key={idx} className="bg-white border rounded-lg p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-lg font-medium">{module.title}</h3>
+                      <div className="flex items-center mt-2 text-neutral-500">
+                        <span className="text-sm">{module.duration}</span>
+                        <span className="mx-2">•</span>
+                        <span className="text-sm">4 lessons</span>
+                      </div>
+                    </div>
+                    <div>
+                      <Badge variant={module.level === "Beginner" ? "default" : 
                                     module.level === "Intermediate" ? "secondary" : "outline"}>
-                      {module.level}
-                    </Badge>
-                  </div>
-                  <div className="flex items-center mt-2 text-neutral-500">
-                    <span className="text-sm">{module.duration}</span>
-                    <span className="mx-2">•</span>
-                    <span className="text-sm">4 lessons</span>
+                        {module.level}
+                      </Badge>
+                    </div>
                   </div>
                   <div className="mt-4">
                     <Button className="w-full sm:w-auto">Start Learning</Button>
@@ -566,7 +427,7 @@ const SubjectDetail: React.FC<{ subject: SubjectModule }> = ({ subject }) => {
           </div>
         </div>
         
-        <div className="space-y-6">
+        <div className="md:w-1/3 space-y-6">
           <Card>
             <CardHeader>
               <CardTitle>Ready to start?</CardTitle>
@@ -584,19 +445,21 @@ const SubjectDetail: React.FC<{ subject: SubjectModule }> = ({ subject }) => {
             </CardHeader>
             <CardContent className="space-y-2">
               {subjectModules
-                .filter(m => m.id !== subject.id)
+                .filter(s => s.id !== subject.id)
                 .slice(0, 3)
-                .map(module => (
-                  <Link key={module.id} href={`/learn/${module.id}`}>
-                    <div className="flex items-center gap-2 p-2 rounded hover:bg-neutral-50 cursor-pointer">
-                      <div className={`${module.color} text-white p-1.5 rounded`}>
-                        {React.cloneElement(module.icon as React.ReactElement, { className: 'h-4 w-4' })}
+                .map(s => (
+                  <Link key={s.id} href={`/learn/${s.id}`}>
+                    <div className="flex items-center p-2 hover:bg-gray-50 rounded-md transition-colors">
+                      <div className={`${s.color} p-2 rounded-md mr-3 text-white`}>
+                        {s.icon}
                       </div>
-                      <span>{module.title}</span>
+                      <div>
+                        <h4 className="font-medium">{s.title}</h4>
+                        <p className="text-sm text-neutral-500">{s.subtitle}</p>
+                      </div>
                     </div>
                   </Link>
-                ))
-              }
+                ))}
             </CardContent>
           </Card>
         </div>
@@ -607,88 +470,511 @@ const SubjectDetail: React.FC<{ subject: SubjectModule }> = ({ subject }) => {
 
 // Main Component
 const Learn: React.FC = () => {
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("all");
+  const [selectedAgeGroup, setSelectedAgeGroup] = useState<AgeGroup>("13-15");
+  const [selectedSkillLevel, setSelectedSkillLevel] = useState("all");
   const [location] = useLocation();
-  const [searchQuery, setSearchQuery] = useState('');
   
   // Check if we're on a subject detail page
-  const matchSubject = location.match(/\/learn\/(.+)/);
-  if (matchSubject) {
-    const subjectId = matchSubject[1];
+  const subjectMatch = /^\/learn\/([^\/]+)$/.exec(location);
+  
+  if (subjectMatch) {
+    const subjectId = subjectMatch[1];
     const subject = subjectModules.find(s => s.id === subjectId);
     
-    if (subject) {
-      return <SubjectDetail subject={subject} />;
+    if (!subject) {
+      return (
+        <div className="container mx-auto px-4 py-12 text-center">
+          <h2 className="text-2xl font-bold mb-4">Subject Not Found</h2>
+          <p className="mb-6">We couldn't find the subject you're looking for.</p>
+          <Link href="/learn">
+            <Button>Back to Subjects</Button>
+          </Link>
+        </div>
+      );
     }
+    
+    return <SubjectDetail subject={subject} />;
   }
   
-  // Filter modules based on search query
-  const filteredModules = searchQuery 
-    ? subjectModules.filter(module => 
-        module.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-        module.subtitle.toLowerCase().includes(searchQuery.toLowerCase())
-      )
-    : subjectModules;
+  // Content categories
+  const categories = [
+    { id: "all", name: "All Subjects" },
+    { id: "core", name: "Core Skills" },
+    { id: "life", name: "Life Skills" },
+    { id: "academic", name: "Academic" },
+    { id: "career", name: "Career Prep" }
+  ];
+  
+  // Map subjects to categories for filtering
+  const subjectCategories: Record<string, string> = {
+    math: "core",
+    science: "academic",
+    history: "academic",
+    finance: "life",
+    technology: "core",
+    careers: "career",
+    communication: "life",
+    health: "life",
+    entrepreneurship: "career",
+    "tech-real-world": "core"
+  };
+  
+  // Query the subjects from the database (simulated for now)
+  const { data: dbSubjects, isLoading } = useQuery({
+    queryKey: ['/api/subjects'],
+    queryFn: () => {
+      // This will be replaced with actual backend API call
+      // For now, just simulate a delay and return our static data
+      return new Promise((resolve) => {
+        setTimeout(() => {
+          resolve(subjectModules);
+        }, 500);
+      });
+    }
+  });
+  
+  // Filter subjects based on search, category, age group and skill level
+  const filteredSubjects = React.useMemo(() => {
+    if (!dbSubjects) return [];
+    
+    return dbSubjects.filter(subject => {
+      // Search filter
+      const matchesSearch = 
+        searchTerm === "" || 
+        subject.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        subject.description.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      // Category filter
+      const matchesCategory = 
+        selectedCategory === "all" || 
+        subjectCategories[subject.id] === selectedCategory;
+      
+      // Skill level filter (based on modules)
+      const matchesSkillLevel = 
+        selectedSkillLevel === "all" ||
+        subject.modules.some(module => 
+          module.level.toLowerCase() === selectedSkillLevel.toLowerCase()
+        );
+      
+      return matchesSearch && matchesCategory && matchesSkillLevel;
+    });
+  }, [dbSubjects, searchTerm, selectedCategory, selectedAgeGroup, selectedSkillLevel]);
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <div className="mb-8">
-        <h1 className="font-sans font-bold text-3xl md:text-4xl text-neutral-900 mb-3">Learn Real-World Skills</h1>
-        <p className="text-lg text-neutral-600">Traditional subjects reimagined with practical, real-world applications.</p>
-      </div>
+      <div className="flex flex-col space-y-6">
+        <div>
+          <h1 className="text-4xl font-bold mb-2">Learn Real-World Skills</h1>
+          <p className="text-lg text-neutral-600">
+            Explore our structured learning paths designed for practical application
+          </p>
+        </div>
 
-      <div className="bg-white rounded-lg shadow-sm p-4 mb-8">
-        <div className="flex flex-wrap items-center gap-4">
-          <div className="flex-grow relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-neutral-400 h-5 w-5" />
-            <input 
-              type="text" 
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search subjects..." 
-              className="w-full pl-10 pr-4 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50"
-            />
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Button variant="outline" className="flex items-center gap-2">
-              <Filter className="h-4 w-4" />
-              <span>Filter</span>
-            </Button>
+        {/* Filters Section */}
+        <div className="bg-white rounded-lg shadow-md p-6">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-neutral-400" size={18} />
+                <Input
+                  placeholder="Search subjects..."
+                  className="pl-10"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
+            </div>
+            
+            <div>
+              <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select Category" />
+                </SelectTrigger>
+                <SelectContent>
+                  {categories.map(category => (
+                    <SelectItem key={category.id} value={category.id}>
+                      {category.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div>
+              <Select value={selectedAgeGroup} onValueChange={(value) => setSelectedAgeGroup(value as AgeGroup)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Age Group" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="9-12">Ages 9-12</SelectItem>
+                  <SelectItem value="13-15">Ages 13-15</SelectItem>
+                  <SelectItem value="16-18">Ages 16-18</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div>
+              <Select value={selectedSkillLevel} onValueChange={setSelectedSkillLevel}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Skill Level" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Levels</SelectItem>
+                  <SelectItem value="beginner">Beginner</SelectItem>
+                  <SelectItem value="intermediate">Intermediate</SelectItem>
+                  <SelectItem value="advanced">Advanced</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </div>
-      </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredModules.map((module) => (
-          <Link key={module.id} href={`/learn/${module.id}`}>
-            <Card className="bg-white rounded-lg shadow-md overflow-hidden transition-all duration-200 hover:shadow-lg cursor-pointer h-full">
-              <div className={`${module.color} text-white p-6`}>
-                <div className="bg-white/10 w-fit p-3 rounded-lg backdrop-blur-sm">
-                  {module.icon}
+        {/* Tabs for different organization views */}
+        <Tabs defaultValue="grid" className="w-full">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-2xl font-semibold">
+              {selectedCategory === "all" 
+                ? "All Subjects" 
+                : categories.find(c => c.id === selectedCategory)?.name}
+              <span className="ml-2 text-sm font-normal text-neutral-500">
+                ({filteredSubjects.length} {filteredSubjects.length === 1 ? "subject" : "subjects"})
+              </span>
+            </h2>
+            <TabsList>
+              <TabsTrigger value="grid">
+                <div className="flex items-center"><Brain className="h-4 w-4 mr-2" /> Subject Grid</div>
+              </TabsTrigger>
+              <TabsTrigger value="journey">
+                <div className="flex items-center"><GraduationCap className="h-4 w-4 mr-2" /> Learning Journey</div>
+              </TabsTrigger>
+              <TabsTrigger value="map">
+                <div className="flex items-center"><Globe className="h-4 w-4 mr-2" /> Skill Map</div>
+              </TabsTrigger>
+            </TabsList>
+          </div>
+
+          {/* Subject Grid View */}
+          <TabsContent value="grid" className="mt-0">
+            {isLoading ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <div key={i} className="bg-neutral-100 rounded-lg p-6 h-64 animate-pulse"></div>
+                ))}
+              </div>
+            ) : filteredSubjects.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {filteredSubjects.map((subject) => (
+                  <Link key={subject.id} href={`/learn/${subject.id}`}>
+                    <Card className="h-full hover:shadow-lg transition-shadow cursor-pointer">
+                      <CardHeader className={`${subject.color} text-white rounded-t-lg`}>
+                        <div className="flex justify-between items-start">
+                          <div className="bg-white p-2 rounded-md shadow">
+                            {subject.icon}
+                          </div>
+                          <Badge variant="outline" className="bg-white text-neutral-800">
+                            For ages {selectedAgeGroup}
+                          </Badge>
+                        </div>
+                        <CardTitle className="mt-2">{subject.title}</CardTitle>
+                        <CardDescription className="text-white opacity-90">{subject.subtitle}</CardDescription>
+                      </CardHeader>
+                      <CardContent className="pt-4">
+                        <p className="text-sm text-neutral-600 line-clamp-2">{subject.description}</p>
+                        <div className="mt-4 space-y-2">
+                          {subject.modules
+                            .filter(module => selectedSkillLevel === "all" || 
+                                  module.level.toLowerCase() === selectedSkillLevel.toLowerCase())
+                            .slice(0, 2)
+                            .map((module, idx) => (
+                              <div key={idx} className="flex items-center text-sm">
+                                <div className={`h-2 w-2 rounded-full mr-2 ${
+                                  module.level === "Beginner" ? "bg-green-500" :
+                                  module.level === "Intermediate" ? "bg-yellow-500" : "bg-red-500"
+                                }`}></div>
+                                <span>{module.title}</span>
+                              </div>
+                            ))}
+                          {subject.modules.length > 2 && (
+                            <div className="text-sm text-neutral-500">
+                              + {subject.modules.length - 2} more modules
+                            </div>
+                          )}
+                        </div>
+                      </CardContent>
+                      <CardFooter className="pt-0">
+                        <Button variant="outline" className="w-full">
+                          <span>Explore Subject</span>
+                          <ChevronRight className="h-4 w-4 ml-2" />
+                        </Button>
+                      </CardFooter>
+                    </Card>
+                  </Link>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-10">
+                <h3 className="text-xl font-medium">No subjects match your filters</h3>
+                <p className="mt-2 text-neutral-600">Try adjusting your search or filters</p>
+                <Button 
+                  variant="outline" 
+                  className="mt-4"
+                  onClick={() => {
+                    setSearchTerm("");
+                    setSelectedCategory("all");
+                    setSelectedSkillLevel("all");
+                  }}
+                >
+                  Reset Filters
+                </Button>
+              </div>
+            )}
+          </TabsContent>
+
+          {/* Learning Journey View */}
+          <TabsContent value="journey">
+            <div className="bg-white rounded-lg shadow-sm p-6">
+              <div className="space-y-8">
+                <div className="border-l-4 border-blue-500 pl-6 py-2">
+                  <h3 className="text-xl font-semibold">Step 1: Build Foundation</h3>
+                  <p className="text-neutral-600 mt-1">Start with these fundamental subjects to build a strong base</p>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+                    {filteredSubjects
+                      .filter(s => ["math", "communication", "health"].includes(s.id))
+                      .map(subject => (
+                        <Card key={subject.id} className="hover:shadow-md transition-shadow">
+                          <CardHeader className="pb-2">
+                            <div className="flex items-center">
+                              <div className={`p-2 rounded-md ${subject.color} text-white mr-3`}>
+                                {subject.icon}
+                              </div>
+                              <CardTitle className="text-lg">{subject.title}</CardTitle>
+                            </div>
+                          </CardHeader>
+                          <CardContent>
+                            <p className="text-sm text-neutral-600 mb-3">{subject.subtitle}</p>
+                            <Link href={`/learn/${subject.id}`}>
+                              <Button size="sm" variant="outline" className="w-full">Start</Button>
+                            </Link>
+                          </CardContent>
+                        </Card>
+                      ))}
+                  </div>
+                </div>
+                
+                <div className="border-l-4 border-purple-500 pl-6 py-2">
+                  <h3 className="text-xl font-semibold">Step 2: Expand Skills</h3>
+                  <p className="text-neutral-600 mt-1">Once you've mastered the basics, broaden your knowledge</p>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+                    {filteredSubjects
+                      .filter(s => ["finance", "technology", "science"].includes(s.id))
+                      .map(subject => (
+                        <Card key={subject.id} className="hover:shadow-md transition-shadow">
+                          <CardHeader className="pb-2">
+                            <div className="flex items-center">
+                              <div className={`p-2 rounded-md ${subject.color} text-white mr-3`}>
+                                {subject.icon}
+                              </div>
+                              <CardTitle className="text-lg">{subject.title}</CardTitle>
+                            </div>
+                          </CardHeader>
+                          <CardContent>
+                            <p className="text-sm text-neutral-600 mb-3">{subject.subtitle}</p>
+                            <Link href={`/learn/${subject.id}`}>
+                              <Button size="sm" variant="outline" className="w-full">Start</Button>
+                            </Link>
+                          </CardContent>
+                        </Card>
+                      ))}
+                  </div>
+                </div>
+                
+                <div className="border-l-4 border-orange-500 pl-6 py-2">
+                  <h3 className="text-xl font-semibold">Step 3: Specialize</h3>
+                  <p className="text-neutral-600 mt-1">Choose your path and develop expertise in areas that interest you</p>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+                    {filteredSubjects
+                      .filter(s => ["entrepreneurship", "careers", "tech-real-world"].includes(s.id))
+                      .map(subject => (
+                        <Card key={subject.id} className="hover:shadow-md transition-shadow">
+                          <CardHeader className="pb-2">
+                            <div className="flex items-center">
+                              <div className={`p-2 rounded-md ${subject.color} text-white mr-3`}>
+                                {subject.icon}
+                              </div>
+                              <CardTitle className="text-lg">{subject.title}</CardTitle>
+                            </div>
+                          </CardHeader>
+                          <CardContent>
+                            <p className="text-sm text-neutral-600 mb-3">{subject.subtitle}</p>
+                            <Link href={`/learn/${subject.id}`}>
+                              <Button size="sm" variant="outline" className="w-full">Start</Button>
+                            </Link>
+                          </CardContent>
+                        </Card>
+                      ))}
+                  </div>
                 </div>
               </div>
-              <CardContent className="p-5">
-                <h3 className="font-sans font-semibold text-xl mb-2">{module.title}</h3>
-                <p className="text-neutral-600 mb-4">{module.subtitle}</p>
-                <div className="text-sm text-neutral-500 mb-4">
-                  <div className="flex items-center gap-1 mb-1">
-                    <span>•</span>
-                    <span>{module.modules.length} Learning Modules</span>
+            </div>
+          </TabsContent>
+
+          {/* Skill Map View */}
+          <TabsContent value="map">
+            <div className="bg-white rounded-lg shadow-sm p-6">
+              <div className="text-center mb-8">
+                <h3 className="text-xl font-semibold">Skills Ecosystem</h3>
+                <p className="text-neutral-600 mt-1">
+                  See how different subjects connect and build on each other
+                </p>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-8">
+                {/* Core Skills Hub */}
+                <div className="relative border-2 border-blue-200 rounded-lg p-6 bg-blue-50">
+                  <div className="absolute -top-3 left-4 bg-blue-500 text-white px-3 py-1 rounded-full text-sm font-semibold">
+                    Core Skills
                   </div>
-                  <div className="flex items-center gap-1">
-                    <span>•</span>
-                    <span>Practical Projects & Assessments</span>
+                  <div className="space-y-3 mt-3">
+                    {filteredSubjects
+                      .filter(s => subjectCategories[s.id] === "core")
+                      .map(subject => (
+                        <Link key={subject.id} href={`/learn/${subject.id}`}>
+                          <div className="flex items-center p-2 hover:bg-blue-100 rounded-md transition-colors">
+                            <div className={`p-1.5 rounded-md ${subject.color} text-white mr-2`}>
+                              {React.cloneElement(subject.icon as React.ReactElement, { size: 20 })}
+                            </div>
+                            <span className="font-medium">{subject.title}</span>
+                          </div>
+                        </Link>
+                      ))}
                   </div>
                 </div>
-              </CardContent>
-              <CardFooter className="p-5 pt-0">
-                <Button className="w-full" variant="outline">
-                  Explore Modules
-                  <ChevronRight className="ml-2 h-4 w-4" />
-                </Button>
-              </CardFooter>
-            </Card>
-          </Link>
-        ))}
+                
+                {/* Life Skills Hub */}
+                <div className="relative border-2 border-purple-200 rounded-lg p-6 bg-purple-50">
+                  <div className="absolute -top-3 left-4 bg-purple-500 text-white px-3 py-1 rounded-full text-sm font-semibold">
+                    Life Skills
+                  </div>
+                  <div className="space-y-3 mt-3">
+                    {filteredSubjects
+                      .filter(s => subjectCategories[s.id] === "life")
+                      .map(subject => (
+                        <Link key={subject.id} href={`/learn/${subject.id}`}>
+                          <div className="flex items-center p-2 hover:bg-purple-100 rounded-md transition-colors">
+                            <div className={`p-1.5 rounded-md ${subject.color} text-white mr-2`}>
+                              {React.cloneElement(subject.icon as React.ReactElement, { size: 20 })}
+                            </div>
+                            <span className="font-medium">{subject.title}</span>
+                          </div>
+                        </Link>
+                      ))}
+                  </div>
+                </div>
+                
+                {/* Career Prep Hub */}
+                <div className="relative border-2 border-orange-200 rounded-lg p-6 bg-orange-50">
+                  <div className="absolute -top-3 left-4 bg-orange-500 text-white px-3 py-1 rounded-full text-sm font-semibold">
+                    Career Prep
+                  </div>
+                  <div className="space-y-3 mt-3">
+                    {filteredSubjects
+                      .filter(s => subjectCategories[s.id] === "career")
+                      .map(subject => (
+                        <Link key={subject.id} href={`/learn/${subject.id}`}>
+                          <div className="flex items-center p-2 hover:bg-orange-100 rounded-md transition-colors">
+                            <div className={`p-1.5 rounded-md ${subject.color} text-white mr-2`}>
+                              {React.cloneElement(subject.icon as React.ReactElement, { size: 20 })}
+                            </div>
+                            <span className="font-medium">{subject.title}</span>
+                          </div>
+                        </Link>
+                      ))}
+                  </div>
+                </div>
+              </div>
+              
+              {/* Cross-Skills Connections */}
+              <div className="border-t-2 border-dashed border-neutral-200 pt-6 mt-6">
+                <h4 className="text-lg font-semibold mb-4">Cross-Disciplinary Pathways</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg">Future Entrepreneur Path</CardTitle>
+                      <CardDescription>Combine these skills to prepare for business success</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-2">
+                      <div className="flex items-center">
+                        <div className="bg-orange-500 text-white p-1.5 rounded mr-2">
+                          <Sparkles size={18} />
+                        </div>
+                        <div>
+                          <p className="font-medium">Entrepreneurship & Work Skills</p>
+                          <p className="text-xs text-neutral-500">Foundation skills</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center">
+                        <div className="bg-purple-500 text-white p-1.5 rounded mr-2">
+                          <PiggyBank size={18} />
+                        </div>
+                        <div>
+                          <p className="font-medium">Financial Literacy</p>
+                          <p className="text-xs text-neutral-500">Money management</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center">
+                        <div className="bg-indigo-500 text-white p-1.5 rounded mr-2">
+                          <MessageCircle size={18} />
+                        </div>
+                        <div>
+                          <p className="font-medium">Communication & Relationships</p>
+                          <p className="text-xs text-neutral-500">People skills</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg">Tech Career Path</CardTitle>
+                      <CardDescription>Skills that prepare you for the digital economy</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-2">
+                      <div className="flex items-center">
+                        <div className="bg-teal-500 text-white p-1.5 rounded mr-2">
+                          <Code size={18} />
+                        </div>
+                        <div>
+                          <p className="font-medium">Tech in the Real World</p>
+                          <p className="text-xs text-neutral-500">Foundation skills</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center">
+                        <div className="bg-cyan-500 text-white p-1.5 rounded mr-2">
+                          <Laptop size={18} />
+                        </div>
+                        <div>
+                          <p className="font-medium">Technology Skills</p>
+                          <p className="text-xs text-neutral-500">Technical abilities</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center">
+                        <div className="bg-blue-500 text-white p-1.5 rounded mr-2">
+                          <Calculator size={18} />
+                        </div>
+                        <div>
+                          <p className="font-medium">Real-World Math</p>
+                          <p className="text-xs text-neutral-500">Analytical thinking</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
+            </div>
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );

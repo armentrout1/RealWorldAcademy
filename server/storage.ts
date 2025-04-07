@@ -20,7 +20,7 @@ import {
   userChallenges, type UserChallenge, type InsertUserChallenge
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, sql } from "drizzle-orm";
+import { eq, sql, and, inArray } from "drizzle-orm";
 
 export interface IStorage {
   // User operations
@@ -403,8 +403,10 @@ export class DatabaseStorage implements IStorage {
     if (!subject) return undefined;
     
     const results = await db.select().from(lessons)
-      .where(eq(lessons.subjectId, subject.id))
-      .where(eq(lessons.slug, lessonSlug));
+      .where(and(
+        eq(lessons.subjectId, subject.id),
+        eq(lessons.slug, lessonSlug)
+      ));
     return results.length > 0 ? results[0] : undefined;
   }
   
@@ -425,8 +427,10 @@ export class DatabaseStorage implements IStorage {
   // User Subject Progress operations
   async getUserSubjectProgress(userId: number, subjectId: number): Promise<UserSubjectProgress | undefined> {
     const results = await db.select().from(userSubjectProgress)
-      .where(eq(userSubjectProgress.userId, userId))
-      .where(eq(userSubjectProgress.subjectId, subjectId));
+      .where(and(
+        eq(userSubjectProgress.userId, userId),
+        eq(userSubjectProgress.subjectId, subjectId)
+      ));
     return results.length > 0 ? results[0] : undefined;
   }
   

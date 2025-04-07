@@ -1,0 +1,67 @@
+Design a content system for building and scaling lessons across all subjects and age groups. Focus on consistency, real-world usefulness, and modular learning experiences.
+
+1. **Define the Core Subject Library**:
+   Add these as your base curriculum areas:
+   - Financial Literacy
+   - Real-World Math
+   - Communication & Relationships
+   - Health & Wellness
+   - Entrepreneurship
+   - Tech in the Real World
+   - History with Context
+   - Science that Matters
+   - Future Planning & Careers
+   - Learning How to Learn
+
+2. **Tiered Learning Model (3 Age Levels)**:
+   Each subject should have 3 tiers:
+   - Tier 1: Ages 9–12 (Foundational, playful, visuals)
+   - Tier 2: Ages 13–15 (Practical, scenario-driven, interactive)
+   - Tier 3: Ages 16–18 (Real-world prep, job and life readiness)
+
+   Each tier should adjust tone, vocabulary, and examples — but keep learning goals consistent.
+
+3. **Standard Lesson Format**:
+   Create a reusable format for each lesson:
+   - ✅ Title
+   - 🎯 Learning Objective
+   - 🧠 Warm-Up Question
+   - 📘 Lesson Explanation (1–2 paragraphs)
+   - 💬 Real-World Scenario or Case Study
+   - 🛠️ Activity or Interactive Element (budget tool, quiz, drag & drop, etc.)
+   - 🔍 Reflection Prompt (text box or journaling)
+   - 🏁 “Mark Complete” + XP Reward + Optional Badge
+
+4. **Batch Create Sample Units**:
+   For each core subject, create at least **2 sample lessons per age tier** (you can add more later).
+
+   Example for Financial Literacy:
+   - Tier 1: “What is Money?” (learn through coins, chores, goals)
+   - Tier 2: “How to Make a Budget”
+   - Tier 3: “Credit Scores, Loans, and Building Wealth”
+
+   Example for Communication:
+   - Tier 1: “Using Kind Words”
+   - Tier 2: “Conflict Resolution 101”
+   - Tier 3: “Interviewing for a Job”
+
+   You can simulate interactivity or use existing components from earlier phases.
+
+5. **Add Subject Browsing & Filtering**:
+   - On the Learn page, allow users to filter lessons by:
+     - Subject
+     - Age group
+     - Skill category (e.g., Money, Mindset, Future, Wellness)
+   - Use colorful subject tags and a clean lesson preview grid
+
+6. **Link Lessons to Other Features**:
+   - Unlock badges via gamification system when a lesson is completed
+   - Show related projects or resources (PDFs, printables, videos)
+   - Let teachers/parents assign lessons to students or groups (placeholder for now)
+
+7. **Design Tips**:
+   - Use consistent layouts, colors, and visuals per subject
+   - Create lesson templates you can duplicate easily
+   - Make sure mobile students can tap through, complete, and reflect just as easily
+
+This gives your platform **depth, replay value, and real impact** — you now have the system to scale learning for thousands of kids, across dozens of skills, at every age and level.
