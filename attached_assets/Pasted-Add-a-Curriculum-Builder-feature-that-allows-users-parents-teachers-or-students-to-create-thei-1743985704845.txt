@@ -1,0 +1,49 @@
+Add a “Curriculum Builder” feature that allows users (parents, teachers, or students) to create their own custom learning paths by mixing and matching modules from across all subjects.
+
+1. **Create a “Curriculum Builder” Page**:
+   - Title: “Build Your Learning Path”
+   - Add a short intro message:
+     “Choose the subjects and skills that matter most. Create a path that fits your goals.”
+
+2. **Add a Module Picker Interface**:
+   - Show a categorized list or grid of all available learning modules
+     - Categories: Financial Literacy, Real-World Math, Projects, Wellness, Tech Skills, Communication, etc.
+   - Each module card should include:
+     - Title
+     - Short summary
+     - Estimated time
+     - Age range or level
+     - “Add to Path” button
+
+   When clicked, the module is added to the user’s custom path below.
+
+3. **Build a Curriculum Path Viewer**:
+   - Below the module picker, display the selected modules in order
+   - Allow drag-and-drop reordering of modules (can be simulated)
+   - Each item shows:
+     - Title
+     - “Edit” (placeholder)
+     - “Remove” button
+
+4. **Add Goal and Name Fields**:
+   - Let users give their curriculum a title (e.g., “Money Mastery for 13–15”)
+   - Optional text box: “What is this learning path for?”
+     - Example: “Summer learning for 12-year-old interested in business”
+
+5. **Preview or Export View**:
+   - Include a “Preview Curriculum” button that shows a print-style or simplified view of the selected path
+   - Display as a list with descriptions and learning objectives
+
+6. **(Optional/Placeholder) Save or Share Buttons**:
+   - Add fake buttons for:
+     - “Save Curriculum”
+     - “Generate Share Link”
+     - “Assign to Class”
+   - These don’t need to work yet — just include them in the UI for future backend integration
+
+7. **Style and UX**:
+   - Keep the layout drag-and-drop friendly
+   - Use color-coded subject labels (e.g., green = finance, blue = tech, orange = wellness)
+   - Make sure mobile users can easily select and view their custom path
+
+This gives users real ownership of the learning journey — a huge step toward making the platform flexible for all types of learners and educators.

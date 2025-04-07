@@ -25,6 +25,7 @@ import Profile from "@/pages/Profile";
 import Settings from "@/pages/Settings";
 import TeacherDashboard from "@/pages/TeacherDashboard";
 import ParentDashboard from "@/pages/ParentDashboard";
+import CurriculumBuilder from "@/pages/CurriculumBuilder";
 import NotFound from "@/pages/not-found";
 
 // Page transition variants
@@ -182,6 +183,11 @@ function Router() {
             <Route path="/parent-dashboard">
               <PageWrapper>
                 <ParentDashboard />
+              </PageWrapper>
+            </Route>
+            <Route path="/curriculum-builder">
+              <PageWrapper>
+                <CurriculumBuilder />
               </PageWrapper>
             </Route>
             <Route>

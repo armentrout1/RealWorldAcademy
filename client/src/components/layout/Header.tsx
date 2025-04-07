@@ -9,6 +9,7 @@ import {
   Users,
   Home,
   UserCircle,
+  BookOpen,
   BarChart as ChartBarIcon,
   Settings as SettingsIcon
 } from "lucide-react";
@@ -82,6 +83,12 @@ const Header: React.FC = () => {
                     <Link href="/parent-dashboard" className="flex w-full items-center">
                       <Home className="mr-2 h-4 w-4" />
                       <span>Homeschool Hub</span>
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem>
+                    <Link href="/curriculum-builder" className="flex w-full items-center">
+                      <BookOpen className="mr-2 h-4 w-4" />
+                      <span>Curriculum Builder</span>
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />

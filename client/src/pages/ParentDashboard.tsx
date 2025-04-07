@@ -695,6 +695,10 @@ const ParentDashboard: React.FC = () => {
                 <BookOpen className="mr-2 h-4 w-4" />
                 Browse Curriculum
               </Button>
+              <Button variant="ghost" className="w-full justify-start" onClick={() => window.location.href = "/curriculum-builder"}>
+                <Edit className="mr-2 h-4 w-4" />
+                Build Custom Curriculum
+              </Button>
             </CardContent>
           </Card>
         </div>
