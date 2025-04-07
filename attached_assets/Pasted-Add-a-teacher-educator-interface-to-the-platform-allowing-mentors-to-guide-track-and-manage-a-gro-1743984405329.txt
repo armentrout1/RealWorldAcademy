@@ -1,0 +1,50 @@
+Add a teacher/educator interface to the platform, allowing mentors to guide, track, and manage a group of student learners. This can be static or simulated for now, with placeholder data — no backend needed yet.
+
+1. **Create a “Teacher Dashboard” Page**:
+   - Title: “Educator Dashboard”
+   - Display a welcome banner with the teacher’s name (use placeholder for now)
+   - Show a list or grid of mock students (4–8 sample students)
+     - Each student should display:
+       - Name
+       - Avatar
+       - Progress bars (e.g., % of modules completed, number of projects done)
+       - A “View Student” button
+
+2. **Build a “Student View” Modal or Page**:
+   When clicking “View Student,” show detailed information for that student:
+   - Self Discovery result (e.g., “Planner” or “Builder”)
+   - Module completion summary
+   - Recent project submissions (can use placeholder titles)
+   - Notes/comments field (for teacher to leave notes — no saving needed yet)
+
+3. **Create a Class Overview or Roster Page**:
+   - Show all students in the class with:
+     - Icons for which subjects each student is focused on
+     - Quick view of “who’s behind” or “who’s ahead”
+     - Filters or tags by skill/interests
+
+4. **Add a “Create Assignment” UI (Static for Now)**:
+   - Let the teacher select:
+     - Subject (e.g., Math, Finance, Communication)
+     - Age group
+     - Due date (date picker or dropdown)
+     - Instructions
+   - Button to “Assign to All Students” (no actual delivery logic yet)
+
+   Below, show a sample list of assignments that have been “created” with:
+   - Title
+   - Subject
+   - Assigned Date
+   - Status (e.g., “5 of 8 completed”)
+
+5. **Add Messaging or Announcement Area (Simulated)**:
+   - Add a section where the teacher can post a “Class Message”
+   - Example: “This week’s focus is budgeting and project collaboration!”
+   - Just a static text box with a “Post” button and a display of the last 1–2 messages
+
+6. **Style for Clean Classroom Use**:
+   - Layout should be easy to use on both desktops and tablets
+   - Use teacher-friendly colors (subtle blues, calm greens, grays)
+   - Keep the interface focused and not overly playful — make it professional but welcoming
+
+These tools are a major step toward making the platform usable by schools, homeschoolers, and mentors who want to track student growth and engagement — even if it’s just a static or demo version for now.

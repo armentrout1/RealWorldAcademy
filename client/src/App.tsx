@@ -22,6 +22,7 @@ import PlanYourFuture from "@/pages/PlanYourFuture";
 import Login from "@/pages/Login";
 import Signup from "@/pages/Signup";
 import Profile from "@/pages/Profile";
+import TeacherDashboard from "@/pages/TeacherDashboard";
 import NotFound from "@/pages/not-found";
 
 // Page transition variants
@@ -164,6 +165,11 @@ function Router() {
             <Route path="/profile">
               <PageWrapper>
                 <Profile />
+              </PageWrapper>
+            </Route>
+            <Route path="/teacher-dashboard">
+              <PageWrapper>
+                <TeacherDashboard />
               </PageWrapper>
             </Route>
             <Route>
