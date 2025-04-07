@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { MessageCircle, X, Send, Smile, Sparkles, Settings, Edit, RefreshCw, Check, ActivitySquare, Brain, Heart, Timer, ExternalLink } from 'lucide-react';
+import { MessageCircle, X, Send, Smile, Sparkles, Settings, Edit, RefreshCw, Check, ActivitySquare, Brain, Heart, Timer, ExternalLink, PenTool, Lightbulb, Briefcase, Globe, Shuffle, Star, GraduationCap, Rocket, Wand } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription } from "@/components/ui/card";
 import {
@@ -130,6 +130,43 @@ const supportPreferences = [
   { value: 'just_listen', label: 'Just listen' },
   { value: 'cheer_up', label: 'Cheer me up' },
   { value: 'help_focus', label: 'Help me focus' }
+];
+
+// Creative mode options
+const creativeOptions = [
+  { value: 'story', label: '✍️ Let\'s Write a Story', 
+    icon: PenTool, description: 'Create interesting characters and plots together' },
+  { value: 'invention', label: '🧠 Invent Something New', 
+    icon: Lightbulb, description: 'Design a cool invention to solve a problem' },
+  { value: 'business', label: '💼 Start a Business', 
+    icon: Briefcase, description: 'Make a plan for your first mini-business' },
+  { value: 'future', label: '🌎 Design Your Dream Future', 
+    icon: Globe, description: 'Explore your ideal future in 10 years' },
+  { value: 'surprise', label: '🔁 Surprise Me!', 
+    icon: Shuffle, description: 'Get a random creative challenge' }
+];
+
+// Story type options
+const storyTypes = [
+  { value: 'adventure', label: 'Adventure', description: 'An exciting journey with challenges and discovery' },
+  { value: 'funny', label: 'Funny', description: 'A humorous tale that will make people laugh' },
+  { value: 'mystery', label: 'Mystery', description: 'An intriguing puzzle waiting to be solved' },
+  { value: 'real_life', label: 'Real Life', description: 'A story based on everyday experiences' },
+  { value: 'fantasy', label: 'Fantasy', description: 'A magical world of imagination and wonder' }
+];
+
+// Surprise creative prompts
+const surprisePrompts = [
+  "Design a new holiday that celebrates learning",
+  "Create a superhero based on your favorite school subject",
+  "Invent a game that teaches something important",
+  "Design a treehouse with three amazing features",
+  "Create a new animal by combining three existing ones",
+  "Imagine a world where kids make all the rules",
+  "Design a restaurant with the most unusual theme",
+  "Create a new sport that anyone can play",
+  "Invent a machine that solves an everyday problem",
+  "Design a perfect day from morning to night"
 ];
 
 // Buddy response patterns based on personality
@@ -277,6 +314,24 @@ export function Buddy() {
   const [reflectionText, setReflectionText] = useState('');
   const [isReflecting, setIsReflecting] = useState(false);
   const [supportPreference, setSupportPreference] = useState<string>('none');
+  
+  // Creative mode states
+  const [isCreativeMode, setIsCreativeMode] = useState(false);
+  const [selectedCreativeOption, setSelectedCreativeOption] = useState<string | null>(null);
+  const [creativePrompt, setCreativePrompt] = useState('');
+  const [creativeResponse, setCreativeResponse] = useState('');
+  const [isCreating, setIsCreating] = useState(false);
+  const [storyType, setStoryType] = useState('');
+  const [mainCharacter, setMainCharacter] = useState('');
+  const [storyLocation, setStoryLocation] = useState('');
+  const [storyTwist, setStoryTwist] = useState('');
+  const [problemToSolve, setProblemToSolve] = useState('');
+  const [businessIdea, setBusinessIdea] = useState('');
+  const [targetCustomer, setTargetCustomer] = useState('');
+  const [businessName, setBusinessName] = useState('');
+  const [futureLocation, setFutureLocation] = useState('');
+  const [futureDreamJob, setFutureDreamJob] = useState('');
+  const [selectedSurprisePrompt, setSelectedSurprisePrompt] = useState('');
   
   const inputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -662,6 +717,15 @@ export function Buddy() {
                   size="icon"
                   variant="ghost" 
                   className="h-7 w-7"
+                  onClick={() => setIsCreativeMode(true)}
+                  title="Create with me"
+                >
+                  <Wand size={15} />
+                </Button>
+                <Button 
+                  size="icon"
+                  variant="ghost" 
+                  className="h-7 w-7"
                   onClick={() => setIsCustomizing(true)}
                   title="Settings"
                 >
@@ -772,13 +836,13 @@ export function Buddy() {
                       variant="outline" 
                       size="icon"
                       className="h-8 w-8"
-                      onClick={handleCreativePrompt}
+                      onClick={() => setIsCreativeMode(true)}
                     >
-                      <Sparkles size={14} />
+                      <Wand size={14} />
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent side="top">
-                    <p className="text-xs">Get a creative prompt</p>
+                    <p className="text-xs">Create with Buddy</p>
                   </TooltipContent>
                 </Tooltip>
                 
@@ -1402,6 +1466,577 @@ export function Buddy() {
               Save to Journal
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Creative Mode Dialog */}
+      <Dialog open={isCreativeMode} onOpenChange={setIsCreativeMode}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Wand className="h-5 w-5 text-primary" />
+              Create with {buddyProfile?.name || 'Buddy'}
+            </DialogTitle>
+            <DialogDescription>
+              Let's make something amazing together! What would you like to create?
+            </DialogDescription>
+          </DialogHeader>
+          
+          {!selectedCreativeOption ? (
+            <div className="grid grid-cols-1 gap-3 py-4">
+              {creativeOptions.map((option) => (
+                <Button
+                  key={option.value}
+                  variant="outline"
+                  className="flex justify-start items-center p-3 h-auto"
+                  onClick={() => {
+                    setSelectedCreativeOption(option.value);
+                    if (option.value === 'surprise') {
+                      // Select a random surprise prompt
+                      const randomPrompt = surprisePrompts[Math.floor(Math.random() * surprisePrompts.length)];
+                      setSelectedSurprisePrompt(randomPrompt);
+                    }
+                  }}
+                >
+                  <div className="bg-primary/10 p-2 rounded-full mr-3">
+                    <option.icon className="h-5 w-5 text-primary" />
+                  </div>
+                  <div className="text-left">
+                    <div className="font-medium">{option.label}</div>
+                    <div className="text-xs text-muted-foreground">{option.description}</div>
+                  </div>
+                </Button>
+              ))}
+            </div>
+          ) : (
+            <>
+              {/* Story Builder */}
+              {selectedCreativeOption === 'story' && (
+                <div className="space-y-4 py-4">
+                  <div className="bg-primary/5 p-3 rounded-md border">
+                    <h3 className="font-medium text-sm flex items-center gap-2">
+                      <PenTool className="h-4 w-4 text-primary" />
+                      Let's Write a Story
+                    </h3>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      We'll create a fun story together, step-by-step.
+                    </p>
+                  </div>
+                  
+                  {!storyType ? (
+                    <div className="space-y-3">
+                      <Label>What kind of story would you like to write?</Label>
+                      <div className="grid grid-cols-1 gap-2">
+                        {storyTypes.map((type) => (
+                          <Button
+                            key={type.value}
+                            variant="outline"
+                            className="justify-start h-auto p-2"
+                            onClick={() => setStoryType(type.value)}
+                          >
+                            <div className="text-left">
+                              <div className="font-medium">{type.label}</div>
+                              <div className="text-xs text-muted-foreground">{type.description}</div>
+                            </div>
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+                  ) : !mainCharacter ? (
+                    <div className="space-y-3">
+                      <Label>Who's your main character?</Label>
+                      <Textarea 
+                        placeholder="Describe your main character (name, age, what they're like)"
+                        value={mainCharacter}
+                        onChange={(e) => setMainCharacter(e.target.value)}
+                        rows={3}
+                      />
+                      <Button 
+                        className="w-full" 
+                        disabled={!mainCharacter.trim()}
+                        onClick={() => {
+                          // Proceed to next step
+                        }}
+                      >
+                        Continue
+                      </Button>
+                    </div>
+                  ) : !storyLocation ? (
+                    <div className="space-y-3">
+                      <Label>Where does the story take place?</Label>
+                      <Textarea 
+                        placeholder="Describe the setting (location, time, weather, etc.)"
+                        value={storyLocation}
+                        onChange={(e) => setStoryLocation(e.target.value)}
+                        rows={3}
+                      />
+                      <Button 
+                        className="w-full" 
+                        disabled={!storyLocation.trim()}
+                        onClick={() => {
+                          // Proceed to next step
+                        }}
+                      >
+                        Continue
+                      </Button>
+                    </div>
+                  ) : !storyTwist ? (
+                    <div className="space-y-3">
+                      <Label>What's the twist or challenge?</Label>
+                      <Textarea 
+                        placeholder="What unexpected thing happens? What problem must be solved?"
+                        value={storyTwist}
+                        onChange={(e) => setStoryTwist(e.target.value)}
+                        rows={3}
+                      />
+                      <Button 
+                        className="w-full" 
+                        disabled={!storyTwist.trim()}
+                        onClick={() => {
+                          // Generate story
+                          const storyParts = [
+                            `Once upon a time, there was ${mainCharacter}.`,
+                            `They lived in ${storyLocation}.`,
+                            `One day, something unexpected happened: ${storyTwist}.`,
+                            `This led to an amazing adventure...`
+                          ];
+                          setCreativeResponse(storyParts.join('\n\n'));
+                        }}
+                      >
+                        Create Our Story!
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <Label>Our Story</Label>
+                      <div className="bg-muted/50 p-3 rounded-md border text-sm">
+                        {creativeResponse.split('\n\n').map((paragraph, idx) => (
+                          <p key={idx} className="mb-2">{paragraph}</p>
+                        ))}
+                      </div>
+                      <Button 
+                        className="w-full" 
+                        onClick={() => {
+                          // Save to journal
+                          // For now, just show a toast message
+                          toast({
+                            title: "Story saved to journal",
+                            description: "You can find your story in your journal anytime!"
+                          });
+                          
+                          // Reset creative mode
+                          setIsCreativeMode(false);
+                          setSelectedCreativeOption(null);
+                          setStoryType('');
+                          setMainCharacter('');
+                          setStoryLocation('');
+                          setStoryTwist('');
+                          setCreativeResponse('');
+                        }}
+                      >
+                        Save to Journal
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )}
+              
+              {/* Invention Generator */}
+              {selectedCreativeOption === 'invention' && (
+                <div className="space-y-4 py-4">
+                  <div className="bg-primary/5 p-3 rounded-md border">
+                    <h3 className="font-medium text-sm flex items-center gap-2">
+                      <Lightbulb className="h-4 w-4 text-primary" />
+                      Invent Something New
+                    </h3>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Let's design a cool invention to solve a problem.
+                    </p>
+                  </div>
+                  
+                  {!problemToSolve ? (
+                    <div className="space-y-3">
+                      <Label>What problem would you like to solve?</Label>
+                      <Textarea 
+                        placeholder="Describe a problem that needs solving (e.g., 'forgetting to water plants')"
+                        value={problemToSolve}
+                        onChange={(e) => setProblemToSolve(e.target.value)}
+                        rows={3}
+                      />
+                      <Button 
+                        className="w-full" 
+                        disabled={!problemToSolve.trim()}
+                        onClick={() => {
+                          // Generate invention idea
+                          const inventionDescription = `Here's an invention to solve "${problemToSolve}":\n\n` +
+                            `The Amazing Problem-Solver 3000!\n\n` +
+                            `This clever device works by using special sensors to detect when the problem is about to happen, ` +
+                            `and then uses its built-in technology to provide a solution automatically!\n\n` +
+                            `Features:\n` +
+                            `- Smart detection system\n` +
+                            `- Eco-friendly power source\n` +
+                            `- Fits in your pocket\n` +
+                            `- Simple one-button operation`;
+                          
+                          setCreativeResponse(inventionDescription);
+                        }}
+                      >
+                        Generate Invention
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <Label>Your Invention</Label>
+                      <div className="bg-muted/50 p-3 rounded-md border text-sm">
+                        {creativeResponse.split('\n\n').map((paragraph, idx) => (
+                          <p key={idx} className="mb-2">{paragraph}</p>
+                        ))}
+                      </div>
+                      <Button 
+                        className="w-full" 
+                        onClick={() => {
+                          // Save to journal
+                          toast({
+                            title: "Invention saved to journal",
+                            description: "Your invention blueprint has been saved!"
+                          });
+                          
+                          // Reset creative mode
+                          setIsCreativeMode(false);
+                          setSelectedCreativeOption(null);
+                          setProblemToSolve('');
+                          setCreativeResponse('');
+                        }}
+                      >
+                        Save to Journal
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )}
+              
+              {/* Mini Business Builder */}
+              {selectedCreativeOption === 'business' && (
+                <div className="space-y-4 py-4">
+                  <div className="bg-primary/5 p-3 rounded-md border">
+                    <h3 className="font-medium text-sm flex items-center gap-2">
+                      <Briefcase className="h-4 w-4 text-primary" />
+                      Start a Business
+                    </h3>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Let's create a plan for your first mini-business.
+                    </p>
+                  </div>
+                  
+                  {!businessIdea ? (
+                    <div className="space-y-3">
+                      <Label>What would you love to sell or offer?</Label>
+                      <Textarea 
+                        placeholder="Describe your business idea (product or service)"
+                        value={businessIdea}
+                        onChange={(e) => setBusinessIdea(e.target.value)}
+                        rows={3}
+                      />
+                      <Button 
+                        className="w-full" 
+                        disabled={!businessIdea.trim()}
+                        onClick={() => {
+                          // Continue to next step
+                        }}
+                      >
+                        Continue
+                      </Button>
+                    </div>
+                  ) : !targetCustomer ? (
+                    <div className="space-y-3">
+                      <Label>Who would buy or use your {businessIdea}?</Label>
+                      <Textarea 
+                        placeholder="Describe your target customers"
+                        value={targetCustomer}
+                        onChange={(e) => setTargetCustomer(e.target.value)}
+                        rows={3}
+                      />
+                      <Button 
+                        className="w-full" 
+                        disabled={!targetCustomer.trim()}
+                        onClick={() => {
+                          // Continue to next step
+                        }}
+                      >
+                        Continue
+                      </Button>
+                    </div>
+                  ) : !businessName ? (
+                    <div className="space-y-3">
+                      <Label>What will you call your business?</Label>
+                      <Input
+                        placeholder="Enter a catchy business name"
+                        value={businessName}
+                        onChange={(e) => setBusinessName(e.target.value)}
+                      />
+                      <Button 
+                        className="w-full" 
+                        disabled={!businessName.trim()}
+                        onClick={() => {
+                          // Generate business plan
+                          const businessPlan = `## ${businessName}\n\n` +
+                            `**Business Idea:** ${businessIdea}\n\n` +
+                            `**Target Customers:** ${targetCustomer}\n\n` +
+                            `**Marketing Strategy:**\n` +
+                            `- Create eye-catching flyers\n` +
+                            `- Tell friends and family\n` +
+                            `- Set up a social media page\n\n` +
+                            `**Startup Costs:**\n` +
+                            `- Materials: $XX\n` +
+                            `- Marketing: $XX\n` +
+                            `- Other expenses: $XX\n\n` +
+                            `**Pricing Strategy:**\n` +
+                            `Consider charging $XX per item/service based on your costs and what customers might pay.\n\n` +
+                            `**Next Steps:**\n` +
+                            `1. Make a prototype or practice your service\n` +
+                            `2. Ask for feedback from potential customers\n` +
+                            `3. Make improvements based on feedback\n` +
+                            `4. Start small and grow!`;
+                          
+                          setCreativeResponse(businessPlan);
+                        }}
+                      >
+                        Create Business Plan
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <Label>Your Business Plan</Label>
+                      <div className="bg-muted/50 p-3 rounded-md border text-sm">
+                        {creativeResponse.split('\n\n').map((paragraph, idx) => (
+                          <p key={idx} className="mb-2">{paragraph}</p>
+                        ))}
+                      </div>
+                      <Button 
+                        className="w-full" 
+                        onClick={() => {
+                          // Save to journal
+                          toast({
+                            title: "Business plan saved to journal",
+                            description: "Your business plan has been saved!"
+                          });
+                          
+                          // Reset creative mode
+                          setIsCreativeMode(false);
+                          setSelectedCreativeOption(null);
+                          setBusinessIdea('');
+                          setTargetCustomer('');
+                          setBusinessName('');
+                          setCreativeResponse('');
+                        }}
+                      >
+                        Save to Journal
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )}
+              
+              {/* Future You Dreamer */}
+              {selectedCreativeOption === 'future' && (
+                <div className="space-y-4 py-4">
+                  <div className="bg-primary/5 p-3 rounded-md border">
+                    <h3 className="font-medium text-sm flex items-center gap-2">
+                      <Globe className="h-4 w-4 text-primary" />
+                      Design Your Dream Future
+                    </h3>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Let's imagine your ideal life in 10 years!
+                    </p>
+                  </div>
+                  
+                  {!futureLocation ? (
+                    <div className="space-y-3">
+                      <Label>Where would you like to be living in 10 years?</Label>
+                      <Textarea 
+                        placeholder="Describe your ideal home and location"
+                        value={futureLocation}
+                        onChange={(e) => setFutureLocation(e.target.value)}
+                        rows={3}
+                      />
+                      <Button 
+                        className="w-full" 
+                        disabled={!futureLocation.trim()}
+                        onClick={() => {
+                          // Continue to next step
+                        }}
+                      >
+                        Continue
+                      </Button>
+                    </div>
+                  ) : !futureDreamJob ? (
+                    <div className="space-y-3">
+                      <Label>What would your dream job or activity be?</Label>
+                      <Textarea 
+                        placeholder="Describe what you'd love to do every day"
+                        value={futureDreamJob}
+                        onChange={(e) => setFutureDreamJob(e.target.value)}
+                        rows={3}
+                      />
+                      <Button 
+                        className="w-full" 
+                        disabled={!futureDreamJob.trim()}
+                        onClick={() => {
+                          // Generate future vision
+                          const futureVision = `# Your Future in 10 Years\n\n` +
+                            `Imagine yourself 10 years from now...\n\n` +
+                            `You wake up in ${futureLocation}. The morning sun gently fills your room as you prepare for another exciting day.\n\n` +
+                            `Your typical day involves ${futureDreamJob}. You're excellent at what you do, and it brings you joy and fulfillment.\n\n` +
+                            `Your life is balanced with:\n` +
+                            `- Meaningful work that challenges you\n` +
+                            `- Close relationships with friends and family\n` +
+                            `- Time for your favorite hobbies and interests\n` +
+                            `- Good health and energy\n\n` +
+                            `The path to this future might include:\n` +
+                            `1. Learning the skills needed for your dream activities\n` +
+                            `2. Making connections with people in your desired field\n` +
+                            `3. Taking small steps each day towards your goals\n` +
+                            `4. Being adaptable as opportunities arise\n\n` +
+                            `Remember: This vision can change and grow as you do. The future is yours to create!`;
+                          
+                          setCreativeResponse(futureVision);
+                        }}
+                      >
+                        Create Future Vision
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <Label>Your Future Vision</Label>
+                      <div className="bg-muted/50 p-3 rounded-md border text-sm">
+                        {creativeResponse.split('\n\n').map((paragraph, idx) => (
+                          <p key={idx} className="mb-2">{paragraph}</p>
+                        ))}
+                      </div>
+                      <Button 
+                        className="w-full" 
+                        onClick={() => {
+                          // Save to journal
+                          toast({
+                            title: "Future vision saved to journal",
+                            description: "Your dream future has been saved to your journal!"
+                          });
+                          
+                          // Reset creative mode
+                          setIsCreativeMode(false);
+                          setSelectedCreativeOption(null);
+                          setFutureLocation('');
+                          setFutureDreamJob('');
+                          setCreativeResponse('');
+                        }}
+                      >
+                        Save to Journal
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )}
+              
+              {/* Surprise Me */}
+              {selectedCreativeOption === 'surprise' && (
+                <div className="space-y-4 py-4">
+                  <div className="bg-primary/5 p-3 rounded-md border">
+                    <h3 className="font-medium text-sm flex items-center gap-2">
+                      <Shuffle className="h-4 w-4 text-primary" />
+                      Surprise Creative Challenge
+                    </h3>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Here's a fun random creative prompt to spark your imagination!
+                    </p>
+                  </div>
+                  
+                  <div className="space-y-3">
+                    <Label>Your Surprise Challenge</Label>
+                    <div className="bg-muted p-3 rounded-md border text-sm font-medium">
+                      {selectedSurprisePrompt}
+                    </div>
+                    
+                    {!creativeResponse ? (
+                      <>
+                        <Textarea 
+                          placeholder="Write your response to the challenge here..."
+                          value={creativeResponse}
+                          onChange={(e) => setCreativeResponse(e.target.value)}
+                          rows={5}
+                        />
+                        <Button 
+                          className="w-full" 
+                          disabled={!creativeResponse.trim()}
+                          onClick={() => {
+                            // Process response
+                          }}
+                        >
+                          Save My Creation
+                        </Button>
+                      </>
+                    ) : (
+                      <Button 
+                        className="w-full" 
+                        onClick={() => {
+                          // Save to journal
+                          toast({
+                            title: "Creation saved to journal",
+                            description: "Your creative response has been saved!"
+                          });
+                          
+                          // Reset creative mode
+                          setIsCreativeMode(false);
+                          setSelectedCreativeOption(null);
+                          setSelectedSurprisePrompt('');
+                          setCreativeResponse('');
+                        }}
+                      >
+                        Save to Journal
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+          
+          {selectedCreativeOption && (
+            <DialogFooter>
+              <Button variant="outline" onClick={() => {
+                if (selectedCreativeOption && !creativeResponse) {
+                  setSelectedCreativeOption(null);
+                  setStoryType('');
+                  setMainCharacter('');
+                  setStoryLocation('');
+                  setStoryTwist('');
+                  setProblemToSolve('');
+                  setBusinessIdea('');
+                  setTargetCustomer('');
+                  setBusinessName('');
+                  setFutureLocation('');
+                  setFutureDreamJob('');
+                  setSelectedSurprisePrompt('');
+                } else {
+                  setIsCreativeMode(false);
+                  setSelectedCreativeOption(null);
+                  setStoryType('');
+                  setMainCharacter('');
+                  setStoryLocation('');
+                  setStoryTwist('');
+                  setProblemToSolve('');
+                  setBusinessIdea('');
+                  setTargetCustomer('');
+                  setBusinessName('');
+                  setFutureLocation('');
+                  setFutureDreamJob('');
+                  setSelectedSurprisePrompt('');
+                  setCreativeResponse('');
+                }
+              }}>
+                {selectedCreativeOption && !creativeResponse ? "Back to Options" : "Close"}
+              </Button>
+            </DialogFooter>
+          )}
         </DialogContent>
       </Dialog>
       </div>
