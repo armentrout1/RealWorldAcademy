@@ -631,6 +631,71 @@ const Learn: React.FC = () => {
           </div>
         </div>
 
+        {/* Featured Lessons Section */}
+        <div className="bg-white rounded-lg shadow-md p-6">
+          <h2 className="text-2xl font-semibold mb-4">Featured Lessons</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Card className="hover:shadow-lg transition-shadow">
+              <CardHeader className="pb-2">
+                <div className="flex items-center">
+                  <div className="p-2 rounded-md bg-purple-500 text-white mr-3">
+                    <PiggyBank className="h-6 w-6" />
+                  </div>
+                  <CardTitle className="text-lg">Smart Money Challenge</CardTitle>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-neutral-600 mb-3">Learn essential financial skills with our interactive money management challenge.</p>
+                <div className="flex space-x-2 mb-3">
+                  <Badge variant="secondary">Financial Literacy</Badge>
+                  <Badge variant="outline">New</Badge>
+                </div>
+                <Link href="/lesson/smart-money-challenge">
+                  <Button size="sm" className="w-full">Start Lesson</Button>
+                </Link>
+              </CardContent>
+            </Card>
+            
+            <Card className="hover:shadow-lg transition-shadow">
+              <CardHeader className="pb-2">
+                <div className="flex items-center">
+                  <div className="p-2 rounded-md bg-blue-500 text-white mr-3">
+                    <Calculator className="h-6 w-6" />
+                  </div>
+                  <CardTitle className="text-lg">Practical Math: Percentages</CardTitle>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-neutral-600 mb-3">Master calculating discounts, tips, and taxes in this real-world math lesson.</p>
+                <div className="flex space-x-2 mb-3">
+                  <Badge variant="secondary">Math</Badge>
+                  <Badge variant="outline">Popular</Badge>
+                </div>
+                <Button size="sm" variant="outline" className="w-full">Coming Soon</Button>
+              </CardContent>
+            </Card>
+            
+            <Card className="hover:shadow-lg transition-shadow">
+              <CardHeader className="pb-2">
+                <div className="flex items-center">
+                  <div className="p-2 rounded-md bg-green-500 text-white mr-3">
+                    <Microscope className="h-6 w-6" />
+                  </div>
+                  <CardTitle className="text-lg">Kitchen Chemistry</CardTitle>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-neutral-600 mb-3">Explore the science behind cooking with hands-on experiments you can do at home.</p>
+                <div className="flex space-x-2 mb-3">
+                  <Badge variant="secondary">Science</Badge>
+                  <Badge variant="outline">Beginner</Badge>
+                </div>
+                <Button size="sm" variant="outline" className="w-full">Coming Soon</Button>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+
         {/* Tabs for different organization views */}
         <Tabs defaultValue="grid" className="w-full">
           <div className="flex justify-between items-center mb-4">

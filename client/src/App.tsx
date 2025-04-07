@@ -30,6 +30,7 @@ import CurriculumBuilder from "@/pages/CurriculumBuilder";
 import ResourceCenter from "@/pages/ResourceCenter";
 import Community from "@/pages/Community";
 import Journal from "@/pages/Journal";
+import LessonTemplate from "@/pages/LessonTemplate";
 import NotFound from "@/pages/not-found";
 
 // Page transition variants
@@ -207,6 +208,11 @@ function Router() {
             <Route path="/journal">
               <PageWrapper>
                 <Journal />
+              </PageWrapper>
+            </Route>
+            <Route path="/lesson/smart-money-challenge">
+              <PageWrapper>
+                <LessonTemplate />
               </PageWrapper>
             </Route>
             <Route>
