@@ -1,0 +1,56 @@
+Create UI and placeholder logic for intelligent, AI-powered features that will personalize the student experience and support teachers/parents. No actual API calls yet — just design and simulate how the system will behave.
+
+1. **AI Learning Coach Sidebar (Global Component)**:
+   - Add a collapsible AI Coach widget on all main student pages
+   - Title it “Coach Nova” or similar — friendly, supportive tone
+   - Coach can:
+     - Recommend what to do next based on progress
+     - Celebrate wins (“Great job finishing your budget!”)
+     - Nudge students when they stall (“Want to keep going on your project?”)
+
+   Simulate responses with a rotating set of motivational and helpful messages using JavaScript logic.
+
+2. **Smart Lesson Generator UI (Simulated)**:
+   - On Learn and Project pages, add a button: “Ask AI to Explain This” or “Create a Real-World Example”
+   - When clicked, show a placeholder AI response — example:
+     - “You asked about compound interest. Here’s a simple example: If you invest $100 and earn 10% per year…”
+   - Show the response in a chat bubble or modal
+
+3. **Instant Feedback on Activities (Mocked for Now)**:
+   - On quizzes, budgeting tools, and projects, add a simulated feedback feature:
+     - After submitting, show a short AI-style message like:
+       - “Nice job! Your budget looks balanced — but don’t forget to include savings.”
+       - “It looks like you skipped step 2 — want help with that?”
+
+   These messages can be conditionally shown based on static form values or selections.
+
+4. **Personalized Learning Path Preview (Simulated)**:
+   - Add a button on the Curriculum Builder and Dashboard: “Let AI Suggest a Learning Path”
+   - When clicked, simulate a generated path based on a fake student profile:
+     - If a student is marked as a “Builder” with strong interest in business, suggest:
+       - Financial Literacy → Entrepreneurship → Budgeting Project → Tech Tools
+
+5. **Growth Snapshot Feature (Student Dashboard)**:
+   - Add a “My Growth Snapshot” panel that shows:
+     - Strengths (based on quiz results)
+     - Skills improved (based on completed modules)
+     - Suggested next challenge
+   - Show this in a clean, infographic-like box or card — even if values are fake for now
+
+6. **Teacher/Parent Smart Assist Features (Optional)**:
+   - In the Teacher and Parent Dashboards, add buttons like:
+     - “Ask AI to Recommend an Assignment”
+     - “Summarize Student’s Week”
+   - Clicking shows simulated responses like:
+     - “Alex worked on budgeting and completed a group project. Recommend: Leadership or Communication next.”
+     - “3 students need help in Financial Literacy.”
+
+7. **Comment Markers in Code**:
+   - Add comments where AI will be wired up later:
+     <!-- TODO: Integrate OpenAI GPT-4 for lesson explanations -->
+     <!-- TODO: Use AI to analyze student input -->
+     <!-- TODO: Replace static learning suggestions with dynamic API results -->
+
+Design everything to feel seamless, friendly, and useful — not robotic. The AI should feel like a **personal mentor**, not a taskmaster.
+
+Make sure all responses, buttons, and layouts work great on both desktop and mobile devices.

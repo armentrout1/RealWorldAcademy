@@ -15,7 +15,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { Progress } from "@/components/ui/progress";
-import { SmartSuggestions } from "@/components/ai";
+import { PersonalizedLearningPath } from "@/components/ai";
 
 const motivationalQuotes = [
   "Today is a great day to grow.",
@@ -161,7 +161,7 @@ const Dashboard: React.FC = () => {
           </div>
           
           <div>
-            <SmartSuggestions />
+            <PersonalizedLearningPath variant="card" />
           </div>
         </div>
       )}
