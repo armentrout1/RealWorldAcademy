@@ -10,7 +10,9 @@ import {
   BarChart,
   Sparkles,
   Award,
-  Clock
+  Clock,
+  Bot,
+  MessageCircle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
@@ -309,6 +311,52 @@ const Dashboard: React.FC = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Learning Buddy Card */}
+      {isAuthenticated && (
+        <div className="bg-gradient-to-r from-indigo-50 to-purple-50 p-6 rounded-xl shadow-sm mb-6 border border-indigo-100">
+          <div className="flex flex-col md:flex-row items-center justify-between">
+            <div className="flex items-center mb-4 md:mb-0">
+              <div className="bg-indigo-100 w-12 h-12 rounded-full flex items-center justify-center mr-4 border-2 border-indigo-200">
+                <Bot className="h-6 w-6 text-indigo-600" />
+              </div>
+              <div>
+                <h3 className="font-medium text-lg">Your Learning Buddy</h3>
+                <p className="text-sm text-neutral-600">
+                  Chat with your AI learning companion for help, motivation, and personalized guidance
+                </p>
+              </div>
+            </div>
+            <div className="flex space-x-3">
+              <Button 
+                variant="outline" 
+                className="border-indigo-300 text-indigo-700 hover:bg-indigo-100"
+                onClick={() => {
+                  // This button would handle the chat open through the Buddy component
+                  // The actual implementation is in the Buddy component via its toggleChat method
+                  const buddyEvent = new CustomEvent('buddyToggle', { detail: { action: 'open' } });
+                  window.dispatchEvent(buddyEvent);
+                }}
+              >
+                <MessageCircle className="h-4 w-4 mr-2" />
+                Chat with Buddy
+              </Button>
+              <Button 
+                variant="ghost" 
+                className="text-indigo-700 hover:bg-indigo-100"
+                onClick={() => {
+                  // This would open the Buddy customization dialog
+                  const buddyEvent = new CustomEvent('buddyToggle', { detail: { action: 'customize' } });
+                  window.dispatchEvent(buddyEvent);
+                }}
+              >
+                <Bot className="h-4 w-4 mr-2" />
+                Customize
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="bg-sky-50 p-6 rounded-xl shadow-sm mb-6">
         <div className="flex flex-col md:flex-row items-center justify-between">

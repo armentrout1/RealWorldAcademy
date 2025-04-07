@@ -31,6 +31,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Slider } from "@/components/ui/slider";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useAuth } from "@/contexts/AuthContext";
 import { apiRequest } from "@/lib/queryClient";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -373,6 +374,24 @@ export function Buddy() {
     }
   }, [buddyProfile]);
   
+  // Listen for events from dashboard to open the buddy panel
+  useEffect(() => {
+    const handleBuddyToggle = (e: CustomEvent) => {
+      if (e.detail.action === 'open') {
+        setIsOpen(true);
+      } else if (e.detail.action === 'customize') {
+        setIsOpen(true);
+        setIsCustomizing(true);
+      }
+    };
+    
+    window.addEventListener('buddyToggle', handleBuddyToggle as EventListener);
+    
+    return () => {
+      window.removeEventListener('buddyToggle', handleBuddyToggle as EventListener);
+    };
+  }, []);
+  
   const toggleChat = () => {
     setIsOpen(!isOpen);
   };
@@ -497,12 +516,36 @@ export function Buddy() {
                 </span>
                 {buddyProfile?.name || 'Learning Buddy'}
               </CardTitle>
-              <div className="flex space-x-1">
+              <div className="flex space-x-2">
+                {/* Quick personality selector */}
+                <Select 
+                  value={buddyProfile?.personalityType || 'friendly_supportive'} 
+                  onValueChange={(value) => {
+                    if (userId) {
+                      updateProfileMutation.mutate({
+                        personalityType: value
+                      });
+                    }
+                  }}
+                >
+                  <SelectTrigger className="h-7 w-[130px] text-xs">
+                    <SelectValue placeholder="Buddy's Tone" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {personalityTypes.map((type) => (
+                      <SelectItem key={type.value} value={type.value} className="text-xs">
+                        {type.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                
                 <Button 
                   size="icon"
                   variant="ghost" 
                   className="h-7 w-7"
                   onClick={() => setIsCheckingIn(true)}
+                  title="How are you feeling?"
                 >
                   <Smile size={15} />
                 </Button>
@@ -511,6 +554,7 @@ export function Buddy() {
                   variant="ghost" 
                   className="h-7 w-7"
                   onClick={() => setIsCustomizing(true)}
+                  title="Settings"
                 >
                   <Settings size={15} />
                 </Button>
@@ -531,6 +575,21 @@ export function Buddy() {
           </CardHeader>
           
           <CardContent className="p-0">
+            {/* Welcome message for student when opening the chat */}
+            {messages.length === 0 && !isLoadingMessages && (
+              <div className="p-4 bg-primary/5 border-b">
+                <div className="flex items-center space-x-2">
+                  <Sparkles className="text-primary h-5 w-5" />
+                  <p className="text-sm font-medium">
+                    Hey {user?.firstName || 'there'}! Ready to learn and grow?
+                  </p>
+                </div>
+                <p className="text-xs text-muted-foreground mt-2 ml-7">
+                  I'm here to help you with your studies, track your progress, and celebrate your wins!
+                </p>
+              </div>
+            )}
+            
             {shouldOfferCheckIn() && !isLoadingEmotion && !isLoadingProfile && (
               <div className="p-3 bg-primary/5 border-b">
                 <div className="flex items-center space-x-2">
@@ -611,7 +670,7 @@ export function Buddy() {
       
       {/* Customization Dialog */}
       <Dialog open={isCustomizing} onOpenChange={setIsCustomizing}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
             <DialogTitle>Customize Your Buddy</DialogTitle>
             <DialogDescription>
@@ -620,9 +679,11 @@ export function Buddy() {
           </DialogHeader>
           
           <Tabs defaultValue="appearance">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="appearance">Appearance</TabsTrigger>
+            <TabsList className="grid w-full grid-cols-4">
+              <TabsTrigger value="appearance">Avatar</TabsTrigger>
               <TabsTrigger value="personality">Personality</TabsTrigger>
+              <TabsTrigger value="history">Chat History</TabsTrigger>
+              <TabsTrigger value="privacy">Privacy</TabsTrigger>
             </TabsList>
             
             <TabsContent value="appearance" className="space-y-4 mt-4">
@@ -704,6 +765,105 @@ export function Buddy() {
                     </div>
                   ))}
                 </RadioGroup>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="history" className="space-y-4 mt-4">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-sm font-medium">Chat History</h4>
+                  <Button variant="outline" size="sm" className="h-8">
+                    Export Chat
+                  </Button>
+                </div>
+
+                <div className="border rounded-md">
+                  <div className="p-3 bg-muted flex items-center justify-between border-b">
+                    <span className="text-xs font-medium">Conversation History</span>
+                    <span className="text-xs text-muted-foreground">{messages.length} messages</span>
+                  </div>
+                  <ScrollArea className="h-[200px] p-3">
+                    {messages.length > 0 ? (
+                      messages.map((message: any, i: number) => (
+                        <div key={i} className="pb-2 mb-2 border-b border-dashed last:border-0 last:mb-0 last:pb-0">
+                          <div className="flex justify-between mb-1">
+                            <span className="text-xs font-medium">
+                              {message.isFromBuddy ? buddyProfile?.name || 'Buddy' : 'You'}
+                            </span>
+                            <time className="text-xs text-muted-foreground">
+                              {new Date(message.sentAt).toLocaleString()}
+                            </time>
+                          </div>
+                          <p className="text-xs">{message.content}</p>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
+                        No conversation history yet
+                      </div>
+                    )}
+                  </ScrollArea>
+                </div>
+
+                <div className="flex">
+                  <Button variant="outline" size="sm" className="w-full flex items-center">
+                    <RefreshCw className="h-3 w-3 mr-2" />
+                    Clear Conversation History
+                  </Button>
+                </div>
+              </div>
+            </TabsContent>
+            
+            <TabsContent value="privacy" className="space-y-4 mt-4">
+              <div className="space-y-4">
+                <div>
+                  <h4 className="text-sm font-medium mb-2">Privacy Settings</h4>
+                  <p className="text-xs text-muted-foreground mb-3">
+                    Control how your buddy uses and stores your information.
+                  </p>
+                </div>
+                
+                <div className="space-y-3">
+                  <div className="flex items-start space-x-3">
+                    <Checkbox id="save-chat" defaultChecked />
+                    <div>
+                      <Label htmlFor="save-chat" className="text-sm font-medium">Save Chat History</Label>
+                      <p className="text-xs text-muted-foreground">
+                        Allow Buddy to remember your conversations for more personalized responses.
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-start space-x-3">
+                    <Checkbox id="emotion-tracking" defaultChecked />
+                    <div>
+                      <Label htmlFor="emotion-tracking" className="text-sm font-medium">Emotion Tracking</Label>
+                      <p className="text-xs text-muted-foreground">
+                        Allow Buddy to track and respond to your emotional patterns.
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-start space-x-3">
+                    <Checkbox id="learning-patterns" defaultChecked />
+                    <div>
+                      <Label htmlFor="learning-patterns" className="text-sm font-medium">Learning Pattern Analysis</Label>
+                      <p className="text-xs text-muted-foreground">
+                        Allow Buddy to analyze your learning patterns to provide better recommendations.
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-start space-x-3">
+                    <Checkbox id="data-sharing" />
+                    <div>
+                      <Label htmlFor="data-sharing" className="text-sm font-medium">Data Sharing with Teachers</Label>
+                      <p className="text-xs text-muted-foreground">
+                        Share your learning insights with teachers and mentors to help with guidance.
+                      </p>
+                    </div>
+                  </div>
+                </div>
               </div>
             </TabsContent>
           </Tabs>
