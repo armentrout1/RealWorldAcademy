@@ -1,0 +1,50 @@
+Create visual dashboards for teachers and parents that display key learning analytics. This will help them understand student progress, strengths, and areas where support is needed.
+
+1. **Add a “Reports” Tab in Teacher and Parent Dashboards**:
+   - Title: “Learning Analytics”
+   - Short intro: “See your student or class performance at a glance.”
+
+2. **Create a Class Overview Report (for Teachers)**:
+   - Table or grid of all students with:
+     - Progress bars (% of modules completed)
+     - Subjects most engaged with
+     - Number of projects submitted
+     - Quiz performance (% correct on average)
+     - Engagement status: “On Track,” “Needs Support,” “High Achiever”
+   - Use color coding (green = on track, yellow = behind, red = needs support)
+
+3. **Create a Student Detail Report (for Teachers and Parents)**:
+   When a specific student is selected, show:
+   - Modules started, in progress, and completed (by subject)
+   - Project submission status
+   - Self Discovery result and recommended paths
+   - Weekly time spent (can be simulated)
+   - Most/least engaged subjects
+   - Suggestions for what to do next (static for now)
+
+4. **Add Visualizations**:
+   - Use bar charts, pie charts, or line graphs to show:
+     - Progress over time
+     - Subject engagement distribution
+     - Project completion trends
+
+   Use placeholder data or simple JS chart libraries (e.g., Chart.js) to simulate analytics.
+
+5. **Export & Print Option (Simulated)**:
+   - Add a “Generate PDF” or “Print Report” button (placeholder)
+   - Display a clean, print-style view of the report when clicked
+
+6. **Compare View (Optional)**:
+   - Let teachers compare two students side by side
+   - Show strengths, subject engagement, and suggested interventions
+
+7. **Privacy & Tone**:
+   - Frame everything in a supportive way: “Growth Focused,” not judgmental
+   - Use positive language (e.g., “Emerging in Math,” not “Failing”)
+
+8. **Design & UX**:
+   - Clean dashboard layout with panels and charts
+   - Mobile-friendly views for quick check-ins
+   - Use light backgrounds, subtle shadows, and color-coded badges/icons
+
+Simulate all data for now — this will become dynamic once user accounts and backend APIs are connected in future phases.

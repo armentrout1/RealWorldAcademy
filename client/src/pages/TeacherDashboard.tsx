@@ -7,6 +7,32 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  BarElement,
+  ArcElement,
+  Title,
+  Tooltip,
+  Legend,
+} from 'chart.js';
+import { Bar, Pie, Line } from 'react-chartjs-2';
+
+// Register ChartJS components
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  BarElement,
+  ArcElement,
+  Title,
+  Tooltip,
+  Legend
+);
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
@@ -47,7 +73,8 @@ import {
   Heart,
   Code,
   Sparkles,
-  AlertCircle
+  AlertCircle,
+  BarChart
 } from "lucide-react";
 
 // Mock data for the teacher dashboard
@@ -454,12 +481,142 @@ const getSubjectColor = (subject: string) => {
   }
 };
 
+// Analytics data preparation functions
+const prepareSubjectDistributionData = () => {
+  // Count subjects across all students
+  const subjectCounts: Record<string, number> = {};
+  
+  students.forEach(student => {
+    student.subjects.forEach(subject => {
+      if (subjectCounts[subject]) {
+        subjectCounts[subject]++;
+      } else {
+        subjectCounts[subject] = 1;
+      }
+    });
+  });
+  
+  // Prepare data for chart
+  return {
+    labels: Object.keys(subjectCounts).map(key => getSubjectName(key)),
+    datasets: [
+      {
+        label: 'Students per Subject',
+        data: Object.values(subjectCounts),
+        backgroundColor: Object.keys(subjectCounts).map(subject => {
+          const bgColor = getSubjectColor(subject).replace('bg-', '');
+          switch (bgColor) {
+            case 'blue-500': return 'rgba(59, 130, 246, 0.7)';
+            case 'purple-500': return 'rgba(168, 85, 247, 0.7)';
+            case 'green-500': return 'rgba(34, 197, 94, 0.7)';
+            case 'amber-500': return 'rgba(245, 158, 11, 0.7)';
+            case 'rose-500': return 'rgba(244, 63, 94, 0.7)';
+            case 'cyan-500': return 'rgba(6, 182, 212, 0.7)';
+            case 'indigo-500': return 'rgba(99, 102, 241, 0.7)';
+            case 'red-500': return 'rgba(239, 68, 68, 0.7)';
+            case 'orange-500': return 'rgba(249, 115, 22, 0.7)';
+            case 'teal-500': return 'rgba(20, 184, 166, 0.7)';
+            default: return 'rgba(107, 114, 128, 0.7)';
+          }
+        }),
+        borderWidth: 1,
+      },
+    ],
+  };
+};
+
+const prepareStudentProgressData = () => {
+  // Prepare progress data for each student
+  return {
+    labels: students.map(student => student.name),
+    datasets: [
+      {
+        label: 'Module Progress (%)',
+        data: students.map(student => student.progress.modules),
+        backgroundColor: 'rgba(54, 162, 235, 0.5)',
+        borderColor: 'rgba(54, 162, 235, 1)',
+        borderWidth: 1,
+      },
+      {
+        label: 'Projects Completed',
+        data: students.map(student => student.progress.projects),
+        backgroundColor: 'rgba(255, 99, 132, 0.5)',
+        borderColor: 'rgba(255, 99, 132, 1)',
+        borderWidth: 1,
+      },
+    ],
+  };
+};
+
+const prepareStatusDistributionData = () => {
+  // Count students by status
+  const statusCounts = {
+    ahead: students.filter(s => s.status === 'ahead').length,
+    onTrack: students.filter(s => s.status === 'on-track').length,
+    behind: students.filter(s => s.status === 'behind').length,
+  };
+  
+  return {
+    labels: ['Ahead', 'On Track', 'Needs Support'],
+    datasets: [
+      {
+        label: 'Student Status Distribution',
+        data: [statusCounts.ahead, statusCounts.onTrack, statusCounts.behind],
+        backgroundColor: [
+          'rgba(34, 197, 94, 0.7)',  // green for ahead
+          'rgba(59, 130, 246, 0.7)', // blue for on-track
+          'rgba(239, 68, 68, 0.7)',  // red for behind
+        ],
+        borderColor: [
+          'rgba(34, 197, 94, 1)',
+          'rgba(59, 130, 246, 1)',
+          'rgba(239, 68, 68, 1)',
+        ],
+        borderWidth: 1,
+      },
+    ],
+  };
+};
+
+const prepareComparisonData = (student1: Student | null, student2: Student | null) => {
+  if (!student1 || !student2) {
+    // Return empty data structure for chart if either student is missing
+    return {
+      labels: ['Module Progress (%)', 'Projects Completed'],
+      datasets: []
+    };
+  }
+  
+  return {
+    labels: ['Module Progress (%)', 'Projects Completed'],
+    datasets: [
+      {
+        label: student1.name,
+        data: [student1.progress.modules, student1.progress.projects],
+        backgroundColor: 'rgba(54, 162, 235, 0.5)',
+        borderColor: 'rgba(54, 162, 235, 1)',
+        borderWidth: 1,
+      },
+      {
+        label: student2.name,
+        data: [student2.progress.modules, student2.progress.projects],
+        backgroundColor: 'rgba(255, 99, 132, 0.5)',
+        borderColor: 'rgba(255, 99, 132, 1)',
+        borderWidth: 1,
+      },
+    ],
+  };
+};
+
 // Teacher Dashboard Component
 const TeacherDashboard: React.FC = () => {
   const [activeTab, setActiveTab] = useState<string>("dashboard");
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [studentDialogOpen, setStudentDialogOpen] = useState<boolean>(false);
   const [newAnnouncement, setNewAnnouncement] = useState<string>("");
+  const [selectedStudentForAnalytics, setSelectedStudentForAnalytics] = useState<Student | null>(null);
+  const [compareStudent1, setCompareStudent1] = useState<Student | null>(null);
+  const [compareStudent2, setCompareStudent2] = useState<Student | null>(null);
   
   // Assignment Form State
   const [assignmentForm, setAssignmentForm] = useState({
@@ -552,11 +709,12 @@ const TeacherDashboard: React.FC = () => {
       </div>
 
       <Tabs defaultValue="dashboard" value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid grid-cols-4 mb-6">
+        <TabsList className="grid grid-cols-5 mb-6">
           <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
           <TabsTrigger value="roster">Class Roster</TabsTrigger>
           <TabsTrigger value="assignments">Assignments</TabsTrigger>
           <TabsTrigger value="messages">Announcements</TabsTrigger>
+          <TabsTrigger value="analytics">Learning Analytics</TabsTrigger>
         </TabsList>
 
         {/* Dashboard Content */}
@@ -1099,6 +1257,390 @@ const TeacherDashboard: React.FC = () => {
                   </div>
                 </CardContent>
               </Card>
+            </div>
+          </div>
+        </TabsContent>
+
+        {/* Learning Analytics Content */}
+        <TabsContent value="analytics">
+          <div className="space-y-8">
+            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-6 mb-6 border border-blue-100">
+              <h2 className="text-2xl font-bold text-blue-800 mb-2">Learning Analytics</h2>
+              <p className="text-blue-600">
+                See your class performance at a glance and make data-driven decisions to support student growth.
+              </p>
+            </div>
+
+            {/* Class Overview Section */}
+            <div className="grid gap-6 md:grid-cols-2">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <BarChart className="mr-2 h-5 w-5" />
+                    Subject Distribution
+                  </CardTitle>
+                  <CardDescription>Student engagement by subject area</CardDescription>
+                </CardHeader>
+                <CardContent className="h-[350px] flex items-center justify-center">
+                  <div className="w-full h-full">
+                    <Pie 
+                      data={prepareSubjectDistributionData()} 
+                      options={{
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                          legend: {
+                            position: 'right',
+                          },
+                        },
+                      }}
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <Users className="mr-2 h-5 w-5" />
+                    Status Distribution
+                  </CardTitle>
+                  <CardDescription>Overall student progress status</CardDescription>
+                </CardHeader>
+                <CardContent className="h-[350px] flex items-center justify-center">
+                  <div className="w-full h-full">
+                    <Pie 
+                      data={prepareStatusDistributionData()}
+                      options={{
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                          legend: {
+                            position: 'right',
+                          },
+                        },
+                      }}
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+            
+            {/* Student Progress Comparison */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <BarChart className="mr-2 h-5 w-5" />
+                  Student Progress Overview
+                </CardTitle>
+                <CardDescription>Module completion and project submission by student</CardDescription>
+              </CardHeader>
+              <CardContent className="h-[400px]">
+                <Bar 
+                  data={prepareStudentProgressData()}
+                  options={{
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                      legend: {
+                        position: 'top',
+                      },
+                    },
+                    scales: {
+                      y: {
+                        beginAtZero: true
+                      }
+                    }
+                  }}
+                />
+              </CardContent>
+            </Card>
+            
+            {/* Student Detail Section */}
+            <div className="grid gap-6 md:grid-cols-[1fr_2fr]">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Student Detail</CardTitle>
+                  <CardDescription>Select a student to view detailed analytics</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="text-sm font-medium mb-2 block">Select Student</label>
+                      <Select 
+                        value={selectedStudentForAnalytics?.id.toString() || ""}
+                        onValueChange={(value) => {
+                          const student = students.find(s => s.id.toString() === value);
+                          setSelectedStudentForAnalytics(student || null);
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Choose a student" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {students.map(student => (
+                            <SelectItem key={student.id} value={student.id.toString()}>
+                              {student.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
+                    {/* Student Compare Feature */}
+                    <div className="pt-6 border-t mt-6">
+                      <h3 className="font-semibold mb-3">Compare Students</h3>
+                      <div className="space-y-3">
+                        <div>
+                          <label className="text-sm font-medium mb-2 block">Student 1</label>
+                          <Select 
+                            value={compareStudent1?.id.toString() || ""}
+                            onValueChange={(value) => {
+                              const student = students.find(s => s.id.toString() === value);
+                              setCompareStudent1(student || null);
+                            }}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select first student" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {students.map(student => (
+                                <SelectItem key={student.id} value={student.id.toString()}>
+                                  {student.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium mb-2 block">Student 2</label>
+                          <Select 
+                            value={compareStudent2?.id.toString() || ""}
+                            onValueChange={(value) => {
+                              const student = students.find(s => s.id.toString() === value);
+                              setCompareStudent2(student || null);
+                            }}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select second student" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {students.map(student => (
+                                <SelectItem key={student.id} value={student.id.toString()}>
+                                  {student.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* Report Generation */}
+                    <div className="pt-6 border-t mt-6">
+                      <h3 className="font-semibold mb-3">Generate Reports</h3>
+                      <Button 
+                        variant="outline" 
+                        className="w-full mb-2"
+                        onClick={() => alert("This feature will generate a PDF report in a future update.")}
+                      >
+                        <FileText className="h-4 w-4 mr-2" />
+                        Print Class Report
+                      </Button>
+                      {selectedStudentForAnalytics && (
+                        <Button 
+                          variant="outline" 
+                          className="w-full"
+                          onClick={() => alert(`This feature will generate a detailed PDF report for ${selectedStudentForAnalytics.name} in a future update.`)}
+                        >
+                          <FileText className="h-4 w-4 mr-2" />
+                          Print Student Report
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              
+              <div className="space-y-6">
+                {/* Selected Student Details */}
+                {selectedStudentForAnalytics && (
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <div className="flex items-center">
+                        <img 
+                          src={selectedStudentForAnalytics.avatar} 
+                          alt={selectedStudentForAnalytics.name} 
+                          className="h-12 w-12 rounded-full mr-4"
+                        />
+                        <div>
+                          <CardTitle>{selectedStudentForAnalytics.name}</CardTitle>
+                          <div className="flex items-center mt-1 text-sm text-neutral-500">
+                            <Badge 
+                              className={
+                                selectedStudentForAnalytics.status === "ahead" ? "bg-green-500" : 
+                                selectedStudentForAnalytics.status === "on-track" ? "bg-blue-500" : 
+                                "bg-red-500"
+                              }
+                            >
+                              {selectedStudentForAnalytics.status === "ahead" ? "Ahead" : 
+                               selectedStudentForAnalytics.status === "on-track" ? "On Track" : 
+                               "Needs Support"}
+                            </Badge>
+                            <span className="ml-2">{selectedStudentForAnalytics.selfDiscoveryType} Type</span>
+                          </div>
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-4">
+                        <div>
+                          <h3 className="text-sm font-medium mb-2">Progress Summary</h3>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <div className="text-sm text-neutral-500 mb-1">Module Progress</div>
+                              <div className="flex items-center">
+                                <div className="font-bold text-2xl">{selectedStudentForAnalytics.progress.modules}%</div>
+                                <Progress value={selectedStudentForAnalytics.progress.modules} className="h-2 w-16 ml-4" />
+                              </div>
+                            </div>
+                            <div>
+                              <div className="text-sm text-neutral-500 mb-1">Projects Completed</div>
+                              <div className="font-bold text-2xl">{selectedStudentForAnalytics.progress.projects}</div>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        <div className="pt-4 border-t">
+                          <h3 className="text-sm font-medium mb-2">Subject Engagement</h3>
+                          <div className="flex flex-wrap gap-2 mb-4">
+                            {selectedStudentForAnalytics.subjects.map((subject, index) => (
+                              <div 
+                                key={index} 
+                                className="flex items-center border px-3 py-1 rounded-full"
+                              >
+                                <div className={`${getSubjectColor(subject)} text-white rounded-full p-1 mr-2 flex items-center justify-center`}>
+                                  {getSubjectIcon(subject)}
+                                </div>
+                                <span className="text-sm">{getSubjectName(subject)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                        
+                        <div className="pt-4 border-t">
+                          <h3 className="text-sm font-medium mb-2">Recent Projects</h3>
+                          <div className="space-y-2">
+                            {selectedStudentForAnalytics.recentProjects.map(project => (
+                              <div key={project.id} className="flex justify-between items-center p-2 bg-neutral-50 rounded">
+                                <div>
+                                  <div className="font-medium">{project.title}</div>
+                                  <div className="text-sm text-neutral-500">{project.subject}</div>
+                                </div>
+                                <div className="text-right">
+                                  <div className="text-sm">{new Date(project.submitted).toLocaleDateString()}</div>
+                                  {project.grade && (
+                                    <Badge className="bg-green-100 text-green-800 hover:bg-green-100">
+                                      {project.grade}
+                                    </Badge>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                        
+                        <div className="pt-4 border-t">
+                          <h3 className="text-sm font-medium mb-2">Learning Recommendations</h3>
+                          <div className="bg-blue-50 border border-blue-100 rounded p-3 text-sm">
+                            <p className="text-blue-800">
+                              {selectedStudentForAnalytics.status === "ahead" ? 
+                                "This student is exceeding expectations. Consider providing advanced materials in their interest areas and peer mentoring opportunities." :
+                                selectedStudentForAnalytics.status === "on-track" ?
+                                "This student is progressing well. Encourage deeper exploration of topics they show interest in." :
+                                "This student would benefit from additional support. Schedule regular check-ins and provide more structure around assignments."
+                              }
+                            </p>
+                            <div className="mt-2 pt-2 border-t border-blue-100">
+                              <span className="font-medium">Focus areas based on interests:</span> {selectedStudentForAnalytics.interests.join(", ")}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+                
+                {/* Student Comparison Chart */}
+                {compareStudent1 && compareStudent2 && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center">
+                        <BarChart className="mr-2 h-5 w-5" />
+                        Student Comparison
+                      </CardTitle>
+                      <CardDescription>
+                        Comparing {compareStudent1.name} and {compareStudent2.name}
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="h-[300px]">
+                      <Bar 
+                        data={prepareComparisonData(compareStudent1, compareStudent2)}
+                        options={{
+                          responsive: true,
+                          maintainAspectRatio: false,
+                          plugins: {
+                            legend: {
+                              position: 'top',
+                            },
+                          },
+                          scales: {
+                            y: {
+                              beginAtZero: true
+                            }
+                          }
+                        }}
+                      />
+                    </CardContent>
+                    <CardFooter>
+                      <div className="w-full text-sm">
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <h3 className="font-medium">{compareStudent1.name}</h3>
+                            <div>Type: {compareStudent1.selfDiscoveryType}</div>
+                            <div>Status: {compareStudent1.status === "ahead" ? "Ahead" : compareStudent1.status === "on-track" ? "On Track" : "Needs Support"}</div>
+                          </div>
+                          <div>
+                            <h3 className="font-medium">{compareStudent2.name}</h3>
+                            <div>Type: {compareStudent2.selfDiscoveryType}</div>
+                            <div>Status: {compareStudent2.status === "ahead" ? "Ahead" : compareStudent2.status === "on-track" ? "On Track" : "Needs Support"}</div>
+                          </div>
+                        </div>
+                        {compareStudent1.selfDiscoveryType === compareStudent2.selfDiscoveryType && (
+                          <div className="mt-3 pt-3 border-t">
+                            <p className="text-neutral-700">
+                              Both students have the same learning type ({compareStudent1.selfDiscoveryType}). Consider pairing them for collaborative projects.
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </CardFooter>
+                  </Card>
+                )}
+                
+                {!selectedStudentForAnalytics && !(compareStudent1 && compareStudent2) && (
+                  <div className="flex items-center justify-center h-full bg-neutral-50 rounded-lg border border-dashed border-neutral-200 p-8">
+                    <div className="text-center">
+                      <Users className="mx-auto h-12 w-12 text-neutral-300" />
+                      <h3 className="mt-4 text-lg font-medium text-neutral-900">No student selected</h3>
+                      <p className="mt-1 text-sm text-neutral-500">
+                        Select a student from the panel on the left to view detailed analytics <br />
+                        or select two students to compare their progress.
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </TabsContent>
