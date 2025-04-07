@@ -27,6 +27,7 @@ import TeacherDashboard from "@/pages/TeacherDashboard";
 import ParentDashboard from "@/pages/ParentDashboard";
 import CurriculumBuilder from "@/pages/CurriculumBuilder";
 import ResourceCenter from "@/pages/ResourceCenter";
+import Community from "@/pages/Community";
 import NotFound from "@/pages/not-found";
 
 // Page transition variants
@@ -194,6 +195,11 @@ function Router() {
             <Route path="/resource-center">
               <PageWrapper>
                 <ResourceCenter />
+              </PageWrapper>
+            </Route>
+            <Route path="/community">
+              <PageWrapper>
+                <Community />
               </PageWrapper>
             </Route>
             <Route>

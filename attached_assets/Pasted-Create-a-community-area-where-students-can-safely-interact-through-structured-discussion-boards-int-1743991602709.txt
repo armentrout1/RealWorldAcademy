@@ -1,0 +1,57 @@
+Create a community area where students can safely interact through structured discussion boards, interest-based clubs, and Q&A spaces — all simulated for now (no real-time chat or user accounts needed yet).
+
+1. **Create a “Community” Page with Tabs or Sections**:
+   Add three main sections:
+   - 📚 Ask a Question
+   - 💬 Join a Club
+   - 💡 Share a Project
+
+2. **Ask a Question (Student Q&A Board)**:
+   - Simulate a message board where students can post questions like:
+     - “What’s the best way to plan a budget?”
+     - “Can someone help explain what compound interest means?”
+   - Show fake questions and replies (prewritten for now)
+   - Include:
+     - A form to “Post a New Question” with topic dropdown
+     - “Like” or “Helpful” buttons
+     - A reply thread with 1–2 sample answers per question
+
+3. **Join a Club (Interest-Based Groups)**:
+   - Show a grid of “Clubs” that students can join
+   - Example clubs:
+     - 💸 Young Entrepreneurs Club
+     - 🧠 Critical Thinkers
+     - 🎨 Creators & Designers
+     - 🌍 World Explorers
+   - Each club card shows:
+     - Club name, description, emoji/icon
+     - Number of members (simulated)
+     - “View Club” button
+
+   Inside each club:
+   - Display a static list of recent discussion topics
+   - Allow posting of questions or comments (simulate)
+   - Include a “This Week’s Challenge” post by a moderator
+
+4. **Share a Project (Showcase Area)**:
+   - Let students share their completed projects (simulated)
+   - Create a gallery of project submissions with:
+     - Project title
+     - Subject/topic
+     - Short student-written summary
+     - “Like” and “Nice Work!” buttons
+   - Optional filter by subject (Finance, Tech, Wellness, etc.)
+
+5. **Safety and Structure**:
+   - Add a visible “Community Guidelines” panel:
+     - Be kind. Be helpful. Stay appropriate.
+     - No sharing real names or personal info
+   - Add fake moderation badges or “Star Helpers” tags
+   - Clearly label that it’s simulated and safe (no live data)
+
+6. **Design and UX**:
+   - Use warm colors and card-based layouts
+   - Avatars instead of photos, emoji-rich but not noisy
+   - Mobile users should be able to post, reply, and browse easily
+
+This phase makes the learning social — without losing the safety, structure, and purpose behind it. It creates connection, collaboration, and **positive peer motivation**.
