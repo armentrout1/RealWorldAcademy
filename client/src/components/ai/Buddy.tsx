@@ -1,7 +1,13 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { MessageCircle, X, Send, Smile, Sparkles, Settings, Edit, RefreshCw, Check } from 'lucide-react';
+import { MessageCircle, X, Send, Smile, Sparkles, Settings, Edit, RefreshCw, Check, ActivitySquare } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription } from "@/components/ui/card";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from '@/lib/utils';
@@ -83,14 +89,14 @@ const avatarColors = [
 ];
 
 const personalityTypes = [
-  { value: 'friendly_supportive', label: 'Friendly & Supportive', 
-    description: 'Warm, nurturing, and encourages your growth with gentle guidance and positive reinforcement.' },
-  { value: 'chill_funny', label: 'Chill & Funny', 
-    description: 'Relaxed, uses humor to make learning fun, and keeps the mood light while still being helpful.' },
-  { value: 'focused_motivational', label: 'Focused & Motivational', 
-    description: 'Goal-oriented, energetic, and pushes you to achieve your full potential through clear action steps.' },
-  { value: 'curious_reflective', label: 'Curious & Reflective', 
-    description: 'Thoughtful, asks deep questions, and helps you explore ideas and feelings with a sense of wonder.' }
+  { value: 'friendly_supportive', label: '💛 Friendly & Supportive', 
+    description: 'Encouraging, soft, always on your side. Warm, nurturing, and guides your growth with gentle positive reinforcement.' },
+  { value: 'chill_funny', label: '😎 Chill & Funny', 
+    description: 'Relaxed, humorous, easygoing. Uses humor to make learning fun, and keeps the mood light while still being helpful.' },
+  { value: 'focused_motivational', label: '🔥 Motivational & Focused', 
+    description: 'Pushes you to grow and level up. Goal-oriented, energetic, and helps you achieve your full potential.' },
+  { value: 'curious_reflective', label: '🧠 Curious & Reflective', 
+    description: 'Thoughtful, loves to explore deep topics with you. Asks deep questions and helps you reflect on ideas and feelings.' }
 ];
 
 // Emotion options
@@ -444,6 +450,38 @@ export function Buddy() {
     });
   };
   
+  // Function to send creative prompts based on personality type
+  const handleCreativePrompt = () => {
+    if (!userId) return;
+    
+    // Get personality-specific creative prompt
+    let prompt = "";
+    const personalityType = buddyProfile?.personalityType || 'friendly_supportive';
+    
+    switch(personalityType) {
+      case 'friendly_supportive':
+        prompt = "Wanna dream up something together? Maybe a cool future house?";
+        break;
+      case 'chill_funny':
+        prompt = "You draw? Let's make something wild.";
+        break;
+      case 'focused_motivational':
+        prompt = "Let's build something that proves you're leveling up.";
+        break;
+      case 'curious_reflective':
+        prompt = "What would a story look like if it was *your* life in 10 years?";
+        break;
+      default:
+        prompt = "Let's create something together! What would you like to explore?";
+    }
+    
+    // Send buddy message with creative prompt
+    sendMessageMutation.mutate({
+      content: prompt,
+      isFromBuddy: true
+    });
+  };
+  
   // Get avatar display details
   const getAvatarDisplay = () => {
     const type = buddyProfile?.avatarType || 'robot';
@@ -486,8 +524,9 @@ export function Buddy() {
   };
   
   return (
-    <div className="fixed bottom-4 left-4 z-50">
-      {/* Chat toggle button */}
+    <TooltipProvider>
+      <div className="fixed bottom-4 left-4 z-50">
+        {/* Chat toggle button */}
       <Button 
         onClick={toggleChat}
         size="icon"
@@ -581,7 +620,16 @@ export function Buddy() {
                 <div className="flex items-center space-x-2">
                   <Sparkles className="text-primary h-5 w-5" />
                   <p className="text-sm font-medium">
-                    Hey {user?.firstName || 'there'}! Ready to learn and grow?
+                    {buddyProfile?.personalityType === 'friendly_supportive' && 
+                      `Hiya, ${user?.firstName || 'there'}! You ready to grow today? 💪`}
+                    {buddyProfile?.personalityType === 'chill_funny' && 
+                      `Heyyo ${user?.firstName || 'there'} 😎 What's up?`}
+                    {buddyProfile?.personalityType === 'focused_motivational' && 
+                      `Let's get it, ${user?.firstName || 'there'}! Another step forward starts now.`}
+                    {buddyProfile?.personalityType === 'curious_reflective' && 
+                      `Welcome back, ${user?.firstName || 'there'}. Let's explore something meaningful today.`}
+                    {!buddyProfile?.personalityType && 
+                      `Hey ${user?.firstName || 'there'}! Ready to learn and grow?`}
                   </p>
                 </div>
                 <p className="text-xs text-muted-foreground mt-2 ml-7">
@@ -645,7 +693,59 @@ export function Buddy() {
             </ScrollArea>
           </CardContent>
           
-          <CardFooter className="p-3 pt-2">
+          <CardFooter className="flex-col gap-2 p-3 pt-2">
+            <div className="flex items-center justify-between w-full mb-2">
+              <div className="flex gap-2">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button 
+                      variant="outline" 
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={handleCreativePrompt}
+                    >
+                      <Sparkles size={14} />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">
+                    <p className="text-xs">Get a creative prompt</p>
+                  </TooltipContent>
+                </Tooltip>
+                
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button 
+                      variant="outline" 
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => setIsCheckingIn(true)}
+                    >
+                      <ActivitySquare size={14} />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">
+                    <p className="text-xs">Check in with your emotions</p>
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+              
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button 
+                    variant="outline" 
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => setIsCustomizing(true)}
+                  >
+                    <Settings size={14} />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top">
+                  <p className="text-xs">Customize your buddy</p>
+                </TooltipContent>
+              </Tooltip>
+            </div>
+            
             <form onSubmit={handleSubmit} className="flex w-full gap-2">
               <Input
                 ref={inputRef}
@@ -894,7 +994,13 @@ export function Buddy() {
       <Dialog open={isCheckingIn} onOpenChange={setIsCheckingIn}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
-            <DialogTitle>How are you feeling?</DialogTitle>
+            <DialogTitle>
+              {buddyProfile?.personalityType === 'friendly_supportive' && "How are you feeling today? I'm all ears."}
+              {buddyProfile?.personalityType === 'chill_funny' && "Feeling good, meh, or need a snack and a nap? 😂"}
+              {buddyProfile?.personalityType === 'focused_motivational' && "What's your vibe today — fire, focus, or figuring it out?"}
+              {buddyProfile?.personalityType === 'curious_reflective' && "Where's your heart today? Calm, cloudy, excited?"}
+              {!buddyProfile?.personalityType && "How are you feeling?"}
+            </DialogTitle>
             <DialogDescription>
               Your buddy wants to understand your mood and emotions.
             </DialogDescription>
@@ -971,8 +1077,10 @@ export function Buddy() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+      </div>
+    </TooltipProvider>
   );
 }
 
-export default Buddy;
+
+

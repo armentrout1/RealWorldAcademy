@@ -5,6 +5,6 @@ export { default as PersonalizedLearningPath } from './PersonalizedLearningPath'
 export { default as GrowthSnapshot } from './GrowthSnapshot';
 export { default as TeacherSmartAssist } from './TeacherSmartAssist';
 export { AIAssistant } from './AIAssistant';
-export { default as Buddy } from './Buddy';
+export { Buddy } from './Buddy';
 
 // Types could be exported here as well if needed for other components
