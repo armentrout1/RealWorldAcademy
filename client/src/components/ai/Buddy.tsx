@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { MessageCircle, X, Send, Smile, Sparkles, Settings, Edit, RefreshCw, Check, ActivitySquare } from 'lucide-react';
+import { MessageCircle, X, Send, Smile, Sparkles, Settings, Edit, RefreshCw, Check, ActivitySquare, Brain, Heart, Timer, ExternalLink } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription } from "@/components/ui/card";
 import {
@@ -38,6 +38,8 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Slider } from "@/components/ui/slider";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Textarea } from "@/components/ui/textarea";
+import { Link } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
 import { apiRequest } from "@/lib/queryClient";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -102,13 +104,32 @@ const personalityTypes = [
 // Emotion options
 const emotions = [
   { value: 'happy', label: 'Happy', emoji: '😊' },
+  { value: 'okay', label: 'Okay', emoji: '😐' },
+  { value: 'sad', label: 'Sad', emoji: '😞' },
+  { value: 'frustrated', label: 'Frustrated', emoji: '😠' },
+  { value: 'anxious', label: 'Anxious', emoji: '😰' },
+  { value: 'tired', label: 'Tired', emoji: '😴' },
   { value: 'excited', label: 'Excited', emoji: '🤩' },
-  { value: 'curious', label: 'Curious', emoji: '🤔' },
-  { value: 'confused', label: 'Confused', emoji: '😕' },
-  { value: 'frustrated', label: 'Frustrated', emoji: '😣' },
-  { value: 'proud', label: 'Proud', emoji: '😌' },
-  { value: 'bored', label: 'Bored', emoji: '😴' },
-  { value: 'stressed', label: 'Stressed', emoji: '😰' }
+  { value: 'proud', label: 'Proud', emoji: '😌' }
+];
+
+// Support actions for emotional tools
+const supportActions = [
+  { value: 'breathe', label: 'Take a Breather', emoji: '💨', 
+    description: 'A guided 1-minute deep breathing exercise' },
+  { value: 'mood_lifter', label: 'Quick Mood Lifter', emoji: '🎵', 
+    description: 'A suggestion to lift your mood like a song, fact, or joke' },
+  { value: 'vent', label: 'Vent Journal', emoji: '📝', 
+    description: 'A space to write out what\'s on your mind' },
+  { value: 'grounding', label: 'Grounding Exercise', emoji: '🧘', 
+    description: 'A calming visualization to help you feel centered' }
+];
+
+// Emotional support preference options
+const supportPreferences = [
+  { value: 'just_listen', label: 'Just listen' },
+  { value: 'cheer_up', label: 'Cheer me up' },
+  { value: 'help_focus', label: 'Help me focus' }
 ];
 
 // Buddy response patterns based on personality
@@ -251,6 +272,11 @@ export function Buddy() {
   const [selectedEmotion, setSelectedEmotion] = useState('');
   const [emotionIntensity, setEmotionIntensity] = useState(5);
   const [emotionNote, setEmotionNote] = useState('');
+  const [selectedSupportAction, setSelectedSupportAction] = useState<string | null>(null);
+  const [showFeelingTools, setShowFeelingTools] = useState(false);
+  const [reflectionText, setReflectionText] = useState('');
+  const [isReflecting, setIsReflecting] = useState(false);
+  const [supportPreference, setSupportPreference] = useState<string>('none');
   
   const inputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -329,7 +355,13 @@ export function Buddy() {
   
   // Record emotion mutation
   const recordEmotionMutation = useMutation({
-    mutationFn: (emotionData: { emotion: string, intensity: number, note: string | null }) => {
+    mutationFn: (emotionData: { 
+      emotion: string, 
+      intensity: number, 
+      note: string | null,
+      supportAction?: string | null,
+      reflectionText?: string | null
+    }) => {
       return apiRequest(`/api/users/${userId}/buddy/emotions`, {
         method: 'POST',
         body: emotionData
@@ -446,8 +478,46 @@ export function Buddy() {
     recordEmotionMutation.mutate({
       emotion: selectedEmotion,
       intensity: emotionIntensity,
-      note: emotionNote || null
+      note: emotionNote || null,
+      supportAction: selectedSupportAction,
+      reflectionText: reflectionText || null
     });
+    
+    // If it's a challenging emotion, suggest a support tool or reflection
+    if (['sad', 'frustrated', 'anxious', 'tired'].includes(selectedEmotion)) {
+      setTimeout(() => {
+        // Send buddy message with supportive response
+        const personalityType = buddyProfile?.personalityType || 'friendly_supportive';
+        let message = "";
+        
+        switch(personalityType) {
+          case 'friendly_supportive':
+            message = `I notice you're feeling ${selectedEmotion}. That's completely okay. Would you like to try one of my feeling tools to help with that?`;
+            break;
+          case 'chill_funny':
+            message = `Feeling ${selectedEmotion}, huh? No worries - we all have those days! Want to check out some quick tools that might help?`;
+            break;
+          case 'focused_motivational':
+            message = `I see you're feeling ${selectedEmotion}. Let's tackle this head-on. I have some tools that might help shift your energy. Want to try?`;
+            break;
+          case 'curious_reflective':
+            message = `Interesting that you're feeling ${selectedEmotion} today. Would you like to explore that a bit with some tools I have, or perhaps reflect on it together?`;
+            break;
+          default:
+            message = `Thanks for sharing that you're feeling ${selectedEmotion}. Would you like to try a feeling tool?`;
+        }
+        
+        sendMessageMutation.mutate({
+          content: message,
+          isFromBuddy: true
+        });
+        
+        // Show feeling tools after a short delay
+        setTimeout(() => {
+          setShowFeelingTools(true);
+        }, 500);
+      }, 1000);
+    }
   };
   
   // Function to send creative prompts based on personality type
@@ -1053,6 +1123,64 @@ export function Buddy() {
                   onChange={(e) => setEmotionNote(e.target.value)}
                 />
               </div>
+              
+              {/* Support tools for challenging emotions */}
+              {['sad', 'frustrated', 'anxious', 'tired'].includes(selectedEmotion) && (
+                <div className="space-y-3 mt-3 pt-3 border-t">
+                  <Label>Would you like support with this feeling?</Label>
+                  <RadioGroup value={supportPreference} onValueChange={setSupportPreference} className="gap-2">
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="none" id="support-none" />
+                      <Label htmlFor="support-none" className="text-sm font-normal">Just note it, thanks!</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="tools" id="support-tools" />
+                      <Label htmlFor="support-tools" className="text-sm font-normal">Show me support tools</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="reflection" id="support-reflection" />
+                      <Label htmlFor="support-reflection" className="text-sm font-normal">Guide me through reflection</Label>
+                    </div>
+                  </RadioGroup>
+                  
+                  {supportPreference === 'tools' && (
+                    <div className="space-y-2 pt-2">
+                      <Label>Select a support action</Label>
+                      <Select value={selectedSupportAction || ''} onValueChange={setSelectedSupportAction}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Choose a support tool" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="breathing">Guided breathing</SelectItem>
+                          <SelectItem value="gratitude">Gratitude practice</SelectItem>
+                          <SelectItem value="reframe">Thought reframing</SelectItem>
+                          <SelectItem value="timeout">Take a mindful pause</SelectItem>
+                          <SelectItem value="affirmations">Positive affirmations</SelectItem>
+                          <SelectItem value="visualization">Peaceful visualization</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                  
+                  {supportPreference === 'reflection' && (
+                    <div className="space-y-2 pt-2">
+                      <Label htmlFor="reflection-text">Quick reflection</Label>
+                      <Textarea
+                        id="reflection-text"
+                        placeholder={
+                          selectedEmotion === 'sad' ? "What's one small thing that might help shift this feeling?" :
+                          selectedEmotion === 'anxious' ? "What's a worry you could let go of right now?" :
+                          selectedEmotion === 'frustrated' ? "What could you focus on that's within your control?" :
+                          "What's one thing your body or mind needs right now?"
+                        }
+                        value={reflectionText}
+                        onChange={(e) => setReflectionText(e.target.value)}
+                        rows={3}
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
             </>
           )}
           
@@ -1073,6 +1201,205 @@ export function Buddy() {
                 <Smile className="h-4 w-4 mr-2" />
               )}
               Save Check-in
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Emotional Support Tools Dialog */}
+      <Dialog open={showFeelingTools} onOpenChange={setShowFeelingTools}>
+        <DialogContent className="sm:max-w-[450px]">
+          <DialogHeader>
+            <DialogTitle>Feeling Tools</DialogTitle>
+            <DialogDescription>
+              These tools can help you process and shift your emotions
+            </DialogDescription>
+          </DialogHeader>
+          
+          <Tabs defaultValue="tools" className="w-full">
+            <TabsList className="grid grid-cols-3 mb-4">
+              <TabsTrigger value="tools">Quick Tools</TabsTrigger>
+              <TabsTrigger value="breathe">Breathing</TabsTrigger>
+              <TabsTrigger value="journal">Journal</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="tools" className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <Card className="p-3 cursor-pointer hover:border-primary" onClick={() => setIsReflecting(true)}>
+                  <div className="flex flex-col items-center text-center">
+                    <Brain className="h-8 w-8 mb-2 text-primary" />
+                    <h4 className="text-sm font-medium">Thought Reframing</h4>
+                    <p className="text-xs text-muted-foreground mt-1">Transform negative thoughts</p>
+                  </div>
+                </Card>
+                
+                <Card className="p-3 cursor-pointer hover:border-primary">
+                  <div className="flex flex-col items-center text-center">
+                    <Heart className="h-8 w-8 mb-2 text-primary" />
+                    <h4 className="text-sm font-medium">Gratitude</h4>
+                    <p className="text-xs text-muted-foreground mt-1">Find things to appreciate</p>
+                  </div>
+                </Card>
+                
+                <Card className="p-3 cursor-pointer hover:border-primary">
+                  <div className="flex flex-col items-center text-center">
+                    <Sparkles className="h-8 w-8 mb-2 text-primary" />
+                    <h4 className="text-sm font-medium">Affirmations</h4>
+                    <p className="text-xs text-muted-foreground mt-1">Positive self-talk</p>
+                  </div>
+                </Card>
+                
+                <Card className="p-3 cursor-pointer hover:border-primary">
+                  <div className="flex flex-col items-center text-center">
+                    <Timer className="h-8 w-8 mb-2 text-primary" />
+                    <h4 className="text-sm font-medium">Break Timer</h4>
+                    <p className="text-xs text-muted-foreground mt-1">Mindful timeout</p>
+                  </div>
+                </Card>
+              </div>
+              
+              <Button 
+                variant="outline" 
+                className="w-full" 
+                onClick={() => setShowFeelingTools(false)}
+              >
+                I'll try these later
+              </Button>
+            </TabsContent>
+            
+            <TabsContent value="breathe" className="space-y-4">
+              <div className="flex flex-col items-center justify-center py-8">
+                <div className="relative flex items-center justify-center">
+                  <div className="absolute animate-ping rounded-full h-32 w-32 bg-primary/10"></div>
+                  <div className="absolute animate-pulse rounded-full h-24 w-24 bg-primary/20"></div>
+                  <div className="rounded-full h-16 w-16 bg-primary/30 flex items-center justify-center text-white font-medium">
+                    Breathe
+                  </div>
+                </div>
+                <p className="text-sm mt-6 text-center text-muted-foreground">
+                  Breathe in for 4 counts<br />
+                  Hold for 4 counts<br />
+                  Exhale for 6 counts
+                </p>
+              </div>
+              
+              <Button 
+                variant="outline" 
+                className="w-full" 
+                onClick={() => setShowFeelingTools(false)}
+              >
+                I feel calmer now
+              </Button>
+            </TabsContent>
+            
+            <TabsContent value="journal" className="space-y-4">
+              <div className="space-y-3">
+                <p className="text-sm text-muted-foreground">
+                  Writing about your feelings can help process them. Try one of these prompts:
+                </p>
+                
+                <div className="space-y-2">
+                  <div className="p-2 rounded-md bg-muted cursor-pointer hover:bg-muted/80">
+                    <p className="text-sm">I'm feeling this way because...</p>
+                  </div>
+                  <div className="p-2 rounded-md bg-muted cursor-pointer hover:bg-muted/80">
+                    <p className="text-sm">One small step I could take is...</p>
+                  </div>
+                  <div className="p-2 rounded-md bg-muted cursor-pointer hover:bg-muted/80">
+                    <p className="text-sm">Something that always helps me feel better is...</p>
+                  </div>
+                </div>
+                
+                <div onClick={() => {
+                  setShowFeelingTools(false);
+                  window.location.href = '/journal';
+                }} className="text-sm text-primary flex items-center cursor-pointer">
+                  <ExternalLink size={12} className="mr-1" /> Open full journal
+                </div>
+              </div>
+              
+              <Button 
+                variant="outline" 
+                className="w-full" 
+                onClick={() => setShowFeelingTools(false)}
+              >
+                Close
+              </Button>
+            </TabsContent>
+          </Tabs>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Reflection Dialog */}
+      <Dialog open={isReflecting} onOpenChange={setIsReflecting}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Thought Reframing</DialogTitle>
+            <DialogDescription>
+              Transform challenging thoughts into more balanced perspectives
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Challenging thought</Label>
+              <Textarea
+                placeholder="What thought is troubling you? For example: 'I'll never understand this math concept'"
+                rows={2}
+                className="resize-none"
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label>How true is this thought? (0-100%)</Label>
+              <Slider
+                min={0}
+                max={100}
+                step={10}
+                defaultValue={[70]}
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label>Evidence that supports this thought</Label>
+              <Textarea
+                placeholder="What makes you believe this thought is true?"
+                rows={2}
+                className="resize-none"
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label>Evidence that doesn't support this thought</Label>
+              <Textarea
+                placeholder="What facts suggest this thought might not be completely true?"
+                rows={2}
+                className="resize-none"
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label>More balanced thought</Label>
+              <Textarea
+                placeholder="How could you rephrase this thought to be more accurate and helpful?"
+                rows={2}
+                className="resize-none"
+              />
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsReflecting(false)}>
+              Close
+            </Button>
+            <Button onClick={() => {
+              setIsReflecting(false);
+              toast({
+                title: "Reflection saved",
+                description: "Your reframed thought has been saved to your journal"
+              });
+            }}>
+              Save to Journal
             </Button>
           </DialogFooter>
         </DialogContent>

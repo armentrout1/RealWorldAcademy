@@ -1,0 +1,56 @@
+Expand the Buddy chatbot with a set of emotional support tools designed to help students process feelings, reduce stress, and feel seen. These features should be warm, judgment-free, and age-appropriate.
+
+1. **Add an Emotion Check-In Feature**:
+   - Create a “How Are You Feeling?” button in Buddy’s chat interface
+   - Let the student pick from emojis or icons:
+     - 😊 Happy
+     - 😐 Okay
+     - 😞 Sad
+     - 😠 Frustrated
+     - 😰 Anxious
+     - 😴 Tired
+
+   - Based on the selected emotion, Buddy responds with empathy:
+     - “I’m really glad you’re feeling good today!”
+     - “That sounds tough. Want to talk about it or shift into something fun?”
+     - “Feeling tired is totally normal. Maybe a low-energy activity today?”
+
+2. **Add a “Feeling Tools” Button in the Chat**:
+   When clicked, show a menu of emotional support actions:
+   - 💨 Take a Breather (guides them through a 1-minute deep breathing)
+   - 🎵 Quick Mood Lifter (suggests a song, a silly fact, or a joke)
+   - 📝 Vent Journal (text box to write out what’s on their mind)
+   - 🧘 Grounding Exercise (Buddy walks them through calming visualization)
+
+   Keep these simple, fun, and not too clinical — use friendly language.
+
+3. **Reflection Mode for Processing Emotions**:
+   - After a tough feeling is shared, Buddy can ask:
+     - “Want to tell me what happened?”
+     - “What would help you feel a little better?”
+     - “Let’s name the feeling and let it pass together.”
+
+   - Store reflection entries in the student’s private journal
+
+4. **Mood History (Optional)**:
+   - Let students view a weekly mood tracker (e.g., emoji line graph)
+   - Buddy can comment gently: “Looks like Tuesday was rough, but Friday was awesome!”
+
+5. **Safe and Supportive Design**:
+   - Avoid asking for too much detail or triggering questions
+   - Always include a button like “I’m okay, let’s move on”
+   - Frame Buddy as a partner, not a therapist
+
+6. **Customization Options**:
+   - Let students pick Buddy’s emotional support tone:
+     - “Just listen”
+     - “Cheer me up”
+     - “Help me focus”
+   - Save their preferred response style in Buddy’s memory
+
+7. **Example Dialogue**:
+
+Student: “I’m feeling really anxious today.”  
+Buddy (Chill tone): “That’s okay. Even brave people get anxious. Want to breathe together or just talk it out a little?”  
+→ Options: “Breathe,” “Vent,” “Distract me,” “No thanks”
+

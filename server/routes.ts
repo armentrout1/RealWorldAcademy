@@ -958,7 +958,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "User not found" });
       }
       
-      const { emotion, intensity, note } = req.body;
+      const { emotion, intensity, note, supportAction, reflectionText } = req.body;
       
       // Validate that emotion exists
       if (!emotion) {
@@ -971,12 +971,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         emotion: String(emotion),
         intensity: Number(intensity) || 5, // Default to middle intensity
         note: note ? String(note) : null,
+        supportAction: supportAction ? String(supportAction) : null,
+        reflectionText: reflectionText ? String(reflectionText) : null,
         loggedAt: new Date()
       });
       
       const newEmotionLog = await storage.recordBuddyEmotion(validatedData);
       res.status(201).json(newEmotionLog);
     } catch (error) {
+      console.error("Error recording emotion:", error);
       res.status(400).json({ message: "Invalid emotion data" });
     }
   });

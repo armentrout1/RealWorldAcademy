@@ -512,6 +512,8 @@ export const buddyEmotionLogs = pgTable("buddy_emotion_logs", {
   intensity: integer("intensity").default(5).notNull(), // 1-10 scale
   loggedAt: timestamp("logged_at").defaultNow(),
   note: text("note"), // Optional context
+  supportAction: text("support_action"), // What support action was taken (e.g., "breathe", "distract", "vent", etc.)
+  reflectionText: text("reflection_text"), // Additional reflection on the emotion
 });
 
 export const buddyEmotionLogsRelations = relations(buddyEmotionLogs, ({ one }) => ({
