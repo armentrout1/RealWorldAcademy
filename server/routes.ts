@@ -10,7 +10,7 @@ import {
   insertSubjectSchema, insertLessonSchema,
   insertResourceSchema, insertDailyChallengeSchema, insertUserChallengeSchema,
   insertBuddyProfileSchema, insertBuddyMessageSchema, insertBuddyEmotionLogSchema,
-  insertBuddyJournalEntrySchema
+  insertBuddyJournalEntrySchema, insertParentChildRelationshipSchema
 } from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -255,6 +255,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(userWithoutPassword);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch user" });
+    }
+  });
+
+  app.get("/api/users/:parentId/children", async (req, res) => {
+    try {
+      const parentId = Number(req.params.parentId);
+      const parent = await storage.getUser(parentId);
+      if (!parent) {
+        return res.status(404).json({ message: "Parent user not found" });
+      }
+
+      const children = await storage.getChildrenForParent(parentId);
+      const safeChildren = children.map(({ password, ...child }) => child);
+      res.json(safeChildren);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch child accounts" });
+    }
+  });
+
+  app.get("/api/users/:childId/parents", async (req, res) => {
+    try {
+      const childId = Number(req.params.childId);
+      const child = await storage.getUser(childId);
+      if (!child) {
+        return res.status(404).json({ message: "Child user not found" });
+      }
+
+      const parents = await storage.getParentsForChild(childId);
+      const safeParents = parents.map(({ password, ...parent }) => parent);
+      res.json(safeParents);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch parent accounts" });
+    }
+  });
+
+  app.post("/api/family/relationships", express.json(), async (req, res) => {
+    try {
+      const validatedData = insertParentChildRelationshipSchema.parse(req.body);
+
+      const parent = await storage.getUser(validatedData.parentUserId);
+      const child = await storage.getUser(validatedData.childUserId);
+      if (!parent || !child) {
+        return res.status(404).json({ message: "Parent or child user not found" });
+      }
+
+      const relationship = await storage.createParentChildRelationship(validatedData);
+      res.status(201).json(relationship);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid parent-child relationship data" });
     }
   });
 

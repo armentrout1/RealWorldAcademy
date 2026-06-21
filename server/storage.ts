@@ -21,7 +21,8 @@ import {
   buddyProfiles, type BuddyProfile, type InsertBuddyProfile,
   buddyMessages, type BuddyMessage, type InsertBuddyMessage,
   buddyEmotionLogs, type BuddyEmotionLog, type InsertBuddyEmotionLog,
-  buddyJournalEntries, type BuddyJournalEntry, type InsertBuddyJournalEntry
+  buddyJournalEntries, type BuddyJournalEntry, type InsertBuddyJournalEntry,
+  parentChildRelationships, type ParentChildRelationship, type InsertParentChildRelationship
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, sql, and, inArray } from "drizzle-orm";
@@ -31,6 +32,9 @@ export interface IStorage {
   getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+  getChildrenForParent(parentUserId: number): Promise<User[]>;
+  getParentsForChild(childUserId: number): Promise<User[]>;
+  createParentChildRelationship(relationship: InsertParentChildRelationship): Promise<ParentChildRelationship>;
   
   // Course operations
   getAllCourses(): Promise<Course[]>;
@@ -183,6 +187,37 @@ export class DatabaseStorage implements IStorage {
 
   async createUser(insertUser: InsertUser): Promise<User> {
     const results = await db.insert(users).values(insertUser).returning();
+    return results[0];
+  }
+
+  async getChildrenForParent(parentUserId: number): Promise<User[]> {
+    const relationships = await db.select().from(parentChildRelationships)
+      .where(and(
+        eq(parentChildRelationships.parentUserId, parentUserId),
+        eq(parentChildRelationships.status, "active")
+      ));
+
+    if (relationships.length === 0) return [];
+
+    const childIds = relationships.map((relationship) => relationship.childUserId);
+    return await db.select().from(users).where(inArray(users.id, childIds));
+  }
+
+  async getParentsForChild(childUserId: number): Promise<User[]> {
+    const relationships = await db.select().from(parentChildRelationships)
+      .where(and(
+        eq(parentChildRelationships.childUserId, childUserId),
+        eq(parentChildRelationships.status, "active")
+      ));
+
+    if (relationships.length === 0) return [];
+
+    const parentIds = relationships.map((relationship) => relationship.parentUserId);
+    return await db.select().from(users).where(inArray(users.id, parentIds));
+  }
+
+  async createParentChildRelationship(relationship: InsertParentChildRelationship): Promise<ParentChildRelationship> {
+    const results = await db.insert(parentChildRelationships).values(relationship).returning();
     return results[0];
   }
   

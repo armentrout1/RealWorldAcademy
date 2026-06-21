@@ -632,6 +632,33 @@ export const insertIssuedCredentialSchema = createInsertSchema(issuedCredentials
 export type InsertIssuedCredential = z.infer<typeof insertIssuedCredentialSchema>;
 export type IssuedCredential = typeof issuedCredentials.$inferSelect;
 
+// Family relationships for homeschool parent review
+export const parentChildRelationships = pgTable("parent_child_relationships", {
+  id: serial("id").primaryKey(),
+  parentUserId: integer("parent_user_id").notNull().references(() => users.id),
+  childUserId: integer("child_user_id").notNull().references(() => users.id),
+  relationshipLabel: text("relationship_label").default("parent").notNull(),
+  status: text("status").default("active").notNull(), // pending, active, revoked
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const parentChildRelationshipsRelations = relations(parentChildRelationships, ({ one }) => ({
+  parent: one(users, {
+    fields: [parentChildRelationships.parentUserId],
+    references: [users.id],
+    relationName: "parentRelationships",
+  }),
+  child: one(users, {
+    fields: [parentChildRelationships.childUserId],
+    references: [users.id],
+    relationName: "childRelationships",
+  }),
+}));
+
+export const insertParentChildRelationshipSchema = createInsertSchema(parentChildRelationships).omit({ id: true });
+export type InsertParentChildRelationship = z.infer<typeof insertParentChildRelationshipSchema>;
+export type ParentChildRelationship = typeof parentChildRelationships.$inferSelect;
+
 // Define the user relations after all models are defined
 export const usersRelations = relations(users, ({ many, one }) => ({
   badges: many(badges),
@@ -648,4 +675,6 @@ export const usersRelations = relations(users, ({ many, one }) => ({
   buddyEmotionLogs: many(buddyEmotionLogs),
   buddyJournalEntries: many(buddyJournalEntries),
   issuedCredentials: many(issuedCredentials),
+  parentRelationships: many(parentChildRelationships, { relationName: "parentRelationships" }),
+  childRelationships: many(parentChildRelationships, { relationName: "childRelationships" }),
 }));
