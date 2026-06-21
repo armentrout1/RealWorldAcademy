@@ -1,8 +1,10 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { apiRequest } from '@/lib/queryClient';
 
-// Mock user data type
 export interface User {
   id: number;
+  username?: string;
+  fullName?: string;
   firstName: string;
   lastName: string;
   email: string;
@@ -23,31 +25,10 @@ export interface User {
   };
 }
 
-// Mock user data
-export const mockUser: User = {
-  id: 1,
-  firstName: 'Alex',
-  lastName: 'Morgan',
-  email: 'alex@example.com',
-  ageGroup: '13-15',
-  interests: ['Money', 'Creativity', 'Technology'],
-  avatar: '/default-avatar.png',
-  // Gamification fields
-  xp: 570,
-  level: 2,
-  levelTitle: 'Explorer',
-  streakCount: 3,
-  gamificationEnabled: true,
-  progress: {
-    selfDiscovery: 0.8,
-    financialLiteracy: 0.6,
-    projectsCompleted: 2,
-    learningPathsStarted: 3
-  }
-};
-
 // Define type for signup data
-export type SignupData = Pick<User, 'firstName' | 'lastName' | 'email' | 'ageGroup' | 'interests'>;
+export type SignupData = Pick<User, 'firstName' | 'lastName' | 'email' | 'ageGroup' | 'interests'> & {
+  password: string;
+};
 
 // Auth context type
 interface AuthContextType {
@@ -56,7 +37,7 @@ interface AuthContextType {
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
   signup: (userData: SignupData) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
   updateProfile: (data: Partial<User>) => Promise<void>;
 }
 
@@ -67,7 +48,7 @@ const AuthContext = createContext<AuthContextType>({
   isLoading: true,
   login: async () => {},
   signup: async () => {},
-  logout: () => {},
+  logout: async () => {},
   updateProfile: async () => {},
 });
 
@@ -76,94 +57,65 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Check for saved user in local storage on initial load
   useEffect(() => {
-    const savedUser = localStorage.getItem('user');
-    
-    if (savedUser) {
-      setUser(JSON.parse(savedUser));
-    }
-    
-    setIsLoading(false);
+    let mounted = true;
+
+    apiRequest<User>('/api/auth/me')
+      .then((currentUser) => {
+        if (mounted) setUser(normalizeUser(currentUser));
+      })
+      .catch(() => {
+        if (mounted) setUser(null);
+      })
+      .finally(() => {
+        if (mounted) setIsLoading(false);
+      });
+
+    return () => {
+      mounted = false;
+    };
   }, []);
 
-  // Save user to local storage when it changes
-  useEffect(() => {
-    if (user) {
-      localStorage.setItem('user', JSON.stringify(user));
-    } else {
-      localStorage.removeItem('user');
-    }
-  }, [user]);
-
-  // Mock login function
   const login = async (email: string, password: string) => {
-    // Simulate network request
     setIsLoading(true);
-    
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    // For demo, any non-empty email/password is valid
-    if (email && password) {
-      // TODO: Connect to user auth backend
-      setUser(mockUser);
-    } else {
-      throw new Error('Invalid credentials');
+    try {
+      const loggedInUser = await apiRequest<User>('/api/auth/login', {
+        method: 'POST',
+        body: { email, password },
+      });
+      setUser(normalizeUser(loggedInUser));
+    } finally {
+      setIsLoading(false);
     }
-    
-    setIsLoading(false);
   };
 
-  // Mock signup function
   const signup = async (userData: SignupData) => {
-    // Simulate network request
     setIsLoading(true);
-    
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    // TODO: Connect to user registration API
-    const newUser: User = {
-      ...userData,
-      id: 1,
-      avatar: '/default-avatar.png',
-      // Initialize gamification fields
-      xp: 0,
-      level: 1,
-      levelTitle: 'Beginner',
-      streakCount: 0,
-      gamificationEnabled: true,
-      progress: {
-        selfDiscovery: 0,
-        financialLiteracy: 0,
-        projectsCompleted: 0,
-        learningPathsStarted: 0
-      }
-    };
-    
-    setUser(newUser);
-    setIsLoading(false);
+    try {
+      const newUser = await apiRequest<User>('/api/auth/signup', {
+        method: 'POST',
+        body: userData,
+      });
+      setUser(normalizeUser(newUser));
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  // Mock logout function
-  const logout = () => {
-    // TODO: Connect to logout API
+  const logout = async () => {
+    await apiRequest('/api/auth/logout', { method: 'POST' });
     setUser(null);
   };
 
-  // Mock profile update function
   const updateProfile = async (data: Partial<User>) => {
-    // Simulate network request
     setIsLoading(true);
-    
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    // TODO: Connect to profile update API
-    if (user) {
-      const updatedUser = { ...user, ...data };
-      setUser(updatedUser);
+    try {
+      if (user) {
+        setUser({ ...user, ...data });
+      }
+    } finally {
+      setIsLoading(false);
     }
-    
-    setIsLoading(false);
   };
 
   const value = {
@@ -183,3 +135,23 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 export const useAuth = () => useContext(AuthContext);
 
 export default AuthContext;
+
+function normalizeUser(user: User): User {
+  return {
+    ...user,
+    firstName: user.firstName || user.fullName?.split(' ')[0] || '',
+    lastName: user.lastName || user.fullName?.split(' ').slice(1).join(' ') || '',
+    interests: user.interests || [],
+    xp: user.xp || 0,
+    level: user.level || 1,
+    levelTitle: user.levelTitle || 'Beginner',
+    streakCount: user.streakCount || 0,
+    gamificationEnabled: user.gamificationEnabled ?? true,
+    progress: user.progress || {
+      selfDiscovery: 0,
+      financialLiteracy: 0,
+      projectsCompleted: 0,
+      learningPathsStarted: 0,
+    },
+  };
+}

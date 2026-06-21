@@ -75,6 +75,7 @@ const Signup = () => {
         firstName: formData.firstName,
         lastName: formData.lastName,
         email: formData.email,
+        password: formData.password,
         ageGroup: formData.ageGroup as any,
         interests: [] // Default empty interests
       });

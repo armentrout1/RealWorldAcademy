@@ -1,6 +1,7 @@
 import express, { type Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
+import { hashPassword, toSafeUser, verifyPassword } from "./auth";
 import { 
   insertUserSchema, insertCourseSchema, insertCategorySchema, 
   insertTestimonialSchema, insertFeatureSchema,
@@ -20,6 +21,99 @@ export async function registerRoutes(app: Express): Promise<Server> {
       service: "real-world-academy",
       version: "2-roadmap",
       timestamp: new Date().toISOString()
+    });
+  });
+
+  app.get("/api/auth/me", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const user = await storage.getUser(req.session.userId);
+      if (!user) {
+        req.session.destroy(() => undefined);
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      res.json(toSafeUser(user));
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch current user" });
+    }
+  });
+
+  app.post("/api/auth/signup", express.json(), async (req, res) => {
+    try {
+      const { email, password, firstName, lastName, ageGroup, interests } = req.body;
+
+      if (!email || !password || !firstName || !lastName || !ageGroup) {
+        return res.status(400).json({ message: "Email, password, name, and age group are required" });
+      }
+
+      if (String(password).length < 8) {
+        return res.status(400).json({ message: "Password must be at least 8 characters" });
+      }
+
+      const normalizedEmail = String(email).trim().toLowerCase();
+      const existingUser = await storage.getUserByEmail(normalizedEmail);
+      if (existingUser) {
+        return res.status(409).json({ message: "An account with that email already exists" });
+      }
+
+      const hashedPassword = await hashPassword(String(password));
+      const newUser = await storage.createUser({
+        username: normalizedEmail,
+        password: hashedPassword,
+        fullName: `${String(firstName).trim()} ${String(lastName).trim()}`,
+        email: normalizedEmail,
+        firstName: String(firstName).trim(),
+        lastName: String(lastName).trim(),
+        ageGroup: String(ageGroup),
+        interests: Array.isArray(interests) ? interests.map(String) : [],
+        xp: 0,
+        level: 1,
+        levelTitle: "Beginner",
+        streakCount: 0,
+        gamificationEnabled: true,
+        showLeaderboard: false,
+        showLevelUpNotifications: true,
+      });
+
+      req.session.userId = newUser.id;
+      res.status(201).json(toSafeUser(newUser));
+    } catch (error) {
+      res.status(400).json({ message: "Invalid signup data" });
+    }
+  });
+
+  app.post("/api/auth/login", express.json(), async (req, res) => {
+    try {
+      const { email, password } = req.body;
+
+      if (!email || !password) {
+        return res.status(400).json({ message: "Email and password are required" });
+      }
+
+      const user = await storage.getUserByEmail(String(email).trim().toLowerCase());
+      if (!user || !(await verifyPassword(String(password), user.password))) {
+        return res.status(401).json({ message: "Invalid email or password" });
+      }
+
+      req.session.userId = user.id;
+      res.json(toSafeUser(user));
+    } catch (error) {
+      res.status(500).json({ message: "Failed to log in" });
+    }
+  });
+
+  app.post("/api/auth/logout", (req, res) => {
+    req.session.destroy((error) => {
+      if (error) {
+        return res.status(500).json({ message: "Failed to log out" });
+      }
+
+      res.clearCookie("rwa.sid");
+      res.status(204).end();
     });
   });
 
@@ -228,7 +322,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // User endpoints
   app.post("/api/users", express.json(), async (req, res) => {
     try {
-      const validatedData = insertUserSchema.parse(req.body);
+      const validatedData = insertUserSchema.parse({
+        ...req.body,
+        password: await hashPassword(String(req.body.password)),
+      });
       const existingUser = await storage.getUserByUsername(validatedData.username);
       
       if (existingUser) {
