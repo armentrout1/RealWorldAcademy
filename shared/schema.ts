@@ -553,6 +553,85 @@ export const insertBuddyJournalEntrySchema = createInsertSchema(buddyJournalEntr
 export type InsertBuddyJournalEntry = z.infer<typeof insertBuddyJournalEntrySchema>;
 export type BuddyJournalEntry = typeof buddyJournalEntries.$inferSelect;
 
+// Credential System
+export const credentialDefinitions = pgTable("credential_definitions", {
+  id: serial("id").primaryKey(),
+  title: text("title").notNull(),
+  slug: text("slug").notNull().unique(),
+  description: text("description").notNull(),
+  subjectId: integer("subject_id").references(() => subjects.id),
+  criteriaSummary: text("criteria_summary").notNull(),
+  disclaimer: text("disclaimer").notNull().default("This is a Real World Academy completion credential and does not represent accredited school credit."),
+  active: boolean("active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const credentialRequirements = pgTable("credential_requirements", {
+  id: serial("id").primaryKey(),
+  credentialId: integer("credential_id").notNull().references(() => credentialDefinitions.id),
+  requirementType: text("requirement_type").notNull(), // lesson, reflection, project, parent_review
+  title: text("title").notNull(),
+  description: text("description").notNull(),
+  targetId: integer("target_id"),
+  required: boolean("required").default(true).notNull(),
+  order: integer("order").notNull(),
+});
+
+export const issuedCredentials = pgTable("issued_credentials", {
+  id: serial("id").primaryKey(),
+  credentialId: integer("credential_id").notNull().references(() => credentialDefinitions.id),
+  userId: integer("user_id").notNull().references(() => users.id),
+  status: text("status").notNull().default("issued"), // pending_review, issued, revoked
+  issuedAt: timestamp("issued_at").defaultNow(),
+  reviewedByUserId: integer("reviewed_by_user_id").references(() => users.id),
+  reviewNote: text("review_note"),
+  shareCode: text("share_code").notNull().unique(),
+});
+
+export const credentialDefinitionsRelations = relations(credentialDefinitions, ({ one, many }) => ({
+  subject: one(subjects, {
+    fields: [credentialDefinitions.subjectId],
+    references: [subjects.id],
+  }),
+  requirements: many(credentialRequirements),
+  issuedCredentials: many(issuedCredentials),
+}));
+
+export const credentialRequirementsRelations = relations(credentialRequirements, ({ one }) => ({
+  credential: one(credentialDefinitions, {
+    fields: [credentialRequirements.credentialId],
+    references: [credentialDefinitions.id],
+  }),
+}));
+
+export const issuedCredentialsRelations = relations(issuedCredentials, ({ one }) => ({
+  credential: one(credentialDefinitions, {
+    fields: [issuedCredentials.credentialId],
+    references: [credentialDefinitions.id],
+  }),
+  user: one(users, {
+    fields: [issuedCredentials.userId],
+    references: [users.id],
+  }),
+  reviewer: one(users, {
+    fields: [issuedCredentials.reviewedByUserId],
+    references: [users.id],
+  }),
+}));
+
+export const insertCredentialDefinitionSchema = createInsertSchema(credentialDefinitions).omit({ id: true });
+export type InsertCredentialDefinition = z.infer<typeof insertCredentialDefinitionSchema>;
+export type CredentialDefinition = typeof credentialDefinitions.$inferSelect;
+
+export const insertCredentialRequirementSchema = createInsertSchema(credentialRequirements).omit({ id: true });
+export type InsertCredentialRequirement = z.infer<typeof insertCredentialRequirementSchema>;
+export type CredentialRequirement = typeof credentialRequirements.$inferSelect;
+
+export const insertIssuedCredentialSchema = createInsertSchema(issuedCredentials).omit({ id: true });
+export type InsertIssuedCredential = z.infer<typeof insertIssuedCredentialSchema>;
+export type IssuedCredential = typeof issuedCredentials.$inferSelect;
+
 // Define the user relations after all models are defined
 export const usersRelations = relations(users, ({ many, one }) => ({
   badges: many(badges),
@@ -568,4 +647,5 @@ export const usersRelations = relations(users, ({ many, one }) => ({
   buddyMessages: many(buddyMessages),
   buddyEmotionLogs: many(buddyEmotionLogs),
   buddyJournalEntries: many(buddyJournalEntries),
+  issuedCredentials: many(issuedCredentials),
 }));

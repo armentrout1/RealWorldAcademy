@@ -7,12 +7,22 @@ import {
   insertBadgeSchema, insertCategoryProgressSchema, 
   insertTimelineEventSchema, insertUserProgressSummarySchema,
   insertCareerPathSchema, insertGoalSchema, insertVisionBoardItemSchema,
+  insertSubjectSchema, insertLessonSchema,
   insertResourceSchema, insertDailyChallengeSchema, insertUserChallengeSchema,
   insertBuddyProfileSchema, insertBuddyMessageSchema, insertBuddyEmotionLogSchema,
   insertBuddyJournalEntrySchema
 } from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  app.get("/api/health", (_req, res) => {
+    res.json({
+      ok: true,
+      service: "real-world-academy",
+      version: "2-roadmap",
+      timestamp: new Date().toISOString()
+    });
+  });
+
   // Courses endpoints
   app.get("/api/courses", async (req, res) => {
     try {
@@ -123,6 +133,95 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(newFeature);
     } catch (error) {
       res.status(400).json({ message: "Invalid feature data" });
+    }
+  });
+
+  // Subject/pathway endpoints
+  app.get("/api/subjects", async (req, res) => {
+    try {
+      const subjects = await storage.getAllSubjects();
+      res.json(subjects);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch subjects" });
+    }
+  });
+
+  app.get("/api/subjects/featured", async (req, res) => {
+    try {
+      const featuredSubjects = await storage.getFeaturedSubjects();
+      res.json(featuredSubjects);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch featured subjects" });
+    }
+  });
+
+  app.get("/api/subjects/:slug/lessons", async (req, res) => {
+    try {
+      const subject = await storage.getSubjectBySlug(req.params.slug);
+      if (!subject) {
+        return res.status(404).json({ message: "Subject not found" });
+      }
+
+      const lessons = await storage.getLessonsBySubject(subject.id);
+      res.json(lessons);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch subject lessons" });
+    }
+  });
+
+  app.get("/api/subjects/:slug", async (req, res) => {
+    try {
+      const subject = await storage.getSubjectBySlug(req.params.slug);
+      if (!subject) {
+        return res.status(404).json({ message: "Subject not found" });
+      }
+      res.json(subject);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch subject" });
+    }
+  });
+
+  app.post("/api/subjects", express.json(), async (req, res) => {
+    try {
+      const validatedData = insertSubjectSchema.parse(req.body);
+      const newSubject = await storage.createSubject(validatedData);
+      res.status(201).json(newSubject);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid subject data" });
+    }
+  });
+
+  app.get("/api/lessons/:id", async (req, res) => {
+    try {
+      const lesson = await storage.getLesson(Number(req.params.id));
+      if (!lesson) {
+        return res.status(404).json({ message: "Lesson not found" });
+      }
+      res.json(lesson);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch lesson" });
+    }
+  });
+
+  app.get("/api/subjects/:subjectSlug/lessons/:lessonSlug", async (req, res) => {
+    try {
+      const lesson = await storage.getLessonBySlug(req.params.subjectSlug, req.params.lessonSlug);
+      if (!lesson) {
+        return res.status(404).json({ message: "Lesson not found" });
+      }
+      res.json(lesson);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch lesson" });
+    }
+  });
+
+  app.post("/api/lessons", express.json(), async (req, res) => {
+    try {
+      const validatedData = insertLessonSchema.parse(req.body);
+      const newLesson = await storage.createLesson(validatedData);
+      res.status(201).json(newLesson);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid lesson data" });
     }
   });
 
@@ -927,7 +1026,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "User not found" });
       }
       
-      const { content, isFromBuddy } = req.body;
+      const { content, isFromBuddy, role } = req.body;
       
       // Validate that message content exists
       if (!content) {
@@ -937,8 +1036,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Create message
       const validatedData = insertBuddyMessageSchema.parse({
         userId,
+        role: role ? String(role) : Boolean(isFromBuddy) ? "buddy" : "user",
         content: String(content),
-        isFromBuddy: Boolean(isFromBuddy),
         sentAt: new Date()
       });
       

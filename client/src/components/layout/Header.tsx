@@ -74,21 +74,21 @@ const Header: React.FC = () => {
                   <DropdownMenuSeparator />
                   <DropdownMenuLabel>Educational Tools</DropdownMenuLabel>
                   <DropdownMenuItem>
-                    <Link href="/teacher-dashboard" className="flex w-full items-center">
-                      <Users className="mr-2 h-4 w-4" />
-                      <span>Educator Dashboard</span>
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem>
                     <Link href="/parent-dashboard" className="flex w-full items-center">
                       <Home className="mr-2 h-4 w-4" />
                       <span>Homeschool Hub</span>
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem>
-                    <Link href="/curriculum-builder" className="flex w-full items-center">
+                    <Link href="/contribute" className="flex w-full items-center">
                       <BookOpen className="mr-2 h-4 w-4" />
-                      <span>Curriculum Builder</span>
+                      <span>Contribute Curriculum</span>
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem>
+                    <Link href="/admin/lessons" className="flex w-full items-center">
+                      <Users className="mr-2 h-4 w-4" />
+                      <span>Review Queue</span>
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />

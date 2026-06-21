@@ -25,6 +25,7 @@ import {
   Globe
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
 
 // Define a type for our subject modules
 interface SubjectModule {
@@ -39,6 +40,16 @@ interface SubjectModule {
     duration: string;
     level: "Beginner" | "Intermediate" | "Advanced";
   }[];
+}
+
+interface BackendSubject {
+  id: number;
+  title: string;
+  description: string;
+  slug: string;
+  iconName: string;
+  color: string;
+  category: string;
 }
 
 // Subject module data
@@ -178,6 +189,39 @@ const subjectModules: SubjectModule[] = [
     ]
   }
 ];
+
+const iconByName: Record<string, React.ReactNode> = {
+  calculator: <Calculator className="h-10 w-10" />,
+  wallet: <PiggyBank className="h-10 w-10" />,
+  "message-circle": <MessageCircle className="h-10 w-10" />,
+};
+
+const colorByName: Record<string, string> = {
+  blue: "bg-blue-500",
+  green: "bg-green-500",
+  violet: "bg-indigo-500",
+};
+
+const mapSubjectFromApi = (subject: BackendSubject): SubjectModule => {
+  const existingSubject = subjectModules.find((module) => module.id === subject.slug);
+  if (existingSubject) return existingSubject;
+
+  return {
+    id: subject.slug,
+    title: subject.title,
+    subtitle: subject.description,
+    description: subject.description,
+    icon: iconByName[subject.iconName] || <BookOpen className="h-10 w-10" />,
+    color: colorByName[subject.color] || "bg-blue-500",
+    modules: [
+      {
+        title: "Guided pathway lessons",
+        duration: "Self-paced",
+        level: "Beginner",
+      },
+    ],
+  };
+};
 
 // Define a type for age groups
 type AgeGroup = '9-12' | '13-15' | '16-18';
@@ -372,7 +416,7 @@ const SubjectDetail: React.FC<{ subject: SubjectModule }> = ({ subject }) => {
             
             <div className="space-y-4">
               {getAgeGroupContent().length > 0 ? (
-                getAgeGroupContent().map((lesson, idx) => (
+                getAgeGroupContent().map((lesson: { title: string; description: string; activity: string }, idx: number) => (
                   <Card key={idx}>
                     <CardHeader>
                       <CardTitle>{lesson.title}</CardTitle>
@@ -510,29 +554,34 @@ const Learn: React.FC = () => {
   // Map subjects to categories for filtering
   const subjectCategories: Record<string, string> = {
     math: "core",
+    "real-world-math": "core",
     science: "academic",
     history: "academic",
     finance: "life",
+    "financial-literacy": "life",
+    "money-basics": "life",
     technology: "core",
     careers: "career",
     communication: "life",
+    "communication-relationships": "life",
     health: "life",
     entrepreneurship: "career",
     "tech-real-world": "core"
   };
   
-  // Query the subjects from the database (simulated for now)
-  const { data: dbSubjects, isLoading } = useQuery({
+  // Query subjects from the API, with local seed content as a fallback while V2 is being wired.
+  const { data: dbSubjects, isLoading } = useQuery<SubjectModule[]>({
     queryKey: ['/api/subjects'],
-    queryFn: () => {
-      // This will be replaced with actual backend API call
-      // For now, just simulate a delay and return our static data
-      return new Promise((resolve) => {
-        setTimeout(() => {
-          resolve(subjectModules);
-        }, 500);
-      });
-    }
+    queryFn: async () => {
+      try {
+        const subjects = await apiRequest<BackendSubject[]>('/api/subjects');
+        return subjects.length > 0 ? subjects.map(mapSubjectFromApi) : subjectModules;
+      } catch (error) {
+        console.error("Falling back to local subject modules:", error);
+        return subjectModules;
+      }
+    },
+    initialData: subjectModules,
   });
   
   // Filter subjects based on search, category, age group and skill level
@@ -650,7 +699,7 @@ const Learn: React.FC = () => {
                   <Badge variant="secondary">Financial Literacy</Badge>
                   <Badge variant="outline">New</Badge>
                 </div>
-                <Link href="/lesson/smart-money-challenge">
+                <Link href="/learn/money-basics">
                   <Button size="sm" className="w-full">Start Lesson</Button>
                 </Link>
               </CardContent>

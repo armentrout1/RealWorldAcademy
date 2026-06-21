@@ -480,8 +480,10 @@ export class DatabaseStorage implements IStorage {
       const results = await db
         .update(userSubjectProgress)
         .set(progress)
-        .where(eq(userSubjectProgress.userId, userId))
-        .where(eq(userSubjectProgress.subjectId, subjectId))
+        .where(and(
+          eq(userSubjectProgress.userId, userId),
+          eq(userSubjectProgress.subjectId, subjectId)
+        ))
         .returning();
       return results[0];
     } else {
@@ -502,8 +504,10 @@ export class DatabaseStorage implements IStorage {
   // User Lesson Progress operations
   async getUserLessonProgress(userId: number, lessonId: number): Promise<UserLessonProgress | undefined> {
     const results = await db.select().from(userLessonProgress)
-      .where(eq(userLessonProgress.userId, userId))
-      .where(eq(userLessonProgress.lessonId, lessonId));
+      .where(and(
+        eq(userLessonProgress.userId, userId),
+        eq(userLessonProgress.lessonId, lessonId)
+      ));
     return results.length > 0 ? results[0] : undefined;
   }
   
@@ -515,8 +519,10 @@ export class DatabaseStorage implements IStorage {
     if (lessonIds.length === 0) return [];
     
     return await db.select().from(userLessonProgress)
-      .where(eq(userLessonProgress.userId, userId))
-      .where(userLessonProgress.lessonId.in(lessonIds));
+      .where(and(
+        eq(userLessonProgress.userId, userId),
+        inArray(userLessonProgress.lessonId, lessonIds)
+      ));
   }
   
   async createUserLessonProgress(progress: InsertUserLessonProgress): Promise<UserLessonProgress> {
@@ -531,8 +537,10 @@ export class DatabaseStorage implements IStorage {
       const results = await db
         .update(userLessonProgress)
         .set(progress)
-        .where(eq(userLessonProgress.userId, userId))
-        .where(eq(userLessonProgress.lessonId, lessonId))
+        .where(and(
+          eq(userLessonProgress.userId, userId),
+          eq(userLessonProgress.lessonId, lessonId)
+        ))
         .returning();
       return results[0];
     } else {
@@ -541,9 +549,10 @@ export class DatabaseStorage implements IStorage {
         userId,
         lessonId,
         status: progress.status || 'not_started',
+        ageGroup: progress.ageGroup || '13-15',
         startedAt: progress.startedAt,
         completedAt: progress.completedAt,
-        answers: progress.answers,
+        answers: progress.answers as InsertUserLessonProgress["answers"],
         notes: progress.notes,
       };
       return await this.createUserLessonProgress(newProgress);
@@ -563,7 +572,7 @@ export class DatabaseStorage implements IStorage {
     // We need a different approach for array fields
     // Since audience is an array, we need to find resources where the audience array includes the requested audience
     const allResources = await this.getAllResources();
-    return allResources.filter(resource => resource.audience.includes(audience));
+    return allResources.filter(resource => resource.audience?.includes(audience));
   }
 
   async getResourcesByType(type: string): Promise<Resource[]> {
@@ -600,7 +609,7 @@ export class DatabaseStorage implements IStorage {
     }
     
     return await this.updateResource(id, {
-      downloadCount: resource.downloadCount + 1
+      downloadCount: (resource.downloadCount || 0) + 1
     });
   }
   
@@ -772,9 +781,11 @@ export class DatabaseStorage implements IStorage {
     tomorrow.setDate(tomorrow.getDate() + 1);
     
     return await db.select().from(userChallenges)
-      .where(eq(userChallenges.userId, userId))
-      .where(sql`${userChallenges.completedAt} >= ${today.toISOString()}`)
-      .where(sql`${userChallenges.completedAt} < ${tomorrow.toISOString()}`);
+      .where(and(
+        eq(userChallenges.userId, userId),
+        sql`${userChallenges.completedAt} >= ${today.toISOString()}`,
+        sql`${userChallenges.completedAt} < ${tomorrow.toISOString()}`
+      ));
   }
   
   async completeChallenge(userChallenge: InsertUserChallenge): Promise<UserChallenge> {
@@ -1065,14 +1076,16 @@ export class DatabaseStorage implements IStorage {
       
       // Create the three core subjects for Phase 19
       const financialLiteracySubject = await this.createSubject({
-        title: "Financial Literacy",
+        title: "Money Basics",
         description: "Learn essential money management skills for real-world financial success. Understand budgeting, saving, investing, and making smart financial decisions.",
-        slug: "financial-literacy",
+        slug: "money-basics",
         iconName: "wallet",
         color: "green",
         featured: true,
         order: 1,
-        summary: "You've gained critical financial skills that will serve you throughout life. You now understand budgeting, saving strategies, how to avoid debt traps, and basic investing concepts.",
+        category: "money",
+        ageGroups: ["9-12", "13-15", "16-18"],
+        summary: "You've gained practical money skills that will serve you throughout life. You now understand needs and wants, budgeting, saving strategies, credit basics, and how to build a simple money plan.",
         nextSubjectIds: []
       });
       
@@ -1084,6 +1097,8 @@ export class DatabaseStorage implements IStorage {
         color: "violet",
         featured: true,
         order: 2,
+        category: "life",
+        ageGroups: ["9-12", "13-15", "16-18"],
         summary: "You've developed essential communication skills to express yourself clearly, listen actively, resolve conflicts, and build meaningful connections with others.",
         nextSubjectIds: []
       });
@@ -1096,6 +1111,8 @@ export class DatabaseStorage implements IStorage {
         color: "blue",
         featured: true,
         order: 3,
+        category: "math",
+        ageGroups: ["9-12", "13-15", "16-18"],
         summary: "You've mastered practical mathematical skills for everyday life, from calculating tips and understanding percentages to making data-driven decisions.",
         nextSubjectIds: []
       });
@@ -1731,20 +1748,49 @@ export class DatabaseStorage implements IStorage {
         }
       ];
       
+      const parseJsonSeedField = (value: unknown) => {
+        if (typeof value !== "string") return value;
+        try {
+          return JSON.parse(value);
+        } catch {
+          return value;
+        }
+      };
+
+      const normalizeLessonSeed = (lesson: any): InsertLesson => ({
+        subjectId: lesson.subjectId,
+        title: lesson.title,
+        subtitle: lesson.subtitle,
+        slug: lesson.slug,
+        order: lesson.order,
+        learningObjective: lesson.learningObjective || `Understand and apply ${lesson.title.toLowerCase()} in real-world situations.`,
+        warmUpQuestion: lesson.warmUpQuestion || `Where have you seen ${lesson.title.toLowerCase()} show up in everyday life?`,
+        lessonExplanation: lesson.lessonExplanation || lesson.content || "",
+        scenarioTitle: lesson.scenarioTitle,
+        scenarioContent: lesson.scenarioContent,
+        activityType: lesson.activityType,
+        activityContent: parseJsonSeedField(lesson.activityContent),
+        reflectionPrompt: lesson.reflectionPrompt || "What is one specific way you can use this lesson in your own life?",
+        estimatedMinutes: lesson.estimatedMinutes,
+        xpReward: lesson.xpReward || 50,
+        badgeId: lesson.badgeId,
+        ageGroupContent: parseJsonSeedField(lesson.ageGroupContent),
+      });
+
       // Create the lessons for each subject
       console.log("Creating Financial Literacy lessons...");
       for (const lesson of financialLiteracyLessons) {
-        await this.createLesson(lesson);
+        await this.createLesson(normalizeLessonSeed(lesson));
       }
       
       console.log("Creating Communication & Relationships lessons...");
       for (const lesson of communicationLessons) {
-        await this.createLesson(lesson);
+        await this.createLesson(normalizeLessonSeed(lesson));
       }
       
       console.log("Creating Real-World Math lessons...");
       for (const lesson of realWorldMathLessons) {
-        await this.createLesson(lesson);
+        await this.createLesson(normalizeLessonSeed(lesson));
       }
       
       // Update subject relations
@@ -1968,7 +2014,7 @@ export class DatabaseStorage implements IStorage {
     
     // Get subjects to link resources
     const allSubjects = await this.getAllSubjects();
-    const financialLiteracySubject = allSubjects.find(subject => subject.slug === "financial-literacy");
+    const financialLiteracySubject = allSubjects.find(subject => subject.slug === "money-basics");
     const communicationSubject = allSubjects.find(subject => subject.slug === "communication-relationships");
     const mathSubject = allSubjects.find(subject => subject.slug === "real-world-math");
     
@@ -2166,7 +2212,7 @@ export class DatabaseStorage implements IStorage {
   
   // Buddy Messages operations
   async getBuddyMessages(userId: number, limit?: number): Promise<BuddyMessage[]> {
-    let query = db.select().from(buddyMessages)
+    let query: any = db.select().from(buddyMessages)
       .where(eq(buddyMessages.userId, userId))
       .orderBy(sql`${buddyMessages.sentAt} DESC`);
     
@@ -2190,7 +2236,7 @@ export class DatabaseStorage implements IStorage {
   
   // Buddy Emotion operations
   async getBuddyEmotions(userId: number, limit?: number): Promise<BuddyEmotionLog[]> {
-    let query = db.select().from(buddyEmotionLogs)
+    let query: any = db.select().from(buddyEmotionLogs)
       .where(eq(buddyEmotionLogs.userId, userId))
       .orderBy(sql`${buddyEmotionLogs.loggedAt} DESC`);
     
@@ -2213,7 +2259,7 @@ export class DatabaseStorage implements IStorage {
   
   // Journal Entries operations
   async getBuddyJournalEntries(userId: number, limit?: number): Promise<BuddyJournalEntry[]> {
-    let query = db.select().from(buddyJournalEntries)
+    let query: any = db.select().from(buddyJournalEntries)
       .where(eq(buddyJournalEntries.userId, userId))
       .orderBy(sql`${buddyJournalEntries.createdAt} DESC`);
     

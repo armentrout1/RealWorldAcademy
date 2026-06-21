@@ -241,21 +241,18 @@ export default function ContributeLesson() {
                 <TabsTrigger 
                   value="info" 
                   onClick={() => setFormStep('info')}
-                  disabled={formStep === 'preview'}
                 >
                   Contributor Info
                 </TabsTrigger>
                 <TabsTrigger 
                   value="content" 
                   onClick={() => setFormStep('content')}
-                  disabled={formStep === 'preview'}
                 >
                   Lesson Content
                 </TabsTrigger>
                 <TabsTrigger 
                   value="details" 
                   onClick={() => setFormStep('details')}
-                  disabled={formStep === 'preview'}
                 >
                   Activities & Reflection
                 </TabsTrigger>
