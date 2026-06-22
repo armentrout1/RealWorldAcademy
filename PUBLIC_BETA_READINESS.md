@@ -7,6 +7,7 @@ This branch has moved the Version 2 MVP from prototype toward a usable homeschoo
 - `DATABASE_URL`: Postgres connection string used by Drizzle and the server.
 - `SESSION_SECRET`: strong random string for Express session signing.
 - `NODE_ENV=production`: required for secure production cookie behavior.
+- `ADMIN_EMAILS`: comma-separated allowlist for accounts that should become admins on signup, login, or `/api/admin/bootstrap`.
 
 ## Database Sync
 
@@ -37,7 +38,7 @@ User accounts now include a `role` field:
 - `parent`
 - `admin`
 
-Public signup can create `student` or `parent` accounts. Existing admins can manage user roles from `/admin/lessons`.
+Public signup can create `student` or `parent` accounts. Emails listed in `ADMIN_EMAILS` are promoted to `admin` on signup, login, session refresh, or by calling `/api/admin/bootstrap` while signed in. Existing admins can manage user roles from `/admin/lessons`.
 
 ## MVP Flow Checks
 
@@ -52,6 +53,7 @@ Public signup can create `student` or `parent` accounts. Existing admins can man
 - Confirm the submission appears in `/admin/lessons` for review after logging in as an admin.
 - Submit beta feedback from `/feedback`.
 - Confirm feedback and user roles can be managed from `/admin/lessons`.
+- Confirm an `ADMIN_EMAILS` account can reach `/admin/lessons` without a manual database role edit.
 
 ## Public Beta Copy and Safety
 
@@ -63,6 +65,5 @@ Public signup can create `student` or `parent` accounts. Existing admins can man
 
 ## Known Pre-Launch Gaps
 
-- Initial admin bootstrap still requires setting one trusted account to `users.role = 'admin'` in the database.
 - More seeded content is needed for Career Exploration and Digital Productivity.
 - Bundle size warnings still appear during `npm run build`; this is not blocking, but code-splitting should be considered before a larger launch.

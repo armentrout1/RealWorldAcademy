@@ -15,10 +15,28 @@ import {
   insertBuddyJournalEntrySchema, insertParentChildRelationshipSchema,
   insertParentLessonReviewSchema, insertCurriculumSubmissionSchema,
   insertFeedbackSubmissionSchema,
-  insertCredentialDefinitionSchema, insertCredentialRequirementSchema
+  insertCredentialDefinitionSchema, insertCredentialRequirementSchema,
+  type User
 } from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  const configuredAdminEmails = new Set(
+    (process.env.ADMIN_EMAILS || process.env.ADMIN_EMAIL || "")
+      .split(",")
+      .map((email) => email.trim().toLowerCase())
+      .filter(Boolean),
+  );
+
+  const isConfiguredAdminEmail = (email: string): boolean => configuredAdminEmails.has(email.trim().toLowerCase());
+
+  const promoteConfiguredAdmin = async (user: User): Promise<User> => {
+    if (user.role === "admin" || !isConfiguredAdminEmail(user.email)) {
+      return user;
+    }
+
+    return await storage.updateUserRole(user.id, "admin");
+  };
+
   const requireSessionUserId = (req: Request, res: Response): number | undefined => {
     if (!req.session.userId) {
       res.status(401).json({ message: "Not authenticated" });
@@ -81,12 +99,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Not authenticated" });
       }
 
-      const user = await storage.getUser(req.session.userId);
+      let user = await storage.getUser(req.session.userId);
       if (!user) {
         req.session.destroy(() => undefined);
         return res.status(401).json({ message: "Not authenticated" });
       }
 
+      user = await promoteConfiguredAdmin(user);
       res.json(toSafeUser(user));
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch current user" });
@@ -112,7 +131,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const hashedPassword = await hashPassword(String(password));
-      const accountRole = role === "parent" ? "parent" : "student";
+      const accountRole = isConfiguredAdminEmail(normalizedEmail)
+        ? "admin"
+        : role === "parent" ? "parent" : "student";
       const newUser = await storage.createUser({
         username: normalizedEmail,
         password: hashedPassword,
@@ -147,11 +168,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Email and password are required" });
       }
 
-      const user = await storage.getUserByEmail(String(email).trim().toLowerCase());
+      let user = await storage.getUserByEmail(String(email).trim().toLowerCase());
       if (!user || !(await verifyPassword(String(password), user.password))) {
         return res.status(401).json({ message: "Invalid email or password" });
       }
 
+      user = await promoteConfiguredAdmin(user);
       req.session.userId = user.id;
       res.json(toSafeUser(user));
     } catch (error) {
@@ -168,6 +190,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.clearCookie("rwa.sid");
       res.status(204).end();
     });
+  });
+
+  app.post("/api/admin/bootstrap", async (req, res) => {
+    try {
+      const sessionUserId = requireSessionUserId(req, res);
+      if (!sessionUserId) return;
+
+      const user = await storage.getUser(sessionUserId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      if (!isConfiguredAdminEmail(user.email)) {
+        return res.status(403).json({ message: "This account is not listed in ADMIN_EMAILS" });
+      }
+
+      const promotedUser = await promoteConfiguredAdmin(user);
+      res.json(toSafeUser(promotedUser));
+    } catch (error) {
+      res.status(500).json({ message: "Failed to bootstrap admin account" });
+    }
   });
 
   // Courses endpoints
