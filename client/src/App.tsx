@@ -34,6 +34,7 @@ import NotFound from "@/pages/not-found";
 import ContributeLesson from "@/pages/ContributeLesson";
 import AdminLessons from "@/pages/AdminLessons";
 import LessonLibrary from "@/pages/LessonLibrary";
+import Credentials from "@/pages/Credentials";
 
 // Page transition variants
 const pageVariants = {
@@ -205,6 +206,11 @@ function Router() {
             <Route path="/resource-center">
               <PageWrapper>
                 <ResourceCenter />
+              </PageWrapper>
+            </Route>
+            <Route path="/credentials">
+              <PageWrapper>
+                <Credentials />
               </PageWrapper>
             </Route>
             <Route path="/community">
