@@ -44,6 +44,7 @@ Public signup can create `student` or `parent` accounts. Emails listed in `ADMIN
 
 - Sign up as a student and confirm `/api/auth/me` returns the current user.
 - Complete a lesson at `/learn/money-basics/budgeting-basics`.
+- Open Career Exploration and Digital Productivity from `/learn` and confirm each pathway shows seeded lessons.
 - Confirm lesson progress appears in `/portfolio`.
 - Issue the Money Basics credential from `/credentials` after requirements are complete.
 - Open the issued credential verification link from `/portfolio` or `/credentials`.
@@ -66,5 +67,5 @@ Public signup can create `student` or `parent` accounts. Emails listed in `ADMIN
 
 ## Known Pre-Launch Gaps
 
-- More seeded content is needed for Career Exploration and Digital Productivity.
+- Run a full launch QA pass with fresh student, parent, and admin accounts before inviting families.
 - Bundle size warnings still appear during `npm run build`; this is not blocking, but code-splitting should be considered before a larger launch.
