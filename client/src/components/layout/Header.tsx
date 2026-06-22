@@ -94,7 +94,7 @@ const Header: React.FC = () => {
                   <DropdownMenuItem>
                     <Link href="/admin/lessons" className="flex w-full items-center">
                       <Users className="mr-2 h-4 w-4" />
-                      <span>Review Queue</span>
+                      <span>Admin Management</span>
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />

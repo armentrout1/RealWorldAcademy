@@ -37,7 +37,7 @@ User accounts now include a `role` field:
 - `parent`
 - `admin`
 
-Public signup can create `student` or `parent` accounts. Admin accounts should be assigned directly in the database by setting `users.role = 'admin'`.
+Public signup can create `student` or `parent` accounts. Existing admins can manage user roles from `/admin/lessons`.
 
 ## MVP Flow Checks
 
@@ -48,8 +48,9 @@ Public signup can create `student` or `parent` accounts. Admin accounts should b
 - Link a parent and child account through the family relationship API.
 - Confirm parent review can approve completed lesson work from `/parent-dashboard`.
 - Submit a curriculum lesson from `/contribute`.
-- Confirm the submission appears in `/admin/lessons` for review after logging in.
+- Confirm the submission appears in `/admin/lessons` for review after logging in as an admin.
 - Submit beta feedback from `/feedback`.
+- Confirm feedback and user roles can be managed from `/admin/lessons`.
 
 ## Public Beta Copy and Safety
 
@@ -61,6 +62,6 @@ Public signup can create `student` or `parent` accounts. Admin accounts should b
 
 ## Known Pre-Launch Gaps
 
-- Admin account management UI is not implemented yet; admin role assignment is still a database operation.
+- Initial admin bootstrap still requires setting one trusted account to `users.role = 'admin'` in the database.
 - More seeded content is needed for Career Exploration and Digital Productivity.
 - Bundle size warnings still appear during `npm run build`; this is not blocking, but code-splitting should be considered before a larger launch.

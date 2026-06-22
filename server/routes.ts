@@ -734,6 +734,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.patch("/api/feedback/:id", express.json(), async (req, res) => {
+    try {
+      if (!(await requireAdminUser(req, res))) return;
+
+      const allowedStatuses = new Set(["new", "reviewing", "resolved", "archived"]);
+      if (!allowedStatuses.has(req.body.status)) {
+        return res.status(400).json({ message: "Invalid feedback status" });
+      }
+
+      const feedback = await storage.updateFeedbackSubmission(Number(req.params.id), {
+        status: req.body.status,
+      });
+      res.json(feedback);
+    } catch (error) {
+      res.status(400).json({ message: "Failed to update feedback" });
+    }
+  });
+
+  app.get("/api/admin/users", async (req, res) => {
+    try {
+      if (!(await requireAdminUser(req, res))) return;
+
+      const users = await storage.getAllUsers();
+      const safeUsers = users.map(({ password, ...user }) => user);
+      res.json(safeUsers);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch users" });
+    }
+  });
+
+  app.patch("/api/admin/users/:userId/role", express.json(), async (req, res) => {
+    try {
+      if (!(await requireAdminUser(req, res))) return;
+
+      const allowedRoles = new Set(["student", "parent", "admin"]);
+      if (!allowedRoles.has(req.body.role)) {
+        return res.status(400).json({ message: "Invalid user role" });
+      }
+
+      const user = await storage.updateUserRole(Number(req.params.userId), req.body.role);
+      const { password, ...safeUser } = user;
+      res.json(safeUser);
+    } catch (error) {
+      res.status(400).json({ message: "Failed to update user role" });
+    }
+  });
+
   // Credential endpoints
   app.get("/api/credentials", async (_req, res) => {
     try {

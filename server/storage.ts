@@ -38,7 +38,9 @@ export interface IStorage {
   getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
+  getAllUsers(): Promise<User[]>;
   createUser(user: InsertUser): Promise<User>;
+  updateUserRole(userId: number, role: string): Promise<User>;
   getChildrenForParent(parentUserId: number): Promise<User[]>;
   getParentsForChild(childUserId: number): Promise<User[]>;
   createParentChildRelationship(relationship: InsertParentChildRelationship): Promise<ParentChildRelationship>;
@@ -50,6 +52,7 @@ export interface IStorage {
   reviewCurriculumSubmission(id: number, updates: Partial<CurriculumSubmission>): Promise<CurriculumSubmission>;
   getFeedbackSubmissions(): Promise<FeedbackSubmission[]>;
   createFeedbackSubmission(submission: InsertFeedbackSubmission): Promise<FeedbackSubmission>;
+  updateFeedbackSubmission(id: number, updates: Partial<FeedbackSubmission>): Promise<FeedbackSubmission>;
 
   // Credential operations
   getAllCredentialDefinitions(): Promise<CredentialDefinition[]>;
@@ -216,8 +219,20 @@ export class DatabaseStorage implements IStorage {
     return results.length > 0 ? results[0] : undefined;
   }
 
+  async getAllUsers(): Promise<User[]> {
+    return await db.select().from(users);
+  }
+
   async createUser(insertUser: InsertUser): Promise<User> {
     const results = await db.insert(users).values(insertUser).returning();
+    return results[0];
+  }
+
+  async updateUserRole(userId: number, role: string): Promise<User> {
+    const results = await db.update(users)
+      .set({ role })
+      .where(eq(users.id, userId))
+      .returning();
     return results[0];
   }
 
@@ -296,6 +311,14 @@ export class DatabaseStorage implements IStorage {
 
   async createFeedbackSubmission(submission: InsertFeedbackSubmission): Promise<FeedbackSubmission> {
     const results = await db.insert(feedbackSubmissions).values(submission).returning();
+    return results[0];
+  }
+
+  async updateFeedbackSubmission(id: number, updates: Partial<FeedbackSubmission>): Promise<FeedbackSubmission> {
+    const results = await db.update(feedbackSubmissions)
+      .set(updates)
+      .where(eq(feedbackSubmissions.id, id))
+      .returning();
     return results[0];
   }
 

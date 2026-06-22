@@ -1,18 +1,18 @@
 import React, { useState } from "react";
 import { Link } from "wouter";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, BookOpen, CheckCircle, Clock, MessageSquare, Search, ThumbsDown, ThumbsUp } from "lucide-react";
+import { ArrowLeft, BookOpen, Inbox, Search, ShieldCheck, Users } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 
@@ -37,53 +37,64 @@ interface CurriculumSubmission {
   reviewedAt?: string | null;
 }
 
+interface FeedbackSubmission {
+  id: number;
+  name: string;
+  email: string;
+  audience: string;
+  category: string;
+  message: string;
+  status: string;
+  createdAt?: string | null;
+}
+
+interface AdminUser {
+  id: number;
+  fullName: string;
+  email: string;
+  firstName?: string | null;
+  lastName?: string | null;
+  role: "student" | "parent" | "admin";
+  ageGroup?: string | null;
+}
+
+const curriculumStatuses = ["pending_review", "approved", "changes_requested", "rejected", "archived"];
+const feedbackStatuses = ["new", "reviewing", "resolved", "archived"];
+const roles = ["student", "parent", "admin"];
+
 export default function AdminLessons() {
-  const [activeTab, setActiveTab] = useState("pending");
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedLesson, setSelectedLesson] = useState<CurriculumSubmission | null>(null);
-  const [viewMode, setViewMode] = useState<"preview" | "feedback">("preview");
-  const [feedbackText, setFeedbackText] = useState("");
-  const [filterSubject, setFilterSubject] = useState("");
+  const [selectedSubmission, setSelectedSubmission] = useState<CurriculumSubmission | null>(null);
+  const [reviewNote, setReviewNote] = useState("");
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: submissions = [], isLoading } = useQuery<CurriculumSubmission[]>({
+  const { data: submissions = [], isLoading: submissionsLoading } = useQuery<CurriculumSubmission[]>({
     queryKey: ["/api/curriculum-submissions"],
     queryFn: () => apiRequest<CurriculumSubmission[]>("/api/curriculum-submissions"),
   });
 
-  // Filter lessons based on search query and subject filter
-  const filterLessons = (lessons: CurriculumSubmission[]) => {
-    return lessons.filter(lesson => {
-      const matchesSearch = 
-        lesson.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        lesson.contributorName.toLowerCase().includes(searchQuery.toLowerCase());
-      
-      const matchesSubject = filterSubject ? lesson.subject === filterSubject : true;
-      
-      return matchesSearch && matchesSubject;
-    });
-  };
+  const { data: feedback = [], isLoading: feedbackLoading } = useQuery<FeedbackSubmission[]>({
+    queryKey: ["/api/feedback"],
+    queryFn: () => apiRequest<FeedbackSubmission[]>("/api/feedback"),
+  });
 
-  const pendingLessons = filterLessons(submissions.filter((lesson) => lesson.status === "pending_review"));
-  const approvedLessons = filterLessons(submissions.filter((lesson) => lesson.status === "approved"));
+  const { data: users = [], isLoading: usersLoading } = useQuery<AdminUser[]>({
+    queryKey: ["/api/admin/users"],
+    queryFn: () => apiRequest<AdminUser[]>("/api/admin/users"),
+  });
 
   const reviewMutation = useMutation({
-    mutationFn: ({ id, status, reviewerNote }: { id: number; status: "approved" | "changes_requested"; reviewerNote?: string }) =>
+    mutationFn: ({ id, status, reviewerNote }: { id: number; status: string; reviewerNote?: string }) =>
       apiRequest<CurriculumSubmission>(`/api/curriculum-submissions/${id}/review`, {
         method: "PATCH",
         body: { status, reviewerNote },
       }),
-    onSuccess: (_submission, variables) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/curriculum-submissions"] });
-      toast({
-        title: variables.status === "approved" ? "Lesson approved" : "Changes requested",
-        description: variables.status === "approved"
-          ? "This submission has been approved for publication readiness."
-          : "The contributor feedback has been recorded.",
-      });
-      setSelectedLesson(null);
-      setFeedbackText("");
+      setSelectedSubmission(null);
+      setReviewNote("");
+      toast({ title: "Review updated", description: "The curriculum submission status has been saved." });
     },
     onError: (error) => {
       toast({
@@ -94,373 +105,375 @@ export default function AdminLessons() {
     },
   });
 
-  // View lesson details
-  const handleViewLesson = (lesson: CurriculumSubmission) => {
-    setSelectedLesson(lesson);
-    setViewMode("preview");
-  };
-
-  // Approve lesson
-  const handleApproveLesson = () => {
-    if (!selectedLesson) return;
-    reviewMutation.mutate({
-      id: selectedLesson.id,
-      status: "approved",
-      reviewerNote: "Approved for publication readiness.",
-    });
-  };
-
-  // Send feedback
-  const handleSendFeedback = () => {
-    if (!feedbackText.trim()) {
+  const feedbackMutation = useMutation({
+    mutationFn: ({ id, status }: { id: number; status: string }) =>
+      apiRequest<FeedbackSubmission>(`/api/feedback/${id}`, {
+        method: "PATCH",
+        body: { status },
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/feedback"] });
+      toast({ title: "Feedback updated", description: "The feedback queue status has been saved." });
+    },
+    onError: (error) => {
       toast({
-        title: "Error",
-        description: "Please enter feedback before sending.",
+        title: "Feedback update failed",
+        description: error instanceof Error ? error.message : "Please try again.",
         variant: "destructive",
       });
-      return;
-    }
+    },
+  });
 
-    if (!selectedLesson) return;
-    reviewMutation.mutate({
-      id: selectedLesson.id,
-      status: "changes_requested",
-      reviewerNote: feedbackText,
-    });
-  };
+  const roleMutation = useMutation({
+    mutationFn: ({ userId, role }: { userId: number; role: string }) =>
+      apiRequest<AdminUser>(`/api/admin/users/${userId}/role`, {
+        method: "PATCH",
+        body: { role },
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      toast({ title: "Role updated", description: "The user's role has been saved." });
+    },
+    onError: (error) => {
+      toast({
+        title: "Role update failed",
+        description: error instanceof Error ? error.message : "Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
 
-  // Format date for display
+  const filteredSubmissions = submissions.filter((submission) =>
+    [submission.title, submission.contributorName, submission.subject, submission.status]
+      .join(" ")
+      .toLowerCase()
+      .includes(searchQuery.toLowerCase())
+  );
+
+  const filteredFeedback = feedback.filter((item) =>
+    [item.name, item.email, item.audience, item.category, item.status, item.message]
+      .join(" ")
+      .toLowerCase()
+      .includes(searchQuery.toLowerCase())
+  );
+
+  const filteredUsers = users.filter((user) =>
+    [user.fullName, user.email, user.role, user.ageGroup]
+      .join(" ")
+      .toLowerCase()
+      .includes(searchQuery.toLowerCase())
+  );
+
   const formatDate = (dateString?: string | null) => {
     if (!dateString) return "Not recorded";
-    const date = new Date(dateString);
-    return new Intl.DateTimeFormat('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric'
-    }).format(date);
+    return new Intl.DateTimeFormat("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    }).format(new Date(dateString));
+  };
+
+  const statusBadge = (status: string) => {
+    const normalized = status.replace("_", " ");
+    if (status === "approved" || status === "resolved") return <Badge className="bg-emerald-600">{normalized}</Badge>;
+    if (status === "pending_review" || status === "new" || status === "reviewing") return <Badge className="bg-amber-500">{normalized}</Badge>;
+    if (status === "rejected" || status === "changes_requested") return <Badge variant="destructive">{normalized}</Badge>;
+    return <Badge variant="secondary">{normalized}</Badge>;
+  };
+
+  const counts = {
+    pending: submissions.filter((submission) => submission.status === "pending_review").length,
+    feedback: feedback.filter((item) => item.status === "new" || item.status === "reviewing").length,
+    users: users.length,
   };
 
   return (
     <div className="container py-8">
-      <div className="flex items-center justify-between mb-6">
-        <Link href="/dashboard">
-          <Button variant="ghost" className="gap-1">
+      <div className="mb-6 flex items-center justify-between">
+        <Button variant="ghost" className="gap-1" asChild>
+          <Link href="/dashboard">
             <ArrowLeft className="h-4 w-4" />
             Back to Dashboard
-          </Button>
-        </Link>
-        
-        <h1 className="text-2xl font-bold">Lesson Review Dashboard</h1>
-        
-        <div className="w-[150px]"></div> {/* Empty div for flex alignment */}
+          </Link>
+        </Button>
+        <h1 className="text-2xl font-bold">Admin Management</h1>
+        <div className="w-[150px]" />
       </div>
-      
-      <div className="flex flex-col md:flex-row gap-6 mb-6">
-        <div className="relative flex-1">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search lessons..."
-            className="pl-8"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-        </div>
-        
-        <Select 
-          value={filterSubject || "__all"}
-          onValueChange={(value) => setFilterSubject(value === "__all" ? "" : value)}
-        >
-          <SelectTrigger className="w-[200px]">
-            <SelectValue placeholder="Filter by subject" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="__all">All Subjects</SelectItem>
-            <SelectItem value="Financial Literacy">Financial Literacy</SelectItem>
-            <SelectItem value="Communication">Communication</SelectItem>
-            <SelectItem value="Technology">Technology</SelectItem>
-            <SelectItem value="Well-Being">Well-Being</SelectItem>
-            <SelectItem value="Critical Thinking">Critical Thinking</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-      
-      {isLoading ? (
+
+      <div className="mb-6 grid gap-4 md:grid-cols-3">
         <Card>
-          <CardContent className="pt-6 text-center">
-            <p className="text-muted-foreground">Loading curriculum submissions...</p>
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-sm font-medium">
+              <BookOpen className="h-4 w-4 text-primary" />
+              Curriculum Queue
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold">{counts.pending}</div>
+            <p className="text-sm text-muted-foreground">pending submissions</p>
           </CardContent>
         </Card>
-      ) : (
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-2 mb-6">
-          <TabsTrigger value="pending" className="relative">
-            Pending Review
-            <Badge className="ml-2 bg-orange-500 hover:bg-orange-500">{pendingLessons.length}</Badge>
-          </TabsTrigger>
-          <TabsTrigger value="approved">
-            Approved Lessons
-            <Badge className="ml-2 bg-green-500 hover:bg-green-500">{approvedLessons.length}</Badge>
-          </TabsTrigger>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-sm font-medium">
+              <Inbox className="h-4 w-4 text-primary" />
+              Feedback Queue
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold">{counts.feedback}</div>
+            <p className="text-sm text-muted-foreground">open messages</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-sm font-medium">
+              <Users className="h-4 w-4 text-primary" />
+              Users
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold">{counts.users}</div>
+            <p className="text-sm text-muted-foreground">accounts</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="relative mb-6">
+        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+        <Input
+          placeholder="Search submissions, feedback, users..."
+          className="pl-8"
+          value={searchQuery}
+          onChange={(event) => setSearchQuery(event.target.value)}
+        />
+      </div>
+
+      <Tabs defaultValue="curriculum">
+        <TabsList className="mb-6 grid w-full grid-cols-3">
+          <TabsTrigger value="curriculum">Curriculum</TabsTrigger>
+          <TabsTrigger value="feedback">Feedback</TabsTrigger>
+          <TabsTrigger value="users">Users & Roles</TabsTrigger>
         </TabsList>
-        
-        <TabsContent value="pending" className="space-y-4">
-          {pendingLessons.length === 0 ? (
-            <Card>
-              <CardContent className="pt-6 text-center">
-                <p className="text-muted-foreground">No pending lessons found.</p>
-              </CardContent>
-            </Card>
-          ) : (
-            <Card>
-              <CardHeader>
-                <CardTitle>Lessons Awaiting Review</CardTitle>
-                <CardDescription>
-                  Review and approve contributor submissions or provide feedback for improvement.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
+
+        <TabsContent value="curriculum">
+          <Card>
+            <CardHeader>
+              <CardTitle>Curriculum Review Queue</CardTitle>
+              <CardDescription>Approve, reject, archive, or request changes for contributor submissions.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {submissionsLoading ? (
+                <p className="py-8 text-center text-muted-foreground">Loading submissions...</p>
+              ) : (
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Lesson Title</TableHead>
-                      <TableHead>Subject</TableHead>
-                      <TableHead>Age Group</TableHead>
+                      <TableHead>Title</TableHead>
                       <TableHead>Contributor</TableHead>
+                      <TableHead>Subject</TableHead>
+                      <TableHead>Status</TableHead>
                       <TableHead>Submitted</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {pendingLessons.map(lesson => (
-                      <TableRow key={lesson.id}>
-                        <TableCell className="font-medium">{lesson.title}</TableCell>
-                        <TableCell>{lesson.subject}</TableCell>
-                        <TableCell>{lesson.ageGroup}</TableCell>
-                        <TableCell>{lesson.contributorName}</TableCell>
-                        <TableCell>{formatDate(lesson.submittedAt)}</TableCell>
+                    {filteredSubmissions.map((submission) => (
+                      <TableRow key={submission.id}>
+                        <TableCell className="font-medium">{submission.title}</TableCell>
+                        <TableCell>{submission.contributorName}</TableCell>
+                        <TableCell>{submission.subject}</TableCell>
+                        <TableCell>{statusBadge(submission.status)}</TableCell>
+                        <TableCell>{formatDate(submission.submittedAt)}</TableCell>
                         <TableCell className="text-right">
-                          <Button variant="outline" size="sm" onClick={() => handleViewLesson(lesson)}>
-                            Review
+                          <Button variant="outline" size="sm" onClick={() => {
+                            setSelectedSubmission(submission);
+                            setReviewNote(submission.reviewerNote || "");
+                          }}>
+                            Manage
                           </Button>
                         </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
                 </Table>
-              </CardContent>
-            </Card>
-          )}
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
-        
-        <TabsContent value="approved" className="space-y-4">
-          {approvedLessons.length === 0 ? (
-            <Card>
-              <CardContent className="pt-6 text-center">
-                <p className="text-muted-foreground">No approved lessons found.</p>
-              </CardContent>
-            </Card>
-          ) : (
-            <Card>
-              <CardHeader>
-                <CardTitle>Approved Lessons</CardTitle>
-                <CardDescription>
-                  These lessons have been reviewed and approved for the curriculum.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
+
+        <TabsContent value="feedback">
+          <Card>
+            <CardHeader>
+              <CardTitle>Feedback Queue</CardTitle>
+              <CardDescription>Track public beta feedback, bug reports, safety concerns, and feature ideas.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {feedbackLoading ? (
+                <p className="py-8 text-center text-muted-foreground">Loading feedback...</p>
+              ) : (
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Lesson Title</TableHead>
-                      <TableHead>Subject</TableHead>
-                      <TableHead>Age Group</TableHead>
-                      <TableHead>Contributor</TableHead>
-                      <TableHead>Approved Date</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
+                      <TableHead>From</TableHead>
+                      <TableHead>Category</TableHead>
+                      <TableHead>Message</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Received</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {approvedLessons.map(lesson => (
-                      <TableRow key={lesson.id}>
-                        <TableCell className="font-medium">{lesson.title}</TableCell>
-                        <TableCell>{lesson.subject}</TableCell>
-                        <TableCell>{lesson.ageGroup}</TableCell>
-                        <TableCell>{lesson.contributorName}</TableCell>
-                        <TableCell>{formatDate(lesson.reviewedAt)}</TableCell>
-                        <TableCell className="text-right">
-                          <Button variant="outline" size="sm" onClick={() => handleViewLesson(lesson)}>
-                            View
-                          </Button>
+                    {filteredFeedback.map((item) => (
+                      <TableRow key={item.id}>
+                        <TableCell>
+                          <div className="font-medium">{item.name}</div>
+                          <div className="text-xs text-muted-foreground">{item.email}</div>
+                          <div className="text-xs text-muted-foreground">{item.audience}</div>
+                        </TableCell>
+                        <TableCell>{item.category}</TableCell>
+                        <TableCell className="max-w-md">
+                          <p className="line-clamp-3 text-sm">{item.message}</p>
+                        </TableCell>
+                        <TableCell>
+                          <Select
+                            value={item.status}
+                            onValueChange={(status) => feedbackMutation.mutate({ id: item.id, status })}
+                            disabled={feedbackMutation.isPending}
+                          >
+                            <SelectTrigger className="w-[150px]">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {feedbackStatuses.map((status) => (
+                                <SelectItem key={status} value={status}>{status}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </TableCell>
+                        <TableCell>{formatDate(item.createdAt)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="users">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <ShieldCheck className="h-5 w-5 text-primary" />
+                Users & Roles
+              </CardTitle>
+              <CardDescription>Promote trusted operators to admin or classify accounts as parent/student.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {usersLoading ? (
+                <p className="py-8 text-center text-muted-foreground">Loading users...</p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Age Group</TableHead>
+                      <TableHead>Role</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredUsers.map((user) => (
+                      <TableRow key={user.id}>
+                        <TableCell className="font-medium">
+                          {user.fullName || `${user.firstName || ""} ${user.lastName || ""}`.trim() || `User ${user.id}`}
+                        </TableCell>
+                        <TableCell>{user.email}</TableCell>
+                        <TableCell>{user.ageGroup || "Not set"}</TableCell>
+                        <TableCell>
+                          <Select
+                            value={user.role || "student"}
+                            onValueChange={(role) => roleMutation.mutate({ userId: user.id, role })}
+                            disabled={roleMutation.isPending}
+                          >
+                            <SelectTrigger className="w-[150px]">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {roles.map((role) => (
+                                <SelectItem key={role} value={role}>{role}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                         </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
                 </Table>
-              </CardContent>
-            </Card>
-          )}
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
-      )}
-      
-      {/* Lesson review dialog */}
-      {selectedLesson && (
-        <Dialog open={!!selectedLesson} onOpenChange={(open) => !open && setSelectedLesson(null)}>
-          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+
+      {selectedSubmission && (
+        <Dialog open={Boolean(selectedSubmission)} onOpenChange={(open) => !open && setSelectedSubmission(null)}>
+          <DialogContent className="max-h-[90vh] max-w-4xl overflow-y-auto">
             <DialogHeader>
-              <div className="flex items-center gap-2 mb-2">
-                <Badge>{selectedLesson.subject}</Badge>
-                <Badge variant="outline">{selectedLesson.ageGroup} years</Badge>
-                {selectedLesson.status === "pending_review" ? (
-                  <Badge variant="outline" className="bg-yellow-50 text-yellow-800 border-yellow-200 dark:bg-yellow-950 dark:text-yellow-300 dark:border-yellow-800">
-                    <Clock className="mr-1 h-3 w-3" />
-                    Pending Review
-                  </Badge>
-                ) : (
-                  <Badge variant="outline" className="bg-green-50 text-green-800 border-green-200 dark:bg-green-950 dark:text-green-300 dark:border-green-800">
-                    <CheckCircle className="mr-1 h-3 w-3" />
-                    Approved
-                  </Badge>
-                )}
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge>{selectedSubmission.subject}</Badge>
+                <Badge variant="outline">{selectedSubmission.ageGroup}</Badge>
+                {statusBadge(selectedSubmission.status)}
               </div>
-              <DialogTitle className="text-2xl">{selectedLesson.title}</DialogTitle>
-              <DialogDescription className="text-base">
-                Submitted by {selectedLesson.contributorName} ({selectedLesson.affiliation}) on {formatDate(selectedLesson.submittedAt)}
+              <DialogTitle>{selectedSubmission.title}</DialogTitle>
+              <DialogDescription>
+                Submitted by {selectedSubmission.contributorName} ({selectedSubmission.contributorEmail})
               </DialogDescription>
-              
-              {selectedLesson.status === "pending_review" && (
-                <div className="flex gap-2 mt-4">
-                  <Button 
-                    variant={viewMode === "preview" ? "default" : "outline"} 
-                    size="sm" 
-                    className="gap-1"
-                    onClick={() => setViewMode("preview")}
-                  >
-                    <BookOpen className="h-4 w-4" />
-                    Preview Lesson
-                  </Button>
-                  <Button 
-                    variant={viewMode === "feedback" ? "default" : "outline"} 
-                    size="sm" 
-                    className="gap-1"
-                    onClick={() => setViewMode("feedback")}
-                  >
-                    <MessageSquare className="h-4 w-4" />
-                    Send Feedback
-                  </Button>
-                </div>
-              )}
             </DialogHeader>
 
-            {viewMode === "preview" ? (
-              <>
-                <div className="space-y-6 mt-2">
-                  <div>
-                    <h3 className="text-lg font-semibold mb-2">Lesson Objective</h3>
-                    <p className="text-muted-foreground whitespace-pre-line">{selectedLesson.objective}</p>
-                  </div>
-                  
-                  <Separator />
-                  
-                  <div>
-                    <h3 className="text-lg font-semibold mb-2">Warm-Up</h3>
-                    <p className="text-muted-foreground whitespace-pre-line">{selectedLesson.warmUp}</p>
-                  </div>
-                  
-                  <Separator />
-                  
-                  <div>
-                    <h3 className="text-lg font-semibold mb-2">Core Content</h3>
-                    <p className="text-muted-foreground whitespace-pre-line">{selectedLesson.coreContent}</p>
-                  </div>
-                  
-                  <Separator />
-                  
-                  <div>
-                    <h3 className="text-lg font-semibold mb-2">Real-World Scenario</h3>
-                    <p className="text-muted-foreground whitespace-pre-line">{selectedLesson.scenario}</p>
-                  </div>
-                  
-                  <Separator />
-                  
-                  <div>
-                    <h3 className="text-lg font-semibold mb-2">Activity</h3>
-                    <p className="text-muted-foreground whitespace-pre-line">{selectedLesson.activity}</p>
-                  </div>
-                  
-                  <Separator />
-                  
-                  <div>
-                    <h3 className="text-lg font-semibold mb-2">Reflection Prompt</h3>
-                    <p className="text-muted-foreground whitespace-pre-line">{selectedLesson.reflection}</p>
-                  </div>
-                  
-                  {selectedLesson.badge && (
-                    <>
-                      <Separator />
-                      <div>
-                        <h3 className="text-lg font-semibold mb-2">Completion Badge</h3>
-                        <div className="flex items-center gap-2">
-                          <Badge variant="outline" className="bg-yellow-50 text-yellow-800 border-yellow-200 dark:bg-yellow-950 dark:text-yellow-300 dark:border-yellow-800">
-                            {selectedLesson.badge}
-                          </Badge>
-                        </div>
-                      </div>
-                    </>
-                  )}
+            <div className="space-y-5">
+              {[
+                ["Objective", selectedSubmission.objective],
+                ["Warm-Up", selectedSubmission.warmUp],
+                ["Core Content", selectedSubmission.coreContent],
+                ["Scenario", selectedSubmission.scenario],
+                ["Activity", selectedSubmission.activity],
+                ["Reflection", selectedSubmission.reflection],
+              ].map(([title, body]) => (
+                <div key={title}>
+                  <h3 className="mb-1 font-semibold">{title}</h3>
+                  <p className="whitespace-pre-line text-sm text-muted-foreground">{body}</p>
+                  <Separator className="mt-4" />
                 </div>
-                
-                {selectedLesson.status === "pending_review" && (
-                  <DialogFooter className="flex gap-2 mt-6 pt-4 border-t">
-                    <div className="flex-1 text-left">
-                      <Button variant="outline" onClick={() => setViewMode("feedback")}>
-                        Request Changes
-                      </Button>
-                    </div>
-                    <Button onClick={handleApproveLesson} className="gap-1" disabled={reviewMutation.isPending}>
-                      <ThumbsUp className="h-4 w-4" />
-                      Approve Lesson
-                    </Button>
-                  </DialogFooter>
-                )}
-              </>
-            ) : (
-              <>
-                <div className="space-y-4 mt-2">
-                  <p>
-                    Send feedback to {selectedLesson.contributorName} about their lesson submission.
-                    Be specific about what needs improvement or clarification.
-                  </p>
-                  
-                  <div className="space-y-2">
-                    <h3 className="font-medium">Feedback Message:</h3>
-                    <Textarea 
-                      placeholder="Your feedback on the lesson submission..."
-                      className="min-h-[200px]"
-                      value={feedbackText}
-                      onChange={(e) => setFeedbackText(e.target.value)}
-                    />
-                  </div>
-                </div>
-                
-                <DialogFooter className="flex gap-2 mt-6 pt-4 border-t">
-                  <div className="flex-1 text-left">
-                    <Button variant="outline" onClick={() => setViewMode("preview")}>
-                      Back to Preview
-                    </Button>
-                  </div>
-                  <Button 
-                    variant="destructive" 
-                    onClick={handleSendFeedback}
-                    disabled={!feedbackText.trim() || reviewMutation.isPending}
-                    className="gap-1"
-                  >
-                    <ThumbsDown className="h-4 w-4" />
-                    Send Feedback
-                  </Button>
-                </DialogFooter>
-              </>
-            )}
+              ))}
+
+              <div className="space-y-2">
+                <h3 className="font-semibold">Reviewer Note</h3>
+                <Textarea
+                  value={reviewNote}
+                  onChange={(event) => setReviewNote(event.target.value)}
+                  placeholder="Add notes for the contributor or internal review history..."
+                  className="min-h-[120px]"
+                />
+              </div>
+            </div>
+
+            <DialogFooter className="flex flex-wrap gap-2">
+              {curriculumStatuses.filter((status) => status !== "pending_review").map((status) => (
+                <Button
+                  key={status}
+                  variant={status === "approved" ? "default" : status === "rejected" ? "destructive" : "outline"}
+                  disabled={reviewMutation.isPending}
+                  onClick={() => reviewMutation.mutate({
+                    id: selectedSubmission.id,
+                    status,
+                    reviewerNote: reviewNote || undefined,
+                  })}
+                >
+                  {status.replace("_", " ")}
+                </Button>
+              ))}
+            </DialogFooter>
           </DialogContent>
         </Dialog>
       )}
