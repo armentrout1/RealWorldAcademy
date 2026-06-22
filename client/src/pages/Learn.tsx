@@ -52,6 +52,18 @@ interface BackendSubject {
   category: string;
 }
 
+interface BackendLesson {
+  id: number;
+  title: string;
+  subtitle?: string | null;
+  slug: string;
+  learningObjective: string;
+  scenarioContent: string;
+  activityType: string;
+  activityContent?: unknown;
+  estimatedMinutes: number;
+}
+
 // Subject module data
 const subjectModules: SubjectModule[] = [
   {
@@ -229,6 +241,10 @@ type AgeGroup = '9-12' | '13-15' | '16-18';
 // Subject Detail Component
 const SubjectDetail: React.FC<{ subject: SubjectModule }> = ({ subject }) => {
   const [selectedAgeGroup, setSelectedAgeGroup] = useState<AgeGroup>('9-12');
+  const { data: dbLessons = [], isLoading: lessonsLoading } = useQuery<BackendLesson[]>({
+    queryKey: ["/api/subjects", subject.id, "lessons"],
+    queryFn: () => apiRequest<BackendLesson[]>(`/api/subjects/${subject.id}/lessons`),
+  });
 
   // Define age-appropriate content for the selected subject based on age group
   const getAgeGroupContent = () => {
@@ -415,25 +431,65 @@ const SubjectDetail: React.FC<{ subject: SubjectModule }> = ({ subject }) => {
             </div>
             
             <div className="space-y-4">
-              {getAgeGroupContent().length > 0 ? (
-                getAgeGroupContent().map((lesson: { title: string; description: string; activity: string }, idx: number) => (
-                  <Card key={idx}>
-                    <CardHeader>
-                      <CardTitle>{lesson.title}</CardTitle>
-                      <CardDescription>{lesson.description}</CardDescription>
-                    </CardHeader>
-                    <CardContent className="bg-gray-50 border-t">
-                      <h4 className="font-medium mb-2">Activity</h4>
-                      <p>{lesson.activity}</p>
-                    </CardContent>
-                    <CardFooter className="flex justify-between">
-                      <Badge variant="outline">Lesson {idx + 1}</Badge>
-                      <Link href={`/learn/${subject.id}/${subject.id === "money-basics" || subject.id === "financial-literacy" ? "budgeting-basics" : subject.modules[0]?.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}`}>
-                        <Button>Start Lesson</Button>
-                      </Link>
-                    </CardFooter>
-                  </Card>
-                ))
+              {lessonsLoading ? (
+                <div className="space-y-4">
+                  {Array.from({ length: 3 }).map((_, idx) => (
+                    <div key={idx} className="h-40 animate-pulse rounded-lg bg-neutral-100" />
+                  ))}
+                </div>
+              ) : dbLessons.length > 0 ? (
+                dbLessons.map((lesson, idx) => {
+                  const activityText =
+                    typeof lesson.activityContent === "object" &&
+                    lesson.activityContent !== null &&
+                    "instructions" in lesson.activityContent
+                      ? String((lesson.activityContent as { instructions?: unknown }).instructions || "")
+                      : lesson.activityType.replace(/-/g, " ");
+
+                  return (
+                    <Card key={lesson.id}>
+                      <CardHeader>
+                        <CardTitle>{lesson.title}</CardTitle>
+                        <CardDescription>{lesson.subtitle || lesson.learningObjective}</CardDescription>
+                      </CardHeader>
+                      <CardContent className="bg-gray-50 border-t">
+                        <h4 className="font-medium mb-2">Activity</h4>
+                        <p className="line-clamp-3">{activityText}</p>
+                      </CardContent>
+                      <CardFooter className="flex justify-between">
+                        <Badge variant="outline">Lesson {idx + 1}</Badge>
+                        <Link href={`/learn/${subject.id}/${lesson.slug}`}>
+                          <Button>Start Lesson</Button>
+                        </Link>
+                      </CardFooter>
+                    </Card>
+                  );
+                })
+              ) : getAgeGroupContent().length > 0 ? (
+                getAgeGroupContent().map((lesson: { title: string; description: string; activity: string }, idx: number) => {
+                  const lessonSlug = subject.id === "money-basics" || subject.id === "financial-literacy"
+                    ? "budgeting-basics"
+                    : lesson.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+
+                  return (
+                    <Card key={idx}>
+                      <CardHeader>
+                        <CardTitle>{lesson.title}</CardTitle>
+                        <CardDescription>{lesson.description}</CardDescription>
+                      </CardHeader>
+                      <CardContent className="bg-gray-50 border-t">
+                        <h4 className="font-medium mb-2">Activity</h4>
+                        <p>{lesson.activity}</p>
+                      </CardContent>
+                      <CardFooter className="flex justify-between">
+                        <Badge variant="outline">Lesson {idx + 1}</Badge>
+                        <Link href={`/learn/${subject.id}/${lessonSlug}`}>
+                          <Button>Start Lesson</Button>
+                        </Link>
+                      </CardFooter>
+                    </Card>
+                  );
+                })
               ) : (
                 <div className="text-center py-12 bg-gray-50 rounded-lg">
                   <h3 className="text-xl font-medium mb-2">Content Coming Soon</h3>
@@ -523,13 +579,28 @@ const Learn: React.FC = () => {
   const [selectedAgeGroup, setSelectedAgeGroup] = useState<AgeGroup>("13-15");
   const [selectedSkillLevel, setSelectedSkillLevel] = useState("all");
   const [location] = useLocation();
+
+  // Query subjects from the API, with local seed content as a fallback while V2 is being wired.
+  const { data: dbSubjects, isLoading } = useQuery<SubjectModule[]>({
+    queryKey: ['/api/subjects'],
+    queryFn: async () => {
+      try {
+        const subjects = await apiRequest<BackendSubject[]>('/api/subjects');
+        return subjects.length > 0 ? subjects.map(mapSubjectFromApi) : subjectModules;
+      } catch (error) {
+        console.error("Falling back to local subject modules:", error);
+        return subjectModules;
+      }
+    },
+    initialData: subjectModules,
+  });
   
   // Check if we're on a subject detail page
   const subjectMatch = /^\/learn\/([^\/]+)$/.exec(location);
   
   if (subjectMatch) {
     const subjectId = subjectMatch[1];
-    const subject = subjectModules.find(s => s.id === subjectId);
+    const subject = dbSubjects.find(s => s.id === subjectId);
     
     if (!subject) {
       return (
@@ -565,28 +636,15 @@ const Learn: React.FC = () => {
     "financial-literacy": "life",
     "money-basics": "life",
     technology: "core",
+    "digital-productivity": "core",
     careers: "career",
+    "career-exploration": "career",
     communication: "life",
     "communication-relationships": "life",
     health: "life",
     entrepreneurship: "career",
     "tech-real-world": "core"
   };
-  
-  // Query subjects from the API, with local seed content as a fallback while V2 is being wired.
-  const { data: dbSubjects, isLoading } = useQuery<SubjectModule[]>({
-    queryKey: ['/api/subjects'],
-    queryFn: async () => {
-      try {
-        const subjects = await apiRequest<BackendSubject[]>('/api/subjects');
-        return subjects.length > 0 ? subjects.map(mapSubjectFromApi) : subjectModules;
-      } catch (error) {
-        console.error("Falling back to local subject modules:", error);
-        return subjectModules;
-      }
-    },
-    initialData: subjectModules,
-  });
   
   // Filter subjects based on search, category, age group and skill level
   const filteredSubjects = React.useMemo(() => {
