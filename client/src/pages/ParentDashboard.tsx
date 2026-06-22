@@ -1,5 +1,6 @@
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Card,
   CardContent,
@@ -54,6 +55,8 @@ import {
 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
+import { apiRequest } from "@/lib/queryClient";
 
 // Types
 interface ChildProfile {
@@ -106,6 +109,46 @@ interface Reward {
   name: string;
   icon: React.ReactNode;
   description: string;
+}
+
+interface SafeUser {
+  id: number;
+  email: string;
+  fullName?: string | null;
+  firstName?: string | null;
+  lastName?: string | null;
+  ageGroup?: string | null;
+}
+
+interface LessonProgressRecord {
+  id: number;
+  lessonId: number;
+  status: string;
+  reflectionResponse?: string | null;
+  notes?: string | null;
+  completedAt?: string | null;
+}
+
+interface LessonRecord {
+  id: number;
+  title: string;
+  subtitle?: string | null;
+  subjectId: number;
+}
+
+interface LessonProgressWithLesson {
+  progress: LessonProgressRecord;
+  lesson?: LessonRecord | null;
+}
+
+interface ParentLessonReview {
+  id: number;
+  parentUserId: number;
+  childUserId: number;
+  lessonId: number;
+  status: string;
+  note?: string | null;
+  reviewedAt?: string | null;
 }
 
 // Mock data for children profiles
@@ -359,6 +402,7 @@ const mockRewards: Reward[] = [
 const ParentDashboard: React.FC = () => {
   const [activeTab, setActiveTab] = useState("overview");
   const [selectedChild, setSelectedChild] = useState<ChildProfile | null>(mockChildren[0]);
+  const [selectedRealChildId, setSelectedRealChildId] = useState<number | null>(null);
   const [showAddNoteDialog, setShowAddNoteDialog] = useState(false);
   const [showAddRewardDialog, setShowAddRewardDialog] = useState(false);
   const [newNote, setNewNote] = useState("");
@@ -377,6 +421,76 @@ const ParentDashboard: React.FC = () => {
   const [rewards, setRewards] = useState(mockRewards);
   const { toast } = useToast();
   const [_, navigate] = useLocation();
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+
+  const { data: linkedChildren = [], isLoading: childrenLoading } = useQuery<SafeUser[]>({
+    queryKey: ["/api/users", user?.id, "children"],
+    queryFn: () => apiRequest<SafeUser[]>(`/api/users/${user!.id}/children`),
+    enabled: Boolean(user?.id),
+  });
+
+  useEffect(() => {
+    if (!selectedRealChildId && linkedChildren.length > 0) {
+      setSelectedRealChildId(linkedChildren[0].id);
+    }
+  }, [linkedChildren, selectedRealChildId]);
+
+  const selectedRealChild = linkedChildren.find((child) => child.id === selectedRealChildId);
+
+  const { data: lessonProgress = [], isLoading: progressLoading } = useQuery<LessonProgressWithLesson[]>({
+    queryKey: ["/api/users", selectedRealChildId, "lesson-progress"],
+    queryFn: () => apiRequest<LessonProgressWithLesson[]>(`/api/users/${selectedRealChildId}/lesson-progress`),
+    enabled: Boolean(selectedRealChildId),
+  });
+
+  const { data: lessonReviews = [] } = useQuery<ParentLessonReview[]>({
+    queryKey: ["/api/users", selectedRealChildId, "lesson-reviews"],
+    queryFn: () => apiRequest<ParentLessonReview[]>(`/api/users/${selectedRealChildId}/lesson-reviews`),
+    enabled: Boolean(selectedRealChildId),
+  });
+
+  const reviewedLessonIds = useMemo(
+    () => new Set(lessonReviews.map((review) => review.lessonId)),
+    [lessonReviews]
+  );
+
+  const completedLessonProgress = lessonProgress.filter(
+    (item) => item.progress.status === "completed"
+  );
+
+  const reviewLessonMutation = useMutation({
+    mutationFn: async ({ lessonId, status }: { lessonId: number; status: "approved" | "changes_requested" }) => {
+      if (!user?.id || !selectedRealChildId) {
+        throw new Error("Select a linked child before reviewing lesson work.");
+      }
+
+      return apiRequest(`/api/users/${selectedRealChildId}/lessons/${lessonId}/reviews`, {
+        method: "POST",
+        body: {
+          parentUserId: user.id,
+          status,
+          note: status === "approved"
+            ? "Reviewed for credential readiness."
+            : "Parent requested updates before approving this lesson.",
+        },
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/users", selectedRealChildId, "lesson-reviews"] });
+      toast({
+        title: "Lesson reviewed",
+        description: "This review is now recorded for credential readiness.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Review not saved",
+        description: error instanceof Error ? error.message : "Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
 
   const saveNote = () => {
     if (selectedChild && newNote.trim()) {
@@ -528,6 +642,134 @@ const ParentDashboard: React.FC = () => {
                 </CardContent>
               </Card>
             </div>
+          </CardContent>
+        </Card>
+        <Card className="border-emerald-100">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center text-xl text-emerald-900">
+              <CheckCircle2 className="mr-2 h-5 w-5 text-emerald-600" />
+              MVP Review Queue
+            </CardTitle>
+            <CardDescription>
+              Review completed lesson work from linked child accounts before it counts toward credential readiness.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {!user ? (
+              <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
+                Sign in as a parent to see linked child progress and lesson reviews.
+              </div>
+            ) : childrenLoading ? (
+              <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
+                Loading linked learners...
+              </div>
+            ) : linkedChildren.length === 0 ? (
+              <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
+                No linked child accounts yet. Link a child account to start reviewing completed lessons.
+              </div>
+            ) : (
+              <>
+                <div className="grid gap-3 md:grid-cols-[260px_1fr]">
+                  <div>
+                    <Label htmlFor="review-child">Learner</Label>
+                    <Select
+                      value={selectedRealChildId ? String(selectedRealChildId) : undefined}
+                      onValueChange={(value) => setSelectedRealChildId(Number(value))}
+                    >
+                      <SelectTrigger id="review-child">
+                        <SelectValue placeholder="Select child" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {linkedChildren.map((child) => (
+                          <SelectItem key={child.id} value={String(child.id)}>
+                            {child.fullName || `${child.firstName || ""} ${child.lastName || ""}`.trim() || child.email}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="rounded-md bg-emerald-50 p-3 text-sm text-emerald-900">
+                    <div className="font-medium">
+                      {selectedRealChild
+                        ? `${completedLessonProgress.length} completed lesson${completedLessonProgress.length === 1 ? "" : "s"} ready to inspect`
+                        : "Choose a learner to inspect work"}
+                    </div>
+                    <div className="text-emerald-700">
+                      {lessonReviews.length} parent review{lessonReviews.length === 1 ? "" : "s"} recorded.
+                    </div>
+                  </div>
+                </div>
+
+                {progressLoading ? (
+                  <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
+                    Loading completed lessons...
+                  </div>
+                ) : completedLessonProgress.length === 0 ? (
+                  <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
+                    Completed student lessons will appear here for review.
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {completedLessonProgress.map(({ progress, lesson }) => {
+                      const alreadyReviewed = reviewedLessonIds.has(progress.lessonId);
+
+                      return (
+                        <div key={progress.id} className="rounded-md border p-4">
+                          <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                            <div>
+                              <div className="font-semibold text-slate-900">
+                                {lesson?.title || `Lesson ${progress.lessonId}`}
+                              </div>
+                              {lesson?.subtitle && (
+                                <div className="text-sm text-muted-foreground">{lesson.subtitle}</div>
+                              )}
+                              <div className="mt-2 flex flex-wrap gap-2">
+                                <Badge variant="secondary">Completed</Badge>
+                                {alreadyReviewed && <Badge className="bg-emerald-600">Reviewed</Badge>}
+                              </div>
+                            </div>
+                            <div className="flex gap-2">
+                              <Button
+                                size="sm"
+                                disabled={alreadyReviewed || reviewLessonMutation.isPending}
+                                onClick={() => reviewLessonMutation.mutate({ lessonId: progress.lessonId, status: "approved" })}
+                              >
+                                Approve
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={alreadyReviewed || reviewLessonMutation.isPending}
+                                onClick={() => reviewLessonMutation.mutate({ lessonId: progress.lessonId, status: "changes_requested" })}
+                              >
+                                Request Updates
+                              </Button>
+                            </div>
+                          </div>
+
+                          {(progress.reflectionResponse || progress.notes) && (
+                            <div className="mt-3 grid gap-3 md:grid-cols-2">
+                              {progress.reflectionResponse && (
+                                <div className="rounded-md bg-slate-50 p-3">
+                                  <div className="text-xs font-medium uppercase text-slate-500">Reflection</div>
+                                  <p className="mt-1 text-sm text-slate-700">{progress.reflectionResponse}</p>
+                                </div>
+                              )}
+                              {progress.notes && (
+                                <div className="rounded-md bg-slate-50 p-3">
+                                  <div className="text-xs font-medium uppercase text-slate-500">Notes</div>
+                                  <p className="mt-1 text-sm text-slate-700">{progress.notes}</p>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </>
+            )}
           </CardContent>
         </Card>
       </div>

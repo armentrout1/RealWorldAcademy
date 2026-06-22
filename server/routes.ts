@@ -13,7 +13,7 @@ import {
   insertResourceSchema, insertDailyChallengeSchema, insertUserChallengeSchema,
   insertBuddyProfileSchema, insertBuddyMessageSchema, insertBuddyEmotionLogSchema,
   insertBuddyJournalEntrySchema, insertParentChildRelationshipSchema,
-  insertCredentialDefinitionSchema, insertCredentialRequirementSchema
+  insertParentLessonReviewSchema, insertCredentialDefinitionSchema, insertCredentialRequirementSchema
 } from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -398,6 +398,74 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(progress);
     } catch (error) {
       res.status(400).json({ message: "Invalid lesson progress data" });
+    }
+  });
+
+  app.get("/api/users/:userId/lesson-progress", async (req, res) => {
+    try {
+      const userId = Number(req.params.userId);
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const progress = await storage.getAllUserLessonProgress(userId);
+      const enrichedProgress = await Promise.all(progress.map(async (item) => ({
+        progress: item,
+        lesson: await storage.getLesson(item.lessonId),
+      })));
+
+      res.json(enrichedProgress);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch lesson progress" });
+    }
+  });
+
+  app.get("/api/users/:childId/lesson-reviews", async (req, res) => {
+    try {
+      const childId = Number(req.params.childId);
+      const child = await storage.getUser(childId);
+      if (!child) {
+        return res.status(404).json({ message: "Child user not found" });
+      }
+
+      const reviews = await storage.getParentLessonReviewsForChild(childId);
+      res.json(reviews);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch lesson reviews" });
+    }
+  });
+
+  app.post("/api/users/:childId/lessons/:lessonId/reviews", express.json(), async (req, res) => {
+    try {
+      const childId = Number(req.params.childId);
+      const lessonId = Number(req.params.lessonId);
+      const validatedData = insertParentLessonReviewSchema.parse({
+        ...req.body,
+        childUserId: childId,
+        lessonId,
+        reviewedAt: new Date(),
+      });
+
+      const [parent, child, lesson] = await Promise.all([
+        storage.getUser(validatedData.parentUserId),
+        storage.getUser(childId),
+        storage.getLesson(lessonId),
+      ]);
+
+      if (!parent || !child || !lesson) {
+        return res.status(404).json({ message: "Parent, child, or lesson not found" });
+      }
+
+      const children = await storage.getChildrenForParent(validatedData.parentUserId);
+      if (!children.some((linkedChild) => linkedChild.id === childId)) {
+        return res.status(403).json({ message: "Parent is not linked to this child" });
+      }
+
+      const review = await storage.createParentLessonReview(validatedData);
+      res.status(201).json(review);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid parent review data" });
     }
   });
 

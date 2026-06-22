@@ -23,6 +23,7 @@ import {
   buddyEmotionLogs, type BuddyEmotionLog, type InsertBuddyEmotionLog,
   buddyJournalEntries, type BuddyJournalEntry, type InsertBuddyJournalEntry,
   parentChildRelationships, type ParentChildRelationship, type InsertParentChildRelationship,
+  parentLessonReviews, type ParentLessonReview, type InsertParentLessonReview,
   credentialDefinitions, type CredentialDefinition, type InsertCredentialDefinition,
   credentialRequirements, type CredentialRequirement, type InsertCredentialRequirement,
   issuedCredentials, type IssuedCredential, type InsertIssuedCredential
@@ -39,6 +40,8 @@ export interface IStorage {
   getChildrenForParent(parentUserId: number): Promise<User[]>;
   getParentsForChild(childUserId: number): Promise<User[]>;
   createParentChildRelationship(relationship: InsertParentChildRelationship): Promise<ParentChildRelationship>;
+  getParentLessonReviewsForChild(childUserId: number): Promise<ParentLessonReview[]>;
+  createParentLessonReview(review: InsertParentLessonReview): Promise<ParentLessonReview>;
 
   // Credential operations
   getAllCredentialDefinitions(): Promise<CredentialDefinition[]>;
@@ -140,6 +143,7 @@ export interface IStorage {
   
   // User Lesson Progress operations
   getUserLessonProgress(userId: number, lessonId: number): Promise<UserLessonProgress | undefined>;
+  getAllUserLessonProgress(userId: number): Promise<UserLessonProgress[]>;
   getAllUserLessonProgressBySubject(userId: number, subjectId: number): Promise<UserLessonProgress[]>;
   createUserLessonProgress(progress: InsertUserLessonProgress): Promise<UserLessonProgress>;
   updateUserLessonProgress(userId: number, lessonId: number, progress: Partial<UserLessonProgress>): Promise<UserLessonProgress>;
@@ -237,6 +241,16 @@ export class DatabaseStorage implements IStorage {
 
   async createParentChildRelationship(relationship: InsertParentChildRelationship): Promise<ParentChildRelationship> {
     const results = await db.insert(parentChildRelationships).values(relationship).returning();
+    return results[0];
+  }
+
+  async getParentLessonReviewsForChild(childUserId: number): Promise<ParentLessonReview[]> {
+    return await db.select().from(parentLessonReviews)
+      .where(eq(parentLessonReviews.childUserId, childUserId));
+  }
+
+  async createParentLessonReview(review: InsertParentLessonReview): Promise<ParentLessonReview> {
+    const results = await db.insert(parentLessonReviews).values(review).returning();
     return results[0];
   }
 
@@ -602,6 +616,11 @@ export class DatabaseStorage implements IStorage {
         eq(userLessonProgress.lessonId, lessonId)
       ));
     return results.length > 0 ? results[0] : undefined;
+  }
+
+  async getAllUserLessonProgress(userId: number): Promise<UserLessonProgress[]> {
+    return await db.select().from(userLessonProgress)
+      .where(eq(userLessonProgress.userId, userId));
   }
   
   async getAllUserLessonProgressBySubject(userId: number, subjectId: number): Promise<UserLessonProgress[]> {

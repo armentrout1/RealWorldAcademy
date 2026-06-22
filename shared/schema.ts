@@ -659,6 +659,37 @@ export const insertParentChildRelationshipSchema = createInsertSchema(parentChil
 export type InsertParentChildRelationship = z.infer<typeof insertParentChildRelationshipSchema>;
 export type ParentChildRelationship = typeof parentChildRelationships.$inferSelect;
 
+export const parentLessonReviews = pgTable("parent_lesson_reviews", {
+  id: serial("id").primaryKey(),
+  parentUserId: integer("parent_user_id").notNull().references(() => users.id),
+  childUserId: integer("child_user_id").notNull().references(() => users.id),
+  lessonId: integer("lesson_id").notNull().references(() => lessons.id),
+  status: text("status").default("approved").notNull(), // approved, changes_requested
+  note: text("note"),
+  reviewedAt: timestamp("reviewed_at").defaultNow(),
+});
+
+export const parentLessonReviewsRelations = relations(parentLessonReviews, ({ one }) => ({
+  parent: one(users, {
+    fields: [parentLessonReviews.parentUserId],
+    references: [users.id],
+    relationName: "parentLessonReviews",
+  }),
+  child: one(users, {
+    fields: [parentLessonReviews.childUserId],
+    references: [users.id],
+    relationName: "childLessonReviews",
+  }),
+  lesson: one(lessons, {
+    fields: [parentLessonReviews.lessonId],
+    references: [lessons.id],
+  }),
+}));
+
+export const insertParentLessonReviewSchema = createInsertSchema(parentLessonReviews).omit({ id: true });
+export type InsertParentLessonReview = z.infer<typeof insertParentLessonReviewSchema>;
+export type ParentLessonReview = typeof parentLessonReviews.$inferSelect;
+
 // Define the user relations after all models are defined
 export const usersRelations = relations(users, ({ many, one }) => ({
   badges: many(badges),
@@ -677,4 +708,6 @@ export const usersRelations = relations(users, ({ many, one }) => ({
   issuedCredentials: many(issuedCredentials),
   parentRelationships: many(parentChildRelationships, { relationName: "parentRelationships" }),
   childRelationships: many(parentChildRelationships, { relationName: "childRelationships" }),
+  parentLessonReviews: many(parentLessonReviews, { relationName: "parentLessonReviews" }),
+  childLessonReviews: many(parentLessonReviews, { relationName: "childLessonReviews" }),
 }));
