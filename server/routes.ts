@@ -31,12 +31,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     req: Request,
     res: Response,
     targetUserId: number,
-    options: { allowParent?: boolean } = {},
+    options: { allowAdmin?: boolean; allowParent?: boolean } = {},
   ): Promise<boolean> => {
     const sessionUserId = requireSessionUserId(req, res);
     if (!sessionUserId) return false;
 
     if (sessionUserId === targetUserId) return true;
+
+    if (options.allowAdmin !== false) {
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (sessionUser?.role === "admin") return true;
+    }
 
     if (options.allowParent) {
       const children = await storage.getChildrenForParent(sessionUserId);
@@ -363,6 +368,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(newLesson);
     } catch (error) {
       res.status(400).json({ message: "Invalid lesson data" });
+    }
+  });
+
+  app.use("/api/users/:userId", async (req, res, next) => {
+    const userId = Number(req.params.userId);
+    if (Number.isNaN(userId)) {
+      return res.status(400).json({ message: "Invalid user id" });
+    }
+
+    const isParentReviewWrite = req.method === "POST" && req.path.includes("/lessons/") && req.path.endsWith("/reviews");
+    const allowParent = req.method === "GET" || isParentReviewWrite;
+
+    if (await canAccessUserRecord(req, res, userId, { allowParent })) {
+      next();
     }
   });
 
