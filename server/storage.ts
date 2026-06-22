@@ -25,6 +25,7 @@ import {
   parentChildRelationships, type ParentChildRelationship, type InsertParentChildRelationship,
   parentLessonReviews, type ParentLessonReview, type InsertParentLessonReview,
   curriculumSubmissions, type CurriculumSubmission, type InsertCurriculumSubmission,
+  feedbackSubmissions, type FeedbackSubmission, type InsertFeedbackSubmission,
   credentialDefinitions, type CredentialDefinition, type InsertCredentialDefinition,
   credentialRequirements, type CredentialRequirement, type InsertCredentialRequirement,
   issuedCredentials, type IssuedCredential, type InsertIssuedCredential
@@ -47,6 +48,8 @@ export interface IStorage {
   getCurriculumSubmission(id: number): Promise<CurriculumSubmission | undefined>;
   createCurriculumSubmission(submission: InsertCurriculumSubmission): Promise<CurriculumSubmission>;
   reviewCurriculumSubmission(id: number, updates: Partial<CurriculumSubmission>): Promise<CurriculumSubmission>;
+  getFeedbackSubmissions(): Promise<FeedbackSubmission[]>;
+  createFeedbackSubmission(submission: InsertFeedbackSubmission): Promise<FeedbackSubmission>;
 
   // Credential operations
   getAllCredentialDefinitions(): Promise<CredentialDefinition[]>;
@@ -284,6 +287,15 @@ export class DatabaseStorage implements IStorage {
       .set(updates)
       .where(eq(curriculumSubmissions.id, id))
       .returning();
+    return results[0];
+  }
+
+  async getFeedbackSubmissions(): Promise<FeedbackSubmission[]> {
+    return await db.select().from(feedbackSubmissions);
+  }
+
+  async createFeedbackSubmission(submission: InsertFeedbackSubmission): Promise<FeedbackSubmission> {
+    const results = await db.insert(feedbackSubmissions).values(submission).returning();
     return results[0];
   }
 

@@ -14,6 +14,7 @@ import {
   insertBuddyProfileSchema, insertBuddyMessageSchema, insertBuddyEmotionLogSchema,
   insertBuddyJournalEntrySchema, insertParentChildRelationshipSchema,
   insertParentLessonReviewSchema, insertCurriculumSubmissionSchema,
+  insertFeedbackSubmissionSchema,
   insertCredentialDefinitionSchema, insertCredentialRequirementSchema
 } from "@shared/schema";
 
@@ -705,6 +706,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(updated);
     } catch (error) {
       res.status(400).json({ message: "Failed to review curriculum submission" });
+    }
+  });
+
+  app.post("/api/feedback", express.json(), async (req, res) => {
+    try {
+      const validatedData = insertFeedbackSubmissionSchema.parse({
+        ...req.body,
+        status: "new",
+        createdAt: new Date(),
+      });
+      const feedback = await storage.createFeedbackSubmission(validatedData);
+      res.status(201).json(feedback);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid feedback submission" });
+    }
+  });
+
+  app.get("/api/feedback", async (req, res) => {
+    try {
+      if (!(await requireAdminUser(req, res))) return;
+
+      const feedback = await storage.getFeedbackSubmissions();
+      res.json(feedback);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch feedback" });
     }
   });
 

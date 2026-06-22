@@ -24,6 +24,7 @@ New Version 2 tables that must exist:
 - `parent_child_relationships`
 - `parent_lesson_reviews`
 - `curriculum_submissions`
+- `feedback_submissions`
 - `user_sessions`
 
 The `user_sessions` table is created automatically by the Postgres session store when the server starts.
@@ -48,10 +49,12 @@ Public signup can create `student` or `parent` accounts. Admin accounts should b
 - Confirm parent review can approve completed lesson work from `/parent-dashboard`.
 - Submit a curriculum lesson from `/contribute`.
 - Confirm the submission appears in `/admin/lessons` for review after logging in.
+- Submit beta feedback from `/feedback`.
 
 ## Public Beta Copy and Safety
 
 - Footer links now route to `/privacy`, `/terms`, and `/safety`.
+- Families can submit beta feedback from `/feedback`.
 - A global banner states that Real World Academy credentials are non-accredited completion records.
 - Credential definitions include a non-accreditation disclaimer.
 - External video/resource links should be reviewed before inviting families.

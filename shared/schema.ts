@@ -717,6 +717,21 @@ export const insertCurriculumSubmissionSchema = createInsertSchema(curriculumSub
 export type InsertCurriculumSubmission = z.infer<typeof insertCurriculumSubmissionSchema>;
 export type CurriculumSubmission = typeof curriculumSubmissions.$inferSelect;
 
+export const feedbackSubmissions = pgTable("feedback_submissions", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  email: text("email").notNull(),
+  audience: text("audience").notNull(), // parent, student, contributor, other
+  category: text("category").notNull(), // bug, content, safety, idea, general
+  message: text("message").notNull(),
+  status: text("status").default("new").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertFeedbackSubmissionSchema = createInsertSchema(feedbackSubmissions).omit({ id: true });
+export type InsertFeedbackSubmission = z.infer<typeof insertFeedbackSubmissionSchema>;
+export type FeedbackSubmission = typeof feedbackSubmissions.$inferSelect;
+
 // Define the user relations after all models are defined
 export const usersRelations = relations(users, ({ many, one }) => ({
   badges: many(badges),
