@@ -22,7 +22,10 @@ import {
   buddyMessages, type BuddyMessage, type InsertBuddyMessage,
   buddyEmotionLogs, type BuddyEmotionLog, type InsertBuddyEmotionLog,
   buddyJournalEntries, type BuddyJournalEntry, type InsertBuddyJournalEntry,
-  parentChildRelationships, type ParentChildRelationship, type InsertParentChildRelationship
+  parentChildRelationships, type ParentChildRelationship, type InsertParentChildRelationship,
+  credentialDefinitions, type CredentialDefinition, type InsertCredentialDefinition,
+  credentialRequirements, type CredentialRequirement, type InsertCredentialRequirement,
+  issuedCredentials, type IssuedCredential, type InsertIssuedCredential
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, sql, and, inArray } from "drizzle-orm";
@@ -36,6 +39,16 @@ export interface IStorage {
   getChildrenForParent(parentUserId: number): Promise<User[]>;
   getParentsForChild(childUserId: number): Promise<User[]>;
   createParentChildRelationship(relationship: InsertParentChildRelationship): Promise<ParentChildRelationship>;
+
+  // Credential operations
+  getAllCredentialDefinitions(): Promise<CredentialDefinition[]>;
+  getCredentialDefinition(id: number): Promise<CredentialDefinition | undefined>;
+  getCredentialDefinitionBySlug(slug: string): Promise<CredentialDefinition | undefined>;
+  createCredentialDefinition(credential: InsertCredentialDefinition): Promise<CredentialDefinition>;
+  getCredentialRequirements(credentialId: number): Promise<CredentialRequirement[]>;
+  createCredentialRequirement(requirement: InsertCredentialRequirement): Promise<CredentialRequirement>;
+  getIssuedCredentialsForUser(userId: number): Promise<IssuedCredential[]>;
+  issueCredential(credential: InsertIssuedCredential): Promise<IssuedCredential>;
   
   // Course operations
   getAllCourses(): Promise<Course[]>;
@@ -224,6 +237,45 @@ export class DatabaseStorage implements IStorage {
 
   async createParentChildRelationship(relationship: InsertParentChildRelationship): Promise<ParentChildRelationship> {
     const results = await db.insert(parentChildRelationships).values(relationship).returning();
+    return results[0];
+  }
+
+  async getAllCredentialDefinitions(): Promise<CredentialDefinition[]> {
+    return await db.select().from(credentialDefinitions).where(eq(credentialDefinitions.active, true));
+  }
+
+  async getCredentialDefinition(id: number): Promise<CredentialDefinition | undefined> {
+    const results = await db.select().from(credentialDefinitions).where(eq(credentialDefinitions.id, id));
+    return results[0];
+  }
+
+  async getCredentialDefinitionBySlug(slug: string): Promise<CredentialDefinition | undefined> {
+    const results = await db.select().from(credentialDefinitions).where(eq(credentialDefinitions.slug, slug));
+    return results[0];
+  }
+
+  async createCredentialDefinition(credential: InsertCredentialDefinition): Promise<CredentialDefinition> {
+    const results = await db.insert(credentialDefinitions).values(credential).returning();
+    return results[0];
+  }
+
+  async getCredentialRequirements(credentialId: number): Promise<CredentialRequirement[]> {
+    return await db.select().from(credentialRequirements)
+      .where(eq(credentialRequirements.credentialId, credentialId))
+      .orderBy(credentialRequirements.order);
+  }
+
+  async createCredentialRequirement(requirement: InsertCredentialRequirement): Promise<CredentialRequirement> {
+    const results = await db.insert(credentialRequirements).values(requirement).returning();
+    return results[0];
+  }
+
+  async getIssuedCredentialsForUser(userId: number): Promise<IssuedCredential[]> {
+    return await db.select().from(issuedCredentials).where(eq(issuedCredentials.userId, userId));
+  }
+
+  async issueCredential(credential: InsertIssuedCredential): Promise<IssuedCredential> {
+    const results = await db.insert(issuedCredentials).values(credential).returning();
     return results[0];
   }
   
@@ -1820,8 +1872,9 @@ export class DatabaseStorage implements IStorage {
 
       // Create the lessons for each subject
       console.log("Creating Financial Literacy lessons...");
+      const createdFinancialLessons: Lesson[] = [];
       for (const lesson of financialLiteracyLessons) {
-        await this.createLesson(normalizeLessonSeed(lesson));
+        createdFinancialLessons.push(await this.createLesson(normalizeLessonSeed(lesson)));
       }
       
       console.log("Creating Communication & Relationships lessons...");
@@ -1846,6 +1899,44 @@ export class DatabaseStorage implements IStorage {
       await this.updateSubject(realWorldMathSubject.id, {
         nextSubjectIds: [financialLiteracySubject.id, communicationSubject.id]
       });
+
+      const existingMoneyCredential = await this.getCredentialDefinitionBySlug("money-basics");
+      if (!existingMoneyCredential) {
+        const moneyCredential = await this.createCredentialDefinition({
+          title: "Money Basics Credential",
+          slug: "money-basics",
+          description: "Awarded for completing the Money Basics pathway and demonstrating core budgeting, saving, credit, and investing concepts.",
+          subjectId: financialLiteracySubject.id,
+          criteriaSummary: "Complete all Money Basics lessons and save a reflection or activity response.",
+          disclaimer: "This is a Real World Academy completion credential and does not represent accredited school credit.",
+          active: true,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
+
+        for (let index = 0; index < createdFinancialLessons.length; index++) {
+          const lesson = createdFinancialLessons[index];
+          await this.createCredentialRequirement({
+            credentialId: moneyCredential.id,
+            requirementType: "lesson",
+            title: `Complete lesson: ${lesson.title}`,
+            description: `Student must complete the ${lesson.title} lesson.`,
+            targetId: lesson.id,
+            required: true,
+            order: index + 1,
+          });
+        }
+
+        await this.createCredentialRequirement({
+          credentialId: moneyCredential.id,
+          requirementType: "parent_review",
+          title: "Parent review",
+          description: "A parent or mentor should review the student's final reflection or activity work.",
+          targetId: null,
+          required: false,
+          order: createdFinancialLessons.length + 1,
+        });
+      }
       
       console.log("Subjects and lessons data initialization complete!");
       

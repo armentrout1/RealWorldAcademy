@@ -1,5 +1,6 @@
 import express, { type Express } from "express";
 import { createServer, type Server } from "http";
+import { randomUUID } from "crypto";
 import { storage } from "./storage";
 import { hashPassword, toSafeUser, verifyPassword } from "./auth";
 import { 
@@ -11,7 +12,8 @@ import {
   insertSubjectSchema, insertLessonSchema,
   insertResourceSchema, insertDailyChallengeSchema, insertUserChallengeSchema,
   insertBuddyProfileSchema, insertBuddyMessageSchema, insertBuddyEmotionLogSchema,
-  insertBuddyJournalEntrySchema, insertParentChildRelationshipSchema
+  insertBuddyJournalEntrySchema, insertParentChildRelationshipSchema,
+  insertCredentialDefinitionSchema, insertCredentialRequirementSchema
 } from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -481,6 +483,110 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(relationship);
     } catch (error) {
       res.status(400).json({ message: "Invalid parent-child relationship data" });
+    }
+  });
+
+  // Credential endpoints
+  app.get("/api/credentials", async (_req, res) => {
+    try {
+      const credentials = await storage.getAllCredentialDefinitions();
+      res.json(credentials);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch credentials" });
+    }
+  });
+
+  app.get("/api/credentials/:slug", async (req, res) => {
+    try {
+      const credential = await storage.getCredentialDefinitionBySlug(req.params.slug);
+      if (!credential) {
+        return res.status(404).json({ message: "Credential not found" });
+      }
+
+      const requirements = await storage.getCredentialRequirements(credential.id);
+      res.json({ ...credential, requirements });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch credential" });
+    }
+  });
+
+  app.post("/api/credentials", express.json(), async (req, res) => {
+    try {
+      const validatedData = insertCredentialDefinitionSchema.parse(req.body);
+      const credential = await storage.createCredentialDefinition(validatedData);
+      res.status(201).json(credential);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid credential data" });
+    }
+  });
+
+  app.post("/api/credentials/:credentialId/requirements", express.json(), async (req, res) => {
+    try {
+      const credentialId = Number(req.params.credentialId);
+      const credential = await storage.getCredentialDefinition(credentialId);
+      if (!credential) {
+        return res.status(404).json({ message: "Credential not found" });
+      }
+
+      const validatedData = insertCredentialRequirementSchema.parse({
+        ...req.body,
+        credentialId,
+      });
+      const requirement = await storage.createCredentialRequirement(validatedData);
+      res.status(201).json(requirement);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid credential requirement data" });
+    }
+  });
+
+  app.get("/api/users/:userId/credentials", async (req, res) => {
+    try {
+      const userId = Number(req.params.userId);
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const credentials = await storage.getIssuedCredentialsForUser(userId);
+      res.json(credentials);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch issued credentials" });
+    }
+  });
+
+  app.post("/api/users/:userId/credentials/:credentialId/issue", async (req, res) => {
+    try {
+      const userId = Number(req.params.userId);
+      const credentialId = Number(req.params.credentialId);
+      const user = await storage.getUser(userId);
+      const credential = await storage.getCredentialDefinition(credentialId);
+
+      if (!user || !credential) {
+        return res.status(404).json({ message: "User or credential not found" });
+      }
+
+      const requirements = await storage.getCredentialRequirements(credentialId);
+      const lessonRequirements = requirements.filter((requirement) => requirement.requirementType === "lesson" && requirement.targetId);
+
+      for (const requirement of lessonRequirements) {
+        const progress = await storage.getUserLessonProgress(userId, requirement.targetId!);
+        if (progress?.status !== "completed") {
+          return res.status(409).json({ message: "Credential requirements are not complete" });
+        }
+      }
+
+      const issuedCredential = await storage.issueCredential({
+        credentialId,
+        userId,
+        status: "issued",
+        issuedAt: new Date(),
+        reviewNote: "Issued automatically after required lesson completion.",
+        shareCode: randomUUID(),
+      });
+
+      res.status(201).json(issuedCredential);
+    } catch (error) {
+      res.status(400).json({ message: "Failed to issue credential" });
     }
   });
 
