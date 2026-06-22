@@ -416,6 +416,8 @@ const ParentDashboard: React.FC = () => {
     age: "",
     ageGroup: "9-12" as "9-12" | "13-15" | "16-18",
   });
+  const [childLinkEmail, setChildLinkEmail] = useState("");
+  const [childRelationshipLabel, setChildRelationshipLabel] = useState("parent");
   const [editingSchedule, setEditingSchedule] = useState(false);
   const [schedule, setSchedule] = useState(mockSchedule);
   const [rewards, setRewards] = useState(mockRewards);
@@ -437,6 +439,39 @@ const ParentDashboard: React.FC = () => {
   }, [linkedChildren, selectedRealChildId]);
 
   const selectedRealChild = linkedChildren.find((child) => child.id === selectedRealChildId);
+
+  const linkChildMutation = useMutation({
+    mutationFn: async () => {
+      if (!childLinkEmail.trim()) {
+        throw new Error("Enter the child account email before linking.");
+      }
+
+      return apiRequest<SafeUser>("/api/family/link-child", {
+        method: "POST",
+        body: {
+          childEmail: childLinkEmail,
+          relationshipLabel: childRelationshipLabel,
+        },
+      });
+    },
+    onSuccess: (child) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/users", user?.id, "children"] });
+      setSelectedRealChildId(child.id);
+      setChildLinkEmail("");
+      setChildRelationshipLabel("parent");
+      toast({
+        title: "Child account linked",
+        description: `${child.fullName || child.email} is now connected to your homeschool dashboard.`,
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Child account not linked",
+        description: error instanceof Error ? error.message : "Please check the email and try again.",
+        variant: "destructive",
+      });
+    },
+  });
 
   const { data: lessonProgress = [], isLoading: progressLoading } = useQuery<LessonProgressWithLesson[]>({
     queryKey: ["/api/users", selectedRealChildId, "lesson-progress"],
@@ -664,11 +699,81 @@ const ParentDashboard: React.FC = () => {
                 Loading linked learners...
               </div>
             ) : linkedChildren.length === 0 ? (
-              <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
-                No linked child accounts yet. Link a child account to start reviewing completed lessons.
+              <div className="rounded-md border border-dashed p-4">
+                <div className="mb-4 text-sm text-muted-foreground">
+                  No linked child accounts yet. Link a student account by email to start reviewing completed lessons.
+                </div>
+                <div className="grid gap-3 md:grid-cols-[1fr_180px_auto] md:items-end">
+                  <div>
+                    <Label htmlFor="child-link-email-empty">Child account email</Label>
+                    <Input
+                      id="child-link-email-empty"
+                      type="email"
+                      value={childLinkEmail}
+                      onChange={(event) => setChildLinkEmail(event.target.value)}
+                      placeholder="student@example.com"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="child-link-relationship-empty">Relationship</Label>
+                    <Select value={childRelationshipLabel} onValueChange={setChildRelationshipLabel}>
+                      <SelectTrigger id="child-link-relationship-empty">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="parent">Parent</SelectItem>
+                        <SelectItem value="guardian">Guardian</SelectItem>
+                        <SelectItem value="mentor">Mentor</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Button
+                    onClick={() => linkChildMutation.mutate()}
+                    disabled={linkChildMutation.isPending || !childLinkEmail.trim()}
+                  >
+                    <UserPlus className="mr-2 h-4 w-4" />
+                    Link
+                  </Button>
+                </div>
               </div>
             ) : (
               <>
+                <div className="rounded-md border bg-slate-50 p-4">
+                  <div className="grid gap-3 md:grid-cols-[1fr_180px_auto] md:items-end">
+                    <div>
+                      <Label htmlFor="child-link-email">Add another child account</Label>
+                      <Input
+                        id="child-link-email"
+                        type="email"
+                        value={childLinkEmail}
+                        onChange={(event) => setChildLinkEmail(event.target.value)}
+                        placeholder="student@example.com"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="child-link-relationship">Relationship</Label>
+                      <Select value={childRelationshipLabel} onValueChange={setChildRelationshipLabel}>
+                        <SelectTrigger id="child-link-relationship">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="parent">Parent</SelectItem>
+                          <SelectItem value="guardian">Guardian</SelectItem>
+                          <SelectItem value="mentor">Mentor</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <Button
+                      variant="outline"
+                      onClick={() => linkChildMutation.mutate()}
+                      disabled={linkChildMutation.isPending || !childLinkEmail.trim()}
+                    >
+                      <UserPlus className="mr-2 h-4 w-4" />
+                      Link
+                    </Button>
+                  </div>
+                </div>
+
                 <div className="grid gap-3 md:grid-cols-[260px_1fr]">
                   <div>
                     <Label htmlFor="review-child">Learner</Label>

@@ -641,6 +641,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/family/link-child", express.json(), async (req, res) => {
+    try {
+      const sessionUserId = requireSessionUserId(req, res);
+      if (!sessionUserId) return;
+
+      const childEmail = typeof req.body.childEmail === "string"
+        ? req.body.childEmail.trim().toLowerCase()
+        : "";
+      const relationshipLabel = typeof req.body.relationshipLabel === "string" && req.body.relationshipLabel.trim()
+        ? req.body.relationshipLabel.trim()
+        : "parent";
+
+      if (!childEmail) {
+        return res.status(400).json({ message: "Child account email is required" });
+      }
+
+      const parent = await storage.getUser(sessionUserId);
+      const child = await storage.getUserByEmail(childEmail);
+      if (!parent) {
+        return res.status(404).json({ message: "Parent account not found" });
+      }
+      if (!child) {
+        return res.status(404).json({ message: "No child account found for that email" });
+      }
+      if (child.id === sessionUserId) {
+        return res.status(400).json({ message: "You cannot link your own account as a child" });
+      }
+
+      const linkedChildren = await storage.getChildrenForParent(sessionUserId);
+      const alreadyLinked = linkedChildren.find((linkedChild) => linkedChild.id === child.id);
+      if (!alreadyLinked) {
+        await storage.createParentChildRelationship({
+          parentUserId: sessionUserId,
+          childUserId: child.id,
+          relationshipLabel,
+          status: "active",
+          createdAt: new Date(),
+        });
+      }
+
+      res.status(alreadyLinked ? 200 : 201).json(toSafeUser(child));
+    } catch (error) {
+      res.status(500).json({ message: "Failed to link child account" });
+    }
+  });
+
   // Curriculum contribution and review endpoints
   app.get("/api/curriculum-submissions", async (req, res) => {
     try {

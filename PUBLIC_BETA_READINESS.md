@@ -45,7 +45,7 @@ Public signup can create `student` or `parent` accounts. Existing admins can man
 - Complete a lesson at `/learn/money-basics/budgeting-basics`.
 - Confirm lesson progress appears in `/portfolio`.
 - Issue the Money Basics credential from `/credentials` after requirements are complete.
-- Link a parent and child account through the family relationship API.
+- Link a parent and child account from `/parent-dashboard`.
 - Confirm parent review can approve completed lesson work from `/parent-dashboard`.
 - Submit a curriculum lesson from `/contribute`.
 - Confirm the submission appears in `/admin/lessons` for review after logging in as an admin.
