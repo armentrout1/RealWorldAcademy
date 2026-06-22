@@ -1,4 +1,4 @@
-import express, { type Express } from "express";
+import express, { type Express, type Request, type Response } from "express";
 import { createServer, type Server } from "http";
 import { randomUUID } from "crypto";
 import { storage } from "./storage";
@@ -18,6 +18,37 @@ import {
 } from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  const requireSessionUserId = (req: Request, res: Response): number | undefined => {
+    if (!req.session.userId) {
+      res.status(401).json({ message: "Not authenticated" });
+      return undefined;
+    }
+
+    return req.session.userId;
+  };
+
+  const canAccessUserRecord = async (
+    req: Request,
+    res: Response,
+    targetUserId: number,
+    options: { allowParent?: boolean } = {},
+  ): Promise<boolean> => {
+    const sessionUserId = requireSessionUserId(req, res);
+    if (!sessionUserId) return false;
+
+    if (sessionUserId === targetUserId) return true;
+
+    if (options.allowParent) {
+      const children = await storage.getChildrenForParent(sessionUserId);
+      if (children.some((child) => child.id === targetUserId)) {
+        return true;
+      }
+    }
+
+    res.status(403).json({ message: "Not authorized for this account" });
+    return false;
+  };
+
   app.get("/api/health", (_req, res) => {
     res.json({
       ok: true,
@@ -326,6 +357,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/users/:userId/lessons/:lessonId/progress", async (req, res) => {
     try {
       const userId = Number(req.params.userId);
+      if (!(await canAccessUserRecord(req, res, userId, { allowParent: true }))) return;
+
       const lessonId = Number(req.params.lessonId);
       const user = await storage.getUser(userId);
       const lesson = await storage.getLesson(lessonId);
@@ -344,6 +377,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/users/:userId/lessons/:lessonId/progress", express.json(), async (req, res) => {
     try {
       const userId = Number(req.params.userId);
+      if (!(await canAccessUserRecord(req, res, userId))) return;
+
       const lessonId = Number(req.params.lessonId);
       const user = await storage.getUser(userId);
       const lesson = await storage.getLesson(lessonId);
@@ -405,6 +440,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/users/:userId/lesson-progress", async (req, res) => {
     try {
       const userId = Number(req.params.userId);
+      if (!(await canAccessUserRecord(req, res, userId, { allowParent: true }))) return;
+
       const user = await storage.getUser(userId);
       if (!user) {
         return res.status(404).json({ message: "User not found" });
@@ -425,6 +462,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/users/:childId/lesson-reviews", async (req, res) => {
     try {
       const childId = Number(req.params.childId);
+      if (!(await canAccessUserRecord(req, res, childId, { allowParent: true }))) return;
+
       const child = await storage.getUser(childId);
       if (!child) {
         return res.status(404).json({ message: "Child user not found" });
@@ -439,10 +478,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/users/:childId/lessons/:lessonId/reviews", express.json(), async (req, res) => {
     try {
+      const sessionUserId = requireSessionUserId(req, res);
+      if (!sessionUserId) return;
+
       const childId = Number(req.params.childId);
       const lessonId = Number(req.params.lessonId);
       const validatedData = insertParentLessonReviewSchema.parse({
         ...req.body,
+        parentUserId: sessionUserId,
         childUserId: childId,
         lessonId,
         reviewedAt: new Date(),
@@ -509,6 +552,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/users/:parentId/children", async (req, res) => {
     try {
       const parentId = Number(req.params.parentId);
+      if (!(await canAccessUserRecord(req, res, parentId))) return;
+
       const parent = await storage.getUser(parentId);
       if (!parent) {
         return res.status(404).json({ message: "Parent user not found" });
@@ -525,6 +570,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/users/:childId/parents", async (req, res) => {
     try {
       const childId = Number(req.params.childId);
+      if (!(await canAccessUserRecord(req, res, childId, { allowParent: true }))) return;
+
       const child = await storage.getUser(childId);
       if (!child) {
         return res.status(404).json({ message: "Child user not found" });
@@ -540,7 +587,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/family/relationships", express.json(), async (req, res) => {
     try {
+      const sessionUserId = requireSessionUserId(req, res);
+      if (!sessionUserId) return;
+
       const validatedData = insertParentChildRelationshipSchema.parse(req.body);
+      if (validatedData.parentUserId !== sessionUserId) {
+        return res.status(403).json({ message: "Parent account must match the current session" });
+      }
 
       const parent = await storage.getUser(validatedData.parentUserId);
       const child = await storage.getUser(validatedData.childUserId);
@@ -558,6 +611,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Curriculum contribution and review endpoints
   app.get("/api/curriculum-submissions", async (req, res) => {
     try {
+      if (!requireSessionUserId(req, res)) return;
+
       const status = typeof req.query.status === "string" ? req.query.status : undefined;
       const submissions = await storage.getCurriculumSubmissions(status);
       res.json(submissions);
@@ -568,6 +623,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/curriculum-submissions/:id", async (req, res) => {
     try {
+      if (!requireSessionUserId(req, res)) return;
+
       const submission = await storage.getCurriculumSubmission(Number(req.params.id));
       if (!submission) {
         return res.status(404).json({ message: "Curriculum submission not found" });
@@ -595,6 +652,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch("/api/curriculum-submissions/:id/review", express.json(), async (req, res) => {
     try {
+      if (!requireSessionUserId(req, res)) return;
+
       const id = Number(req.params.id);
       const existing = await storage.getCurriculumSubmission(id);
       if (!existing) {
@@ -643,6 +702,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/credentials", express.json(), async (req, res) => {
     try {
+      if (!requireSessionUserId(req, res)) return;
+
       const validatedData = insertCredentialDefinitionSchema.parse(req.body);
       const credential = await storage.createCredentialDefinition(validatedData);
       res.status(201).json(credential);
@@ -653,6 +714,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/credentials/:credentialId/requirements", express.json(), async (req, res) => {
     try {
+      if (!requireSessionUserId(req, res)) return;
+
       const credentialId = Number(req.params.credentialId);
       const credential = await storage.getCredentialDefinition(credentialId);
       if (!credential) {
@@ -673,6 +736,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/users/:userId/credentials", async (req, res) => {
     try {
       const userId = Number(req.params.userId);
+      if (!(await canAccessUserRecord(req, res, userId, { allowParent: true }))) return;
+
       const user = await storage.getUser(userId);
       if (!user) {
         return res.status(404).json({ message: "User not found" });
@@ -688,6 +753,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/users/:userId/credentials/:credentialId/issue", async (req, res) => {
     try {
       const userId = Number(req.params.userId);
+      if (!(await canAccessUserRecord(req, res, userId))) return;
+
       const credentialId = Number(req.params.credentialId);
       const user = await storage.getUser(userId);
       const credential = await storage.getCredentialDefinition(credentialId);
