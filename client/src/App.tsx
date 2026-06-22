@@ -112,6 +112,11 @@ function Router() {
                 <Learn />
               </PageWrapper>
             </Route>
+            <Route path="/learn/:subject/:lesson">
+              <PageWrapper>
+                <LessonTemplate />
+              </PageWrapper>
+            </Route>
             <Route path="/learn/:subject">
               <PageWrapper>
                 <Learn />

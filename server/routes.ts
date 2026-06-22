@@ -319,6 +319,86 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Lesson progress endpoints
+  app.get("/api/users/:userId/lessons/:lessonId/progress", async (req, res) => {
+    try {
+      const userId = Number(req.params.userId);
+      const lessonId = Number(req.params.lessonId);
+      const user = await storage.getUser(userId);
+      const lesson = await storage.getLesson(lessonId);
+
+      if (!user || !lesson) {
+        return res.status(404).json({ message: "User or lesson not found" });
+      }
+
+      const progress = await storage.getUserLessonProgress(userId, lessonId);
+      res.json(progress || null);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch lesson progress" });
+    }
+  });
+
+  app.patch("/api/users/:userId/lessons/:lessonId/progress", express.json(), async (req, res) => {
+    try {
+      const userId = Number(req.params.userId);
+      const lessonId = Number(req.params.lessonId);
+      const user = await storage.getUser(userId);
+      const lesson = await storage.getLesson(lessonId);
+
+      if (!user || !lesson) {
+        return res.status(404).json({ message: "User or lesson not found" });
+      }
+
+      const existing = await storage.getUserLessonProgress(userId, lessonId);
+      const status = req.body.status || existing?.status || "in_progress";
+      const progress = await storage.updateUserLessonProgress(userId, lessonId, {
+        status,
+        ageGroup: req.body.ageGroup || existing?.ageGroup || user.ageGroup || "13-15",
+        startedAt: existing?.startedAt || new Date(),
+        completedAt: status === "completed" ? (existing?.completedAt || new Date()) : existing?.completedAt,
+        answers: req.body.answers ?? existing?.answers,
+        reflectionResponse: req.body.reflectionResponse ?? existing?.reflectionResponse,
+        notes: req.body.notes ?? existing?.notes,
+        xpEarned: status === "completed" ? (existing?.xpEarned || lesson.xpReward) : existing?.xpEarned,
+        badgeEarned: status === "completed" ? true : existing?.badgeEarned,
+      });
+
+      if (status === "completed") {
+        const subjectLessons = await storage.getLessonsBySubject(lesson.subjectId);
+        const lessonProgress = await storage.getAllUserLessonProgressBySubject(userId, lesson.subjectId);
+        const completedLessonIds = new Set(
+          lessonProgress
+            .filter((item) => item.status === "completed")
+            .map((item) => item.lessonId)
+        );
+        completedLessonIds.add(lessonId);
+
+        await storage.updateUserSubjectProgress(userId, lesson.subjectId, {
+          status: completedLessonIds.size >= subjectLessons.length ? "completed" : "in_progress",
+          currentLessonId: lessonId,
+          startedAt: new Date(),
+          completedAt: completedLessonIds.size >= subjectLessons.length ? new Date() : undefined,
+          percentComplete: subjectLessons.length > 0
+            ? Math.round((completedLessonIds.size / subjectLessons.length) * 100)
+            : 0,
+        });
+
+        await storage.updateUserXP(userId, lesson.xpReward);
+        await storage.createTimelineEvent({
+          userId,
+          title: `Completed lesson: ${lesson.title}`,
+          date: new Date(),
+          completed: true,
+          category: "lesson",
+        });
+      }
+
+      res.json(progress);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid lesson progress data" });
+    }
+  });
+
   // User endpoints
   app.post("/api/users", express.json(), async (req, res) => {
     try {

@@ -428,7 +428,9 @@ const SubjectDetail: React.FC<{ subject: SubjectModule }> = ({ subject }) => {
                     </CardContent>
                     <CardFooter className="flex justify-between">
                       <Badge variant="outline">Lesson {idx + 1}</Badge>
-                      <Button>Start Lesson</Button>
+                      <Link href={`/learn/${subject.id}/${subject.id === "money-basics" || subject.id === "financial-literacy" ? "budgeting-basics" : subject.modules[0]?.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}`}>
+                        <Button>Start Lesson</Button>
+                      </Link>
                     </CardFooter>
                   </Card>
                 ))
@@ -463,7 +465,9 @@ const SubjectDetail: React.FC<{ subject: SubjectModule }> = ({ subject }) => {
                     </div>
                   </div>
                   <div className="mt-4">
-                    <Button className="w-full sm:w-auto">Start Learning</Button>
+                    <Link href={`/learn/${subject.id}/${subject.id === "money-basics" || subject.id === "financial-literacy" ? "budgeting-basics" : module.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}`}>
+                      <Button className="w-full sm:w-auto">Start Learning</Button>
+                    </Link>
                   </div>
                 </div>
               ))}
