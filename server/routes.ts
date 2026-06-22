@@ -851,6 +851,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/credential-verifications/:shareCode", async (req, res) => {
+    try {
+      const shareCode = req.params.shareCode.trim();
+      const issuedCredential = await storage.getIssuedCredentialByShareCode(shareCode);
+      if (!issuedCredential) {
+        return res.status(404).json({ message: "Credential verification not found" });
+      }
+
+      const credential = await storage.getCredentialDefinition(issuedCredential.credentialId);
+      const learner = await storage.getUser(issuedCredential.userId);
+      if (!credential || !learner) {
+        return res.status(404).json({ message: "Credential verification record is incomplete" });
+      }
+
+      res.json({
+        shareCode: issuedCredential.shareCode,
+        status: issuedCredential.status,
+        issuedAt: issuedCredential.issuedAt,
+        reviewNote: issuedCredential.reviewNote,
+        learner: {
+          fullName: learner.fullName,
+        },
+        credential: {
+          title: credential.title,
+          description: credential.description,
+          criteriaSummary: credential.criteriaSummary,
+          disclaimer: credential.disclaimer,
+        },
+      });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to verify credential" });
+    }
+  });
+
   app.post("/api/credentials", express.json(), async (req, res) => {
     try {
       if (!(await requireAdminUser(req, res))) return;

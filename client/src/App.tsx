@@ -35,6 +35,7 @@ import ContributeLesson from "@/pages/ContributeLesson";
 import AdminLessons from "@/pages/AdminLessons";
 import LessonLibrary from "@/pages/LessonLibrary";
 import Credentials from "@/pages/Credentials";
+import CredentialVerification from "@/pages/CredentialVerification";
 import Portfolio from "@/pages/Portfolio";
 import LegalInfo from "@/pages/LegalInfo";
 import Feedback from "@/pages/Feedback";
@@ -214,6 +215,11 @@ function Router() {
             <Route path="/credentials">
               <PageWrapper>
                 <Credentials />
+              </PageWrapper>
+            </Route>
+            <Route path="/verify/:shareCode">
+              <PageWrapper>
+                <CredentialVerification />
               </PageWrapper>
             </Route>
             <Route path="/portfolio">

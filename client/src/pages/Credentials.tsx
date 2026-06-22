@@ -91,6 +91,7 @@ export default function Credentials() {
   });
 
   const issuedCredentialIds = new Set(issuedCredentials.map((credential) => credential.credentialId));
+  const credentialById = new Map(credentials.map((credential) => [credential.id, credential]));
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -205,13 +206,21 @@ export default function Credentials() {
               <div className="space-y-3">
                 {issuedCredentials.map((credential) => (
                   <div key={credential.id} className="rounded-md border p-3">
-                    <div className="font-medium">Credential #{credential.id}</div>
+                    <div className="font-medium">
+                      {credentialById.get(credential.credentialId)?.title || `Credential #${credential.id}`}
+                    </div>
                     <div className="text-sm text-muted-foreground">Status: {credential.status}</div>
                     {credential.issuedAt && (
                       <div className="text-sm text-muted-foreground">
                         Issued: {new Date(credential.issuedAt).toLocaleDateString()}
                       </div>
                     )}
+                    <Button variant="outline" size="sm" className="mt-3" asChild>
+                      <Link href={`/verify/${encodeURIComponent(credential.shareCode)}`}>
+                        Verify
+                        <ExternalLink className="ml-2 h-4 w-4" />
+                      </Link>
+                    </Button>
                   </div>
                 ))}
               </div>

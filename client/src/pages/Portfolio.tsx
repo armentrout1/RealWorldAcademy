@@ -1,5 +1,5 @@
 import React from "react";
-import { Award, BookOpen, CheckCircle2, FileText, LockKeyhole } from "lucide-react";
+import { Award, BookOpen, CheckCircle2, ExternalLink, FileText, LockKeyhole } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { Badge } from "@/components/ui/badge";
@@ -221,6 +221,12 @@ export default function Portfolio() {
                             </div>
                           )}
                           <div className="mt-2 text-xs text-muted-foreground">Share code: {issuedCredential.shareCode}</div>
+                          <Button variant="outline" size="sm" className="mt-3" asChild>
+                            <Link href={`/verify/${encodeURIComponent(issuedCredential.shareCode)}`}>
+                              Verify Public Record
+                              <ExternalLink className="ml-2 h-4 w-4" />
+                            </Link>
+                          </Button>
                         </div>
                       </div>
                     </div>

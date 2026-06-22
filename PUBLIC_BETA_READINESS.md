@@ -45,6 +45,7 @@ Public signup can create `student` or `parent` accounts. Existing admins can man
 - Complete a lesson at `/learn/money-basics/budgeting-basics`.
 - Confirm lesson progress appears in `/portfolio`.
 - Issue the Money Basics credential from `/credentials` after requirements are complete.
+- Open the issued credential verification link from `/portfolio` or `/credentials`.
 - Link a parent and child account from `/parent-dashboard`.
 - Confirm parent review can approve completed lesson work from `/parent-dashboard`.
 - Submit a curriculum lesson from `/contribute`.

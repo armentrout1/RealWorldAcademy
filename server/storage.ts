@@ -62,6 +62,7 @@ export interface IStorage {
   getCredentialRequirements(credentialId: number): Promise<CredentialRequirement[]>;
   createCredentialRequirement(requirement: InsertCredentialRequirement): Promise<CredentialRequirement>;
   getIssuedCredentialsForUser(userId: number): Promise<IssuedCredential[]>;
+  getIssuedCredentialByShareCode(shareCode: string): Promise<IssuedCredential | undefined>;
   issueCredential(credential: InsertIssuedCredential): Promise<IssuedCredential>;
   
   // Course operations
@@ -354,6 +355,11 @@ export class DatabaseStorage implements IStorage {
 
   async getIssuedCredentialsForUser(userId: number): Promise<IssuedCredential[]> {
     return await db.select().from(issuedCredentials).where(eq(issuedCredentials.userId, userId));
+  }
+
+  async getIssuedCredentialByShareCode(shareCode: string): Promise<IssuedCredential | undefined> {
+    const results = await db.select().from(issuedCredentials).where(eq(issuedCredentials.shareCode, shareCode));
+    return results.length > 0 ? results[0] : undefined;
   }
 
   async issueCredential(credential: InsertIssuedCredential): Promise<IssuedCredential> {
