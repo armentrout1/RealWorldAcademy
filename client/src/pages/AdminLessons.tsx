@@ -35,6 +35,11 @@ interface CurriculumSubmission {
   reviewerNote?: string | null;
   submittedAt?: string | null;
   reviewedAt?: string | null;
+  publishedLesson?: {
+    id: number;
+    title: string;
+    slug: string;
+  };
 }
 
 interface FeedbackSubmission {
@@ -94,7 +99,10 @@ export default function AdminLessons() {
       queryClient.invalidateQueries({ queryKey: ["/api/curriculum-submissions"] });
       setSelectedSubmission(null);
       setReviewNote("");
-      toast({ title: "Review updated", description: "The curriculum submission status has been saved." });
+      toast({
+        title: "Review updated",
+        description: "Approved submissions are now published into the lesson library.",
+      });
     },
     onError: (error) => {
       toast({

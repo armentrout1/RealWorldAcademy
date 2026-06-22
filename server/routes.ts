@@ -16,6 +16,7 @@ import {
   insertParentLessonReviewSchema, insertCurriculumSubmissionSchema,
   insertFeedbackSubmissionSchema,
   insertCredentialDefinitionSchema, insertCredentialRequirementSchema,
+  type CurriculumSubmission,
   type User
 } from "@shared/schema";
 
@@ -729,6 +730,79 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  const contributionSubjectAliases: Record<string, string> = {
+    "financial-literacy": "money-basics",
+    finance: "money-basics",
+    technology: "digital-productivity",
+    "digital-skills": "digital-productivity",
+    communication: "communication-relationships",
+    "well-being": "career-exploration",
+    "critical-thinking": "career-exploration",
+    creativity: "career-exploration",
+    citizenship: "digital-productivity",
+  };
+
+  const slugify = (value: string): string => value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80);
+
+  const publishCurriculumSubmission = async (submission: CurriculumSubmission) => {
+    const requestedSubjectSlug = slugify(submission.subject);
+    const subjectSlug = contributionSubjectAliases[requestedSubjectSlug] || requestedSubjectSlug;
+    const subject = await storage.getSubjectBySlug(subjectSlug);
+
+    if (!subject) {
+      throw new Error(`No publishable subject exists for "${submission.subject}"`);
+    }
+
+    const baseSlug = slugify(submission.title) || `submission-${submission.id}`;
+    const slug = `contrib-${submission.id}-${baseSlug}`;
+    const existingLesson = await storage.getLessonBySlug(subject.slug, slug);
+
+    if (existingLesson) {
+      return existingLesson;
+    }
+
+    const existingLessons = await storage.getLessonsBySubject(subject.id);
+    return await storage.createLesson(insertLessonSchema.parse({
+      subjectId: subject.id,
+      title: submission.title,
+      subtitle: `Community lesson by ${submission.contributorName}`,
+      slug,
+      order: existingLessons.length + 1,
+      learningObjective: submission.objective,
+      warmUpQuestion: submission.warmUp,
+      lessonExplanation: submission.coreContent,
+      scenarioTitle: "Real-World Scenario",
+      scenarioContent: submission.scenario,
+      activityType: "reflection",
+      activityContent: {
+        instructions: submission.activity,
+        contributor: {
+          name: submission.contributorName,
+          affiliation: submission.affiliation,
+        },
+        sourceSubmissionId: submission.id,
+      },
+      reflectionPrompt: submission.reflection,
+      estimatedMinutes: 30,
+      xpReward: 50,
+      ageGroupContent: {
+        [submission.ageGroup]: {
+          learningObjective: submission.objective,
+          warmUpQuestion: submission.warmUp,
+          lessonExplanation: submission.coreContent,
+          scenarioContent: submission.scenario,
+          activityContent: submission.activity,
+          reflectionPrompt: submission.reflection,
+        },
+      },
+    }));
+  };
+
   // Curriculum contribution and review endpoints
   app.get("/api/curriculum-submissions", async (req, res) => {
     try {
@@ -786,14 +860,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid review status" });
       }
 
+      const publishedLesson = req.body.status === "approved"
+        ? await publishCurriculumSubmission(existing)
+        : undefined;
+
       const updated = await storage.reviewCurriculumSubmission(id, {
         status: req.body.status,
         reviewerNote: req.body.reviewerNote,
         reviewedAt: new Date(),
       });
-      res.json(updated);
+
+      res.json({ ...updated, publishedLesson });
     } catch (error) {
-      res.status(400).json({ message: "Failed to review curriculum submission" });
+      res.status(400).json({
+        message: error instanceof Error ? error.message : "Failed to review curriculum submission",
+      });
     }
   });
 

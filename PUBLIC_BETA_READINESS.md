@@ -51,6 +51,7 @@ Public signup can create `student` or `parent` accounts. Emails listed in `ADMIN
 - Confirm parent review can approve completed lesson work from `/parent-dashboard`.
 - Submit a curriculum lesson from `/contribute`.
 - Confirm the submission appears in `/admin/lessons` for review after logging in as an admin.
+- Approve a curriculum submission and confirm it publishes into the matching learning pathway.
 - Submit beta feedback from `/feedback`.
 - Confirm feedback and user roles can be managed from `/admin/lessons`.
 - Confirm an `ADMIN_EMAILS` account can reach `/admin/lessons` without a manual database role edit.
