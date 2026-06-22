@@ -49,6 +49,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return false;
   };
 
+  const requireAdminUser = async (req: Request, res: Response): Promise<boolean> => {
+    const sessionUserId = requireSessionUserId(req, res);
+    if (!sessionUserId) return false;
+
+    const user = await storage.getUser(sessionUserId);
+    if (user?.role === "admin") return true;
+
+    res.status(403).json({ message: "Admin access required" });
+    return false;
+  };
+
   app.get("/api/health", (_req, res) => {
     res.json({
       ok: true,
@@ -78,7 +89,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/auth/signup", express.json(), async (req, res) => {
     try {
-      const { email, password, firstName, lastName, ageGroup, interests } = req.body;
+      const { email, password, firstName, lastName, ageGroup, interests, role } = req.body;
 
       if (!email || !password || !firstName || !lastName || !ageGroup) {
         return res.status(400).json({ message: "Email, password, name, and age group are required" });
@@ -95,6 +106,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const hashedPassword = await hashPassword(String(password));
+      const accountRole = role === "parent" ? "parent" : "student";
       const newUser = await storage.createUser({
         username: normalizedEmail,
         password: hashedPassword,
@@ -102,6 +114,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         email: normalizedEmail,
         firstName: String(firstName).trim(),
         lastName: String(lastName).trim(),
+        role: accountRole,
         ageGroup: String(ageGroup),
         interests: Array.isArray(interests) ? interests.map(String) : [],
         xp: 0,
@@ -611,7 +624,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Curriculum contribution and review endpoints
   app.get("/api/curriculum-submissions", async (req, res) => {
     try {
-      if (!requireSessionUserId(req, res)) return;
+      if (!(await requireAdminUser(req, res))) return;
 
       const status = typeof req.query.status === "string" ? req.query.status : undefined;
       const submissions = await storage.getCurriculumSubmissions(status);
@@ -623,7 +636,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/curriculum-submissions/:id", async (req, res) => {
     try {
-      if (!requireSessionUserId(req, res)) return;
+      if (!(await requireAdminUser(req, res))) return;
 
       const submission = await storage.getCurriculumSubmission(Number(req.params.id));
       if (!submission) {
@@ -652,7 +665,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch("/api/curriculum-submissions/:id/review", express.json(), async (req, res) => {
     try {
-      if (!requireSessionUserId(req, res)) return;
+      if (!(await requireAdminUser(req, res))) return;
 
       const id = Number(req.params.id);
       const existing = await storage.getCurriculumSubmission(id);
@@ -702,7 +715,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/credentials", express.json(), async (req, res) => {
     try {
-      if (!requireSessionUserId(req, res)) return;
+      if (!(await requireAdminUser(req, res))) return;
 
       const validatedData = insertCredentialDefinitionSchema.parse(req.body);
       const credential = await storage.createCredentialDefinition(validatedData);
@@ -714,7 +727,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/credentials/:credentialId/requirements", express.json(), async (req, res) => {
     try {
-      if (!requireSessionUserId(req, res)) return;
+      if (!(await requireAdminUser(req, res))) return;
 
       const credentialId = Number(req.params.credentialId);
       const credential = await storage.getCredentialDefinition(credentialId);

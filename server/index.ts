@@ -1,12 +1,21 @@
 import express, { type Request, Response, NextFunction } from "express";
 import session from "express-session";
+import connectPgSimple from "connect-pg-simple";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import { pool } from "./db";
 
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
+const PgSessionStore = connectPgSimple(session);
+
 app.use(session({
+  store: new PgSessionStore({
+    pool,
+    createTableIfMissing: true,
+    tableName: "user_sessions",
+  }),
   name: "rwa.sid",
   secret: process.env.SESSION_SECRET || "real-world-academy-dev-session-secret",
   resave: false,

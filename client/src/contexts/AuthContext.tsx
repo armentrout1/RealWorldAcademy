@@ -7,6 +7,7 @@ export interface User {
   fullName?: string;
   firstName: string;
   lastName: string;
+  role?: 'student' | 'parent' | 'admin';
   email: string;
   ageGroup: 'under-9' | '9-12' | '13-15' | '16-18' | '18+';
   interests: string[];
@@ -28,6 +29,7 @@ export interface User {
 // Define type for signup data
 export type SignupData = Pick<User, 'firstName' | 'lastName' | 'email' | 'ageGroup' | 'interests'> & {
   password: string;
+  role?: 'student' | 'parent';
 };
 
 // Auth context type

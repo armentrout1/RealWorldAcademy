@@ -13,6 +13,7 @@ export const users = pgTable("users", {
   bio: text("bio"),
   firstName: text("first_name"),
   lastName: text("last_name"),
+  role: text("role").default("student").notNull(), // student, parent, admin
   ageGroup: text("age_group"),
   interests: text("interests").array(),
   // Gamification fields
@@ -35,6 +36,7 @@ export const insertUserSchema = createInsertSchema(users).pick({
   bio: true,
   firstName: true,
   lastName: true,
+  role: true,
   ageGroup: true,
   interests: true,
   xp: true,

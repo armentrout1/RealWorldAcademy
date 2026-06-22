@@ -24,6 +24,19 @@ New Version 2 tables that must exist:
 - `parent_child_relationships`
 - `parent_lesson_reviews`
 - `curriculum_submissions`
+- `user_sessions`
+
+The `user_sessions` table is created automatically by the Postgres session store when the server starts.
+
+## Roles
+
+User accounts now include a `role` field:
+
+- `student`
+- `parent`
+- `admin`
+
+Public signup can create `student` or `parent` accounts. Admin accounts should be assigned directly in the database by setting `users.role = 'admin'`.
 
 ## MVP Flow Checks
 
@@ -45,7 +58,6 @@ New Version 2 tables that must exist:
 
 ## Known Pre-Launch Gaps
 
-- True admin role enforcement is not implemented yet; admin review routes currently require authentication but not an admin role.
-- Production session storage should move from the default in-memory store to Postgres or another durable store.
+- Admin account management UI is not implemented yet; admin role assignment is still a database operation.
 - More seeded content is needed for Career Exploration and Digital Productivity.
 - Bundle size warnings still appear during `npm run build`; this is not blocking, but code-splitting should be considered before a larger launch.

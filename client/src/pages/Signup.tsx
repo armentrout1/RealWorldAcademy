@@ -18,6 +18,7 @@ const Signup = () => {
     email: '',
     password: '',
     confirmPassword: '',
+    role: 'student',
     ageGroup: '',
     agreeToTerms: false,
   });
@@ -35,6 +36,10 @@ const Signup = () => {
 
   const handleSelectChange = (value: string) => {
     setFormData(prev => ({ ...prev, ageGroup: value }));
+  };
+
+  const handleRoleChange = (value: string) => {
+    setFormData(prev => ({ ...prev, role: value }));
   };
 
   const handleCheckboxChange = (checked: boolean) => {
@@ -76,6 +81,7 @@ const Signup = () => {
         lastName: formData.lastName,
         email: formData.email,
         password: formData.password,
+        role: formData.role as 'student' | 'parent',
         ageGroup: formData.ageGroup as any,
         interests: [] // Default empty interests
       });
@@ -180,6 +186,19 @@ const Signup = () => {
                   autoComplete="new-password"
                   disabled={isSubmitting}
                 />
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="role">Account Type</Label>
+                <Select value={formData.role} onValueChange={handleRoleChange} disabled={isSubmitting}>
+                  <SelectTrigger id="role">
+                    <SelectValue placeholder="Select account type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="student">Student</SelectItem>
+                    <SelectItem value="parent">Parent / Guardian</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               
               <div className="grid gap-2">
