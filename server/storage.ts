@@ -1214,8 +1214,319 @@ export class DatabaseStorage implements IStorage {
   async initializeSubjectsData() {
     // Check if subjects already exist
     try {
+      const parseJsonSeedField = (value: unknown) => {
+        if (typeof value !== "string") return value;
+        try {
+          return JSON.parse(value);
+        } catch {
+          return value;
+        }
+      };
+
+      const normalizeLessonSeed = (lesson: any): InsertLesson => ({
+        subjectId: lesson.subjectId,
+        title: lesson.title,
+        subtitle: lesson.subtitle,
+        slug: lesson.slug,
+        order: lesson.order,
+        learningObjective: lesson.learningObjective || `Understand and apply ${lesson.title.toLowerCase()} in real-world situations.`,
+        warmUpQuestion: lesson.warmUpQuestion || `Where have you seen ${lesson.title.toLowerCase()} show up in everyday life?`,
+        lessonExplanation: lesson.lessonExplanation || lesson.content || "",
+        scenarioTitle: lesson.scenarioTitle,
+        scenarioContent: lesson.scenarioContent,
+        activityType: lesson.activityType,
+        activityContent: parseJsonSeedField(lesson.activityContent),
+        reflectionPrompt: lesson.reflectionPrompt || "What is one specific way you can use this lesson in your own life?",
+        estimatedMinutes: lesson.estimatedMinutes,
+        xpReward: lesson.xpReward || 50,
+        badgeId: lesson.badgeId,
+        ageGroupContent: parseJsonSeedField(lesson.ageGroupContent),
+      });
+
+      const seedBetaPathway = async ({
+        subject,
+        lessons: lessonSeeds,
+        credential,
+      }: {
+        subject: InsertSubject;
+        lessons: Omit<InsertLesson, "subjectId">[];
+        credential: {
+          title: string;
+          slug: string;
+          description: string;
+          criteriaSummary: string;
+        };
+      }) => {
+        let subjectRecord = await this.getSubjectBySlug(subject.slug);
+        if (!subjectRecord) {
+          subjectRecord = await this.createSubject(subject);
+        }
+
+        const existingLessons = await this.getLessonsBySubject(subjectRecord.id);
+        const createdOrExistingLessons: Lesson[] = [];
+        for (const lesson of lessonSeeds) {
+          const existingLesson = existingLessons.find((item) => item.slug === lesson.slug);
+          if (existingLesson) {
+            createdOrExistingLessons.push(existingLesson);
+          } else {
+            createdOrExistingLessons.push(await this.createLesson(normalizeLessonSeed({
+              ...lesson,
+              subjectId: subjectRecord.id,
+            })));
+          }
+        }
+
+        const existingCredential = await this.getCredentialDefinitionBySlug(credential.slug);
+        if (!existingCredential) {
+          const credentialRecord = await this.createCredentialDefinition({
+            ...credential,
+            subjectId: subjectRecord.id,
+            disclaimer: "This is a Real World Academy completion credential and does not represent accredited school credit.",
+            active: true,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          });
+
+          for (let index = 0; index < createdOrExistingLessons.length; index++) {
+            const lesson = createdOrExistingLessons[index];
+            await this.createCredentialRequirement({
+              credentialId: credentialRecord.id,
+              requirementType: "lesson",
+              title: `Complete lesson: ${lesson.title}`,
+              description: `Student must complete the ${lesson.title} lesson.`,
+              targetId: lesson.id,
+              required: true,
+              order: index + 1,
+            });
+          }
+        }
+      };
+
+      const seedRoadmapBetaPathways = async () => {
+        await seedBetaPathway({
+          subject: {
+            title: "Career Exploration",
+            description: "Discover strengths, research career options, practice workplace communication, and build a clear next-step plan.",
+            slug: "career-exploration",
+            iconName: "briefcase",
+            color: "indigo",
+            featured: true,
+            order: 4,
+            category: "future",
+            ageGroups: ["13-15", "16-18"],
+            summary: "You've explored career options, practiced professional communication, and built a practical next-step plan.",
+            nextSubjectIds: [],
+          },
+          lessons: [
+            {
+              title: "Strengths and Interests",
+              subtitle: "Notice the patterns in what you enjoy and do well",
+              slug: "strengths-and-interests",
+              order: 1,
+              learningObjective: "Identify personal strengths, interests, and values that can guide career exploration.",
+              warmUpQuestion: "What is something people often ask you for help with?",
+              lessonExplanation: "Career exploration starts by noticing patterns. Your strengths are things you tend to do well, your interests are things that pull your attention, and your values are what you want your work to support. A good career direction often sits where these three overlap.",
+              scenarioTitle: "Choosing a Direction",
+              scenarioContent: "Jordan likes helping younger students, enjoys organizing events, and cares about community impact. Jordan is trying to choose between education, nonprofit work, and business.",
+              activityType: "reflection",
+              activityContent: { prompts: ["List three strengths.", "List three interests.", "Name two values you want your work to support."] },
+              reflectionPrompt: "Which strength or interest could become part of a future career path?",
+              estimatedMinutes: 20,
+              xpReward: 50,
+              ageGroupContent: { "13-15": { focus: "school activities and hobbies" }, "16-18": { focus: "work, volunteering, and postsecondary options" } },
+            },
+            {
+              title: "Career Research",
+              subtitle: "Learn how to compare real jobs",
+              slug: "career-research",
+              order: 2,
+              learningObjective: "Research a career using reliable sources and compare pay, training, tasks, and lifestyle fit.",
+              warmUpQuestion: "What is one job you are curious about but do not fully understand?",
+              lessonExplanation: "A career title only tells part of the story. Good research looks at daily tasks, training requirements, work environment, pay range, growth outlook, and whether the work fits your values.",
+              scenarioTitle: "Beyond the Job Title",
+              scenarioContent: "Sam thinks graphic design sounds fun, but needs to learn what designers actually do each day, what skills are required, and how people get started.",
+              activityType: "research-profile",
+              activityContent: { fields: ["career title", "daily tasks", "required skills", "training path", "why it fits or does not fit"] },
+              reflectionPrompt: "What did your research reveal that surprised you?",
+              estimatedMinutes: 30,
+              xpReward: 60,
+              ageGroupContent: { "13-15": { sources: "family interviews and career websites" }, "16-18": { sources: "career databases, job postings, and training programs" } },
+            },
+            {
+              title: "Resume Basics",
+              subtitle: "Show what you can do",
+              slug: "resume-basics",
+              order: 3,
+              learningObjective: "Create a simple resume section that highlights skills, experience, projects, or volunteer work.",
+              warmUpQuestion: "What is one project, chore, club, or responsibility you could proudly explain to someone?",
+              lessonExplanation: "A beginner resume is not about having a long work history. It is about clearly showing responsibility, skills, projects, learning, and character. Strong bullets start with action words and describe what you did.",
+              scenarioTitle: "First Opportunity",
+              scenarioContent: "A local business is hiring weekend help. Taylor has never had a formal job but has babysitting experience, a school project, and volunteer hours.",
+              activityType: "resume-draft",
+              activityContent: { sections: ["summary", "skills", "experience or projects", "education"] },
+              reflectionPrompt: "Which experience from your life shows responsibility or initiative?",
+              estimatedMinutes: 35,
+              xpReward: 60,
+              ageGroupContent: { "13-15": { resumeType: "project and responsibility based" }, "16-18": { resumeType: "job, volunteer, and project based" } },
+            },
+            {
+              title: "Interview Practice",
+              subtitle: "Answer with examples",
+              slug: "interview-practice",
+              order: 4,
+              learningObjective: "Practice answering interview questions with specific examples and a confident structure.",
+              warmUpQuestion: "What is one time you solved a problem or helped someone?",
+              lessonExplanation: "Strong interview answers are specific. A simple structure is situation, action, result: explain what was happening, what you did, and what changed because of it.",
+              scenarioTitle: "Tell Me About Yourself",
+              scenarioContent: "Riley has an interview for a summer program and wants to sound prepared without memorizing every word.",
+              activityType: "practice-script",
+              activityContent: { questions: ["Tell me about yourself.", "Describe a challenge you handled.", "Why are you interested in this opportunity?"] },
+              reflectionPrompt: "Which example from your life would make a strong interview answer?",
+              estimatedMinutes: 25,
+              xpReward: 50,
+              ageGroupContent: { "13-15": { interviewType: "club, volunteer, and school opportunities" }, "16-18": { interviewType: "job, internship, and program opportunities" } },
+            },
+            {
+              title: "Career Next-Step Plan",
+              subtitle: "Turn research into action",
+              slug: "career-next-step-plan",
+              order: 5,
+              learningObjective: "Create a short action plan for exploring or preparing for one career direction.",
+              warmUpQuestion: "What is one small step you could take this month to learn more about a career?",
+              lessonExplanation: "A career plan should be useful, not perfect. Pick one direction to explore, choose a skill to build, identify someone to learn from, and set one next action with a date.",
+              scenarioTitle: "One Month From Now",
+              scenarioContent: "Avery is interested in healthcare but does not know whether to explore nursing, therapy, medical technology, or administration.",
+              activityType: "action-plan",
+              activityContent: { steps: ["career to explore", "skill to practice", "person or source to learn from", "next action", "deadline"] },
+              reflectionPrompt: "What is your next step, and when will you do it?",
+              estimatedMinutes: 30,
+              xpReward: 70,
+              ageGroupContent: { "13-15": { timeline: "one month exploration plan" }, "16-18": { timeline: "three month preparation plan" } },
+            },
+          ],
+          credential: {
+            title: "Career Explorer Credential",
+            slug: "career-explorer",
+            description: "Awarded for completing the Career Exploration pathway and creating a practical career next-step plan.",
+            criteriaSummary: "Complete Career Exploration lessons and save a career profile or next-step plan.",
+          },
+        });
+
+        await seedBetaPathway({
+          subject: {
+            title: "Digital Productivity",
+            description: "Build practical computer, document, spreadsheet, email, research, and digital safety habits for school, work, and life.",
+            slug: "digital-productivity",
+            iconName: "laptop",
+            color: "cyan",
+            featured: true,
+            order: 5,
+            category: "technology",
+            ageGroups: ["9-12", "13-15", "16-18"],
+            summary: "You've practiced the digital organization and communication skills needed for modern learning and work.",
+            nextSubjectIds: [],
+          },
+          lessons: [
+            {
+              title: "Files and Folders",
+              subtitle: "Keep digital work findable",
+              slug: "files-and-folders",
+              order: 1,
+              learningObjective: "Organize files with clear names, folders, and backup habits.",
+              warmUpQuestion: "Have you ever lost a file or forgotten where you saved something?",
+              lessonExplanation: "Digital organization saves time and prevents stress. Strong file habits include clear names, logical folders, dates or versions when needed, and backups for important work.",
+              scenarioTitle: "Missing Assignment",
+              scenarioContent: "Mia finished a project but saved it as final-final-new.docx somewhere on the computer and cannot find it before the deadline.",
+              activityType: "organization-plan",
+              activityContent: { folders: ["School", "Projects", "Personal", "Archive"], namingExample: "2026-06-budget-project-v1" },
+              reflectionPrompt: "What folder system would make your digital work easier to find?",
+              estimatedMinutes: 20,
+              xpReward: 50,
+              ageGroupContent: { "9-12": { focus: "simple folders" }, "13-15": { focus: "projects and versions" }, "16-18": { focus: "school, work, and backup habits" } },
+            },
+            {
+              title: "Document Basics",
+              subtitle: "Make writing readable and polished",
+              slug: "document-basics",
+              order: 2,
+              learningObjective: "Create a clear document using headings, spacing, lists, and proofreading.",
+              warmUpQuestion: "What makes a document easy or hard to read?",
+              lessonExplanation: "A polished document helps readers understand your ideas. Good formatting uses a clear title, headings, short paragraphs, consistent spacing, and careful proofreading.",
+              scenarioTitle: "Instructions That Work",
+              scenarioContent: "Noah wrote instructions for a science activity, but classmates are confused because everything is in one long paragraph.",
+              activityType: "document-polish",
+              activityContent: { checklist: ["title", "headings", "short paragraphs", "bullets or numbers", "proofread"] },
+              reflectionPrompt: "What formatting choice would most improve your next document?",
+              estimatedMinutes: 25,
+              xpReward: 50,
+              ageGroupContent: { "9-12": { focus: "titles and spacing" }, "13-15": { focus: "headings and lists" }, "16-18": { focus: "professional formatting" } },
+            },
+            {
+              title: "Spreadsheet Basics",
+              subtitle: "Use rows, columns, and formulas",
+              slug: "spreadsheet-basics",
+              order: 3,
+              learningObjective: "Build a simple spreadsheet with labels, numbers, and a total formula.",
+              warmUpQuestion: "Where could a table or spreadsheet help you keep track of something?",
+              lessonExplanation: "Spreadsheets organize information in rows and columns. Labels explain what data means, formulas calculate automatically, and formatting makes patterns easier to see.",
+              scenarioTitle: "Savings Tracker",
+              scenarioContent: "Kai wants to track weekly income, spending, and savings for eight weeks to see if a goal is realistic.",
+              activityType: "spreadsheet-plan",
+              activityContent: { columns: ["week", "income", "spending", "saved", "running total"], formula: "SUM saved amounts" },
+              reflectionPrompt: "What could you track in a spreadsheet for your own life?",
+              estimatedMinutes: 30,
+              xpReward: 60,
+              ageGroupContent: { "9-12": { formula: "simple totals" }, "13-15": { formula: "totals and averages" }, "16-18": { formula: "budgets and comparisons" } },
+            },
+            {
+              title: "Email Etiquette",
+              subtitle: "Communicate clearly online",
+              slug: "email-etiquette",
+              order: 4,
+              learningObjective: "Write a clear, respectful email with a subject, greeting, message, and closing.",
+              warmUpQuestion: "What makes a message sound respectful instead of rushed?",
+              lessonExplanation: "Email is still important for school, work, and formal communication. A strong email has a useful subject line, polite greeting, clear request, context, and a closing.",
+              scenarioTitle: "Asking for Help",
+              scenarioContent: "Leah needs to ask a mentor for advice but wants the message to sound respectful and easy to answer.",
+              activityType: "email-draft",
+              activityContent: { parts: ["subject", "greeting", "context", "request", "closing"] },
+              reflectionPrompt: "What is one email you might need to write this year?",
+              estimatedMinutes: 20,
+              xpReward: 50,
+              ageGroupContent: { "9-12": { focus: "polite messages" }, "13-15": { focus: "clear requests" }, "16-18": { focus: "professional tone" } },
+            },
+            {
+              title: "Online Research and Safety",
+              subtitle: "Find useful information without getting fooled",
+              slug: "online-research-and-safety",
+              order: 5,
+              learningObjective: "Evaluate online sources for trustworthiness and practice basic digital safety.",
+              warmUpQuestion: "How do you decide whether something online is true?",
+              lessonExplanation: "Good online research means checking the source, date, evidence, purpose, and whether other reliable sources agree. Digital safety also means protecting personal information and slowing down before clicking suspicious links.",
+              scenarioTitle: "Too Good to Be True",
+              scenarioContent: "A search result claims students can earn thousands of dollars instantly with no skills. The page asks for personal information before explaining the opportunity.",
+              activityType: "source-check",
+              activityContent: { checks: ["author", "date", "evidence", "purpose", "personal information risk"] },
+              reflectionPrompt: "What warning sign would make you leave a website or ask an adult for help?",
+              estimatedMinutes: 30,
+              xpReward: 70,
+              ageGroupContent: { "9-12": { focus: "ask before sharing info" }, "13-15": { focus: "source checks" }, "16-18": { focus: "research quality and scams" } },
+            },
+          ],
+          credential: {
+            title: "Digital Productivity Credential",
+            slug: "digital-productivity",
+            description: "Awarded for completing the Digital Productivity pathway and demonstrating practical digital organization and communication skills.",
+            criteriaSummary: "Complete Digital Productivity lessons and save a practical digital workflow or project reflection.",
+          },
+        });
+      };
+
       const existingSubjects = await db.select().from(subjects);
-      if (existingSubjects.length > 0) return; // Skip if data exists
+      if (existingSubjects.length > 0) {
+        await seedRoadmapBetaPathways();
+        return;
+      }
       
       console.log("Initializing subjects and lessons data...");
       
@@ -1893,35 +2204,6 @@ export class DatabaseStorage implements IStorage {
         }
       ];
       
-      const parseJsonSeedField = (value: unknown) => {
-        if (typeof value !== "string") return value;
-        try {
-          return JSON.parse(value);
-        } catch {
-          return value;
-        }
-      };
-
-      const normalizeLessonSeed = (lesson: any): InsertLesson => ({
-        subjectId: lesson.subjectId,
-        title: lesson.title,
-        subtitle: lesson.subtitle,
-        slug: lesson.slug,
-        order: lesson.order,
-        learningObjective: lesson.learningObjective || `Understand and apply ${lesson.title.toLowerCase()} in real-world situations.`,
-        warmUpQuestion: lesson.warmUpQuestion || `Where have you seen ${lesson.title.toLowerCase()} show up in everyday life?`,
-        lessonExplanation: lesson.lessonExplanation || lesson.content || "",
-        scenarioTitle: lesson.scenarioTitle,
-        scenarioContent: lesson.scenarioContent,
-        activityType: lesson.activityType,
-        activityContent: parseJsonSeedField(lesson.activityContent),
-        reflectionPrompt: lesson.reflectionPrompt || "What is one specific way you can use this lesson in your own life?",
-        estimatedMinutes: lesson.estimatedMinutes,
-        xpReward: lesson.xpReward || 50,
-        badgeId: lesson.badgeId,
-        ageGroupContent: parseJsonSeedField(lesson.ageGroupContent),
-      });
-
       // Create the lessons for each subject
       console.log("Creating Financial Literacy lessons...");
       const createdFinancialLessons: Lesson[] = [];
@@ -1989,6 +2271,8 @@ export class DatabaseStorage implements IStorage {
           order: createdFinancialLessons.length + 1,
         });
       }
+
+      await seedRoadmapBetaPathways();
       
       console.log("Subjects and lessons data initialization complete!");
       
