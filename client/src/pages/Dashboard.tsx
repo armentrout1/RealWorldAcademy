@@ -17,6 +17,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { Progress } from "@/components/ui/progress";
+import { useQuery } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
 import { PersonalizedLearningPath } from "@/components/ai";
 import { DailyChallengeCard } from "@/components/challenges/DailyChallenge";
 import { UserXP } from "@/components/challenges/UserXP";
@@ -32,9 +34,52 @@ const motivationalQuotes = [
   "Growth happens outside your comfort zone."
 ];
 
+interface LessonProgressRecord {
+  id: number;
+  lessonId: number;
+  status: string;
+  completedAt?: string | null;
+}
+
+interface LessonRecord {
+  id: number;
+  title: string;
+  subtitle?: string | null;
+  subjectId: number;
+}
+
+interface LessonProgressWithLesson {
+  progress: LessonProgressRecord;
+  lesson?: LessonRecord | null;
+}
+
+interface IssuedCredential {
+  id: number;
+  status: string;
+}
+
 const Dashboard: React.FC = () => {
   const [quote, setQuote] = useState<string>("");
   const { user, isAuthenticated } = useAuth();
+
+  const { data: lessonProgress = [] } = useQuery<LessonProgressWithLesson[]>({
+    queryKey: ["/api/users", user?.id, "lesson-progress"],
+    queryFn: () => apiRequest<LessonProgressWithLesson[]>(`/api/users/${user!.id}/lesson-progress`),
+    enabled: Boolean(user?.id),
+  });
+
+  const { data: issuedCredentials = [] } = useQuery<IssuedCredential[]>({
+    queryKey: ["/api/users", user?.id, "credentials"],
+    queryFn: () => apiRequest<IssuedCredential[]>(`/api/users/${user!.id}/credentials`),
+    enabled: Boolean(user?.id),
+  });
+
+  const completedLessons = lessonProgress.filter((item) => item.progress.status === "completed");
+  const inProgressLessons = lessonProgress.filter((item) => item.progress.status !== "completed");
+  const continueLesson = inProgressLessons[0] || lessonProgress[0];
+  const completedPercent = lessonProgress.length > 0
+    ? Math.round((completedLessons.length / lessonProgress.length) * 100)
+    : 0;
   
   useEffect(() => {
     // Select a random quote when the component mounts
@@ -64,16 +109,16 @@ const Dashboard: React.FC = () => {
             <CardHeader className="pb-2">
               <CardTitle className="text-base font-medium flex items-center gap-2">
                 <BookOpen className="h-4 w-4 text-primary" />
-                Financial Literacy
+                Lessons Completed
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
-                  <span>Progress</span>
-                  <span className="font-medium">{Math.round((user?.progress?.financialLiteracy || 0) * 100)}%</span>
+                  <span>Real saved progress</span>
+                  <span className="font-medium">{completedLessons.length} / {lessonProgress.length}</span>
                 </div>
-                <Progress value={(user?.progress?.financialLiteracy || 0) * 100} className="h-2" />
+                <Progress value={completedPercent} className="h-2" />
               </div>
             </CardContent>
           </Card>
@@ -82,16 +127,16 @@ const Dashboard: React.FC = () => {
             <CardHeader className="pb-2">
               <CardTitle className="text-base font-medium flex items-center gap-2">
                 <Lightbulb className="h-4 w-4 text-amber-500" />
-                Self Discovery
+                Active Lessons
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
-                  <span>Progress</span>
-                  <span className="font-medium">{Math.round((user?.progress?.selfDiscovery || 0) * 100)}%</span>
+                  <span>In progress</span>
+                  <span className="font-medium">{inProgressLessons.length}</span>
                 </div>
-                <Progress value={(user?.progress?.selfDiscovery || 0) * 100} className="h-2" />
+                <Progress value={inProgressLessons.length > 0 ? 40 : completedLessons.length > 0 ? 100 : 0} className="h-2" />
               </div>
             </CardContent>
           </Card>
@@ -100,18 +145,18 @@ const Dashboard: React.FC = () => {
             <CardHeader className="pb-2">
               <CardTitle className="text-base font-medium flex items-center gap-2">
                 <Award className="h-4 w-4 text-green-500" />
-                Projects Completed
+                Credentials
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
-                  <span>Total</span>
-                  <span className="font-medium">{user?.progress?.projectsCompleted || 0}</span>
+                  <span>Issued</span>
+                  <span className="font-medium">{issuedCredentials.length}</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span>Learning Paths Started</span>
-                  <span className="font-medium">{user?.progress?.learningPathsStarted || 0}</span>
+                  <span>Status</span>
+                  <span className="font-medium">{issuedCredentials.length > 0 ? "Portfolio ready" : "Keep learning"}</span>
                 </div>
               </div>
             </CardContent>
@@ -153,27 +198,41 @@ const Dashboard: React.FC = () => {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  <div className="p-4 bg-primary/5 rounded-lg border border-primary/10">
-                    <h3 className="font-medium mb-1">Financial Literacy: Budgeting Basics</h3>
-                    <p className="text-sm text-muted-foreground mb-2">
-                      You completed 60% of this module
-                    </p>
-                    <Progress value={60} className="h-2 mb-4" />
-                    <Link href="/financial-literacy">
-                      <Button variant="outline" size="sm">
-                        Continue Learning
-                      </Button>
-                    </Link>
-                  </div>
+                  {continueLesson ? (
+                    <div className="p-4 bg-primary/5 rounded-lg border border-primary/10">
+                      <h3 className="font-medium mb-1">{continueLesson.lesson?.title || "Continue your lesson"}</h3>
+                      <p className="text-sm text-muted-foreground mb-2">
+                        Status: {continueLesson.progress.status.replace("_", " ")}
+                      </p>
+                      <Progress value={continueLesson.progress.status === "completed" ? 100 : 50} className="h-2 mb-4" />
+                      <Link href="/learn">
+                        <Button variant="outline" size="sm">
+                          Continue Learning
+                        </Button>
+                      </Link>
+                    </div>
+                  ) : (
+                    <div className="p-4 bg-primary/5 rounded-lg border border-primary/10">
+                      <h3 className="font-medium mb-1">Start a pathway</h3>
+                      <p className="text-sm text-muted-foreground mb-2">
+                        Choose Money Basics, Career Exploration, or Digital Productivity to begin saving progress.
+                      </p>
+                      <Link href="/learn">
+                        <Button variant="outline" size="sm">
+                          Browse Pathways
+                        </Button>
+                      </Link>
+                    </div>
+                  )}
                   
                   <div className="p-4 bg-amber-50 rounded-lg border border-amber-100">
-                    <h3 className="font-medium mb-1">Career Planning: Finding Your Path</h3>
+                    <h3 className="font-medium mb-1">Portfolio & Credentials</h3>
                     <p className="text-sm text-muted-foreground mb-2">
-                      New module available
+                      Review completed lessons and issued credentials in your private record.
                     </p>
-                    <Link href="/plan-your-future">
+                    <Link href="/portfolio">
                       <Button variant="outline" size="sm" className="border-amber-200 bg-amber-100/50 hover:bg-amber-100">
-                        Start Module
+                        Open Portfolio
                       </Button>
                     </Link>
                   </div>
