@@ -9,6 +9,7 @@ const primaryNavItems = [
   { href: "/learn", label: "Pathways" },
   { href: "/library", label: "Lessons" },
   { href: "/credentials", label: "Credentials" },
+  { href: "/portfolio", label: "Portfolio" },
   { href: "/resource-center", label: "Resources" },
   { href: "/parent-dashboard", label: "Parent Dashboard" },
   { href: "/contribute", label: "Contribute" },

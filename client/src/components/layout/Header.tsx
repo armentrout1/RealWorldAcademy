@@ -66,6 +66,12 @@ const Header: React.FC = () => {
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem>
+                    <Link href="/portfolio" className="flex w-full items-center">
+                      <BookOpenIcon className="mr-2 h-4 w-4" />
+                      Portfolio
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem>
                     <Link href="/settings" className="flex w-full items-center">
                       <SettingsIcon className="mr-2 h-4 w-4" />
                       Settings
