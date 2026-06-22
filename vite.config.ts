@@ -29,5 +29,33 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes("node_modules")) return undefined;
+
+          if (id.includes("/react") || id.includes("/react-dom") || id.includes("/wouter")) {
+            return "react-vendor";
+          }
+          if (id.includes("@radix-ui")) {
+            return "ui-vendor";
+          }
+          if (id.includes("framer-motion")) {
+            return "motion-vendor";
+          }
+          if (id.includes("chart.js") || id.includes("recharts") || id.includes("react-chartjs-2")) {
+            return "charts-vendor";
+          }
+          if (id.includes("react-hook-form") || id.includes("zod") || id.includes("@hookform")) {
+            return "forms-vendor";
+          }
+          if (id.includes("openai")) {
+            return "ai-vendor";
+          }
+
+          return "vendor";
+        },
+      },
+    },
   },
 });

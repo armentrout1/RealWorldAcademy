@@ -68,4 +68,4 @@ Public signup can create `student` or `parent` accounts. Emails listed in `ADMIN
 ## Known Pre-Launch Gaps
 
 - Run a full launch QA pass with fresh student, parent, and admin accounts before inviting families.
-- Bundle size warnings still appear during `npm run build`; this is not blocking, but code-splitting should be considered before a larger launch.
+- Browserslist data is stale during `npm run build`; refresh caniuse-lite before a larger production launch.
