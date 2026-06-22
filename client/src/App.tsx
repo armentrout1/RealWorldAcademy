@@ -36,6 +36,7 @@ import AdminLessons from "@/pages/AdminLessons";
 import LessonLibrary from "@/pages/LessonLibrary";
 import Credentials from "@/pages/Credentials";
 import Portfolio from "@/pages/Portfolio";
+import LegalInfo from "@/pages/LegalInfo";
 
 // Page transition variants
 const pageVariants = {
@@ -217,6 +218,21 @@ function Router() {
             <Route path="/portfolio">
               <PageWrapper>
                 <Portfolio />
+              </PageWrapper>
+            </Route>
+            <Route path="/privacy">
+              <PageWrapper>
+                <LegalInfo />
+              </PageWrapper>
+            </Route>
+            <Route path="/terms">
+              <PageWrapper>
+                <LegalInfo />
+              </PageWrapper>
+            </Route>
+            <Route path="/safety">
+              <PageWrapper>
+                <LegalInfo />
               </PageWrapper>
             </Route>
             <Route path="/community">

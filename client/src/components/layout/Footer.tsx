@@ -26,7 +26,7 @@ const Footer: React.FC = () => {
               </h2>
             </div>
             <p className="text-neutral-600 mb-5 leading-relaxed">
-              A new way for the modern generation to learn skills that matter in today's world.
+              A homeschool-friendly way to organize free learning into guided pathways, parent review, and transparent credentials.
             </p>
             <div className="flex space-x-4">
               <a href="#" className="p-2 rounded-full text-neutral-500 hover:text-primary hover:bg-neutral-100 transition-all duration-200">
@@ -59,17 +59,17 @@ const Footer: React.FC = () => {
               </li>
               <li>
                 <Link href="/learn" className="text-neutral-600 hover:text-primary transition-colors duration-200">
-                  Learn
+                  Pathways
                 </Link>
               </li>
               <li>
-                <Link href="/self-discovery" className="text-neutral-600 hover:text-primary transition-colors duration-200">
-                  Self Discovery
+                <Link href="/credentials" className="text-neutral-600 hover:text-primary transition-colors duration-200">
+                  Credentials
                 </Link>
               </li>
               <li>
-                <Link href="/projects" className="text-neutral-600 hover:text-primary transition-colors duration-200">
-                  Projects
+                <Link href="/portfolio" className="text-neutral-600 hover:text-primary transition-colors duration-200">
+                  Portfolio
                 </Link>
               </li>
               <li>
@@ -83,11 +83,10 @@ const Footer: React.FC = () => {
           <div>
             <h3 className="font-sans font-semibold text-lg text-neutral-800 mb-5">Resources</h3>
             <ul className="space-y-3">
-              <li><a href="#" className="text-neutral-600 hover:text-primary transition-colors duration-200">Blog</a></li>
-              <li><a href="#" className="text-neutral-600 hover:text-primary transition-colors duration-200">Support Center</a></li>
-              <li><a href="#" className="text-neutral-600 hover:text-primary transition-colors duration-200">Career Resources</a></li>
-              <li><a href="#" className="text-neutral-600 hover:text-primary transition-colors duration-200">Success Stories</a></li>
-              <li><a href="#" className="text-neutral-600 hover:text-primary transition-colors duration-200">FAQ</a></li>
+              <li><Link href="/resource-center" className="text-neutral-600 hover:text-primary transition-colors duration-200">Resource Center</Link></li>
+              <li><Link href="/contribute" className="text-neutral-600 hover:text-primary transition-colors duration-200">Contribute Curriculum</Link></li>
+              <li><Link href="/admin/lessons" className="text-neutral-600 hover:text-primary transition-colors duration-200">Review Queue</Link></li>
+              <li><Link href="/safety" className="text-neutral-600 hover:text-primary transition-colors duration-200">Family Safety</Link></li>
             </ul>
           </div>
           
@@ -115,11 +114,11 @@ const Footer: React.FC = () => {
         </div>
         
         <div className="pt-8 border-t border-neutral-200 text-neutral-500 text-sm flex flex-col md:flex-row justify-between items-center">
-          <p>&copy; 2023 Real World Academy. All rights reserved.</p>
+          <p>&copy; 2026 Real World Academy. Credentials are non-accredited completion records.</p>
           <div className="flex space-x-6 mt-4 md:mt-0">
-            <a href="#" className="hover:text-primary transition-colors duration-200">Privacy Policy</a>
-            <a href="#" className="hover:text-primary transition-colors duration-200">Terms of Service</a>
-            <a href="#" className="hover:text-primary transition-colors duration-200">Cookie Policy</a>
+            <Link href="/privacy" className="hover:text-primary transition-colors duration-200">Privacy Policy</Link>
+            <Link href="/terms" className="hover:text-primary transition-colors duration-200">Terms of Service</Link>
+            <Link href="/safety" className="hover:text-primary transition-colors duration-200">Family Safety</Link>
           </div>
         </div>
       </div>
