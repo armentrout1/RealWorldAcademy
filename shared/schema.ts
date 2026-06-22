@@ -690,6 +690,31 @@ export const insertParentLessonReviewSchema = createInsertSchema(parentLessonRev
 export type InsertParentLessonReview = z.infer<typeof insertParentLessonReviewSchema>;
 export type ParentLessonReview = typeof parentLessonReviews.$inferSelect;
 
+export const curriculumSubmissions = pgTable("curriculum_submissions", {
+  id: serial("id").primaryKey(),
+  contributorName: text("contributor_name").notNull(),
+  contributorEmail: text("contributor_email").notNull(),
+  affiliation: text("affiliation").notNull(),
+  title: text("title").notNull(),
+  subject: text("subject").notNull(),
+  ageGroup: text("age_group").notNull(),
+  objective: text("objective").notNull(),
+  warmUp: text("warm_up").notNull(),
+  coreContent: text("core_content").notNull(),
+  scenario: text("scenario").notNull(),
+  activity: text("activity").notNull(),
+  reflection: text("reflection").notNull(),
+  badge: text("badge"),
+  status: text("status").default("pending_review").notNull(), // draft, pending_review, changes_requested, approved, rejected, archived
+  reviewerNote: text("reviewer_note"),
+  submittedAt: timestamp("submitted_at").defaultNow(),
+  reviewedAt: timestamp("reviewed_at"),
+});
+
+export const insertCurriculumSubmissionSchema = createInsertSchema(curriculumSubmissions).omit({ id: true });
+export type InsertCurriculumSubmission = z.infer<typeof insertCurriculumSubmissionSchema>;
+export type CurriculumSubmission = typeof curriculumSubmissions.$inferSelect;
+
 // Define the user relations after all models are defined
 export const usersRelations = relations(users, ({ many, one }) => ({
   badges: many(badges),

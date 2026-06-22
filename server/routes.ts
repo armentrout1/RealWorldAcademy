@@ -13,7 +13,8 @@ import {
   insertResourceSchema, insertDailyChallengeSchema, insertUserChallengeSchema,
   insertBuddyProfileSchema, insertBuddyMessageSchema, insertBuddyEmotionLogSchema,
   insertBuddyJournalEntrySchema, insertParentChildRelationshipSchema,
-  insertParentLessonReviewSchema, insertCredentialDefinitionSchema, insertCredentialRequirementSchema
+  insertParentLessonReviewSchema, insertCurriculumSubmissionSchema,
+  insertCredentialDefinitionSchema, insertCredentialRequirementSchema
 } from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -551,6 +552,68 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(relationship);
     } catch (error) {
       res.status(400).json({ message: "Invalid parent-child relationship data" });
+    }
+  });
+
+  // Curriculum contribution and review endpoints
+  app.get("/api/curriculum-submissions", async (req, res) => {
+    try {
+      const status = typeof req.query.status === "string" ? req.query.status : undefined;
+      const submissions = await storage.getCurriculumSubmissions(status);
+      res.json(submissions);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch curriculum submissions" });
+    }
+  });
+
+  app.get("/api/curriculum-submissions/:id", async (req, res) => {
+    try {
+      const submission = await storage.getCurriculumSubmission(Number(req.params.id));
+      if (!submission) {
+        return res.status(404).json({ message: "Curriculum submission not found" });
+      }
+
+      res.json(submission);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch curriculum submission" });
+    }
+  });
+
+  app.post("/api/curriculum-submissions", express.json(), async (req, res) => {
+    try {
+      const validatedData = insertCurriculumSubmissionSchema.parse({
+        ...req.body,
+        status: "pending_review",
+        submittedAt: new Date(),
+      });
+      const submission = await storage.createCurriculumSubmission(validatedData);
+      res.status(201).json(submission);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid curriculum submission data" });
+    }
+  });
+
+  app.patch("/api/curriculum-submissions/:id/review", express.json(), async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const existing = await storage.getCurriculumSubmission(id);
+      if (!existing) {
+        return res.status(404).json({ message: "Curriculum submission not found" });
+      }
+
+      const allowedStatuses = new Set(["approved", "changes_requested", "rejected", "archived"]);
+      if (!allowedStatuses.has(req.body.status)) {
+        return res.status(400).json({ message: "Invalid review status" });
+      }
+
+      const updated = await storage.reviewCurriculumSubmission(id, {
+        status: req.body.status,
+        reviewerNote: req.body.reviewerNote,
+        reviewedAt: new Date(),
+      });
+      res.json(updated);
+    } catch (error) {
+      res.status(400).json({ message: "Failed to review curriculum submission" });
     }
   });
 

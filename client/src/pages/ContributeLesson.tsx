@@ -17,6 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { apiRequest } from "@/lib/queryClient";
 
 // Form schema
 const lessonFormSchema = z.object({
@@ -92,19 +93,31 @@ export default function ContributeLesson() {
   });
 
   // Submit handler
-  function onSubmit(data: LessonFormValues) {
+  async function onSubmit(data: LessonFormValues) {
     setSubmitting(true);
-    
-    // Simulate API call
-    setTimeout(() => {
-      console.log("Lesson data submitted:", data);
+
+    try {
+      await apiRequest("/api/curriculum-submissions", {
+        method: "POST",
+        body: {
+          ...data,
+          badge: data.badge || null,
+        },
+      });
       setSubmitting(false);
       setSubmitted(true);
       toast({
         title: "Lesson submitted successfully!",
         description: "Your lesson has been sent for review.",
       });
-    }, 1500);
+    } catch (error) {
+      setSubmitting(false);
+      toast({
+        title: "Submission failed",
+        description: error instanceof Error ? error.message : "Please try again.",
+        variant: "destructive",
+      });
+    }
   }
 
   // Preview mode toggle
@@ -232,7 +245,7 @@ export default function ContributeLesson() {
       </Alert>
 
       {formStep === 'preview' ? (
-        <LessonPreview data={form.getValues()} onBack={prevStep} onSubmit={() => form.handleSubmit(onSubmit)()} />
+        <LessonPreview data={form.getValues()} onBack={prevStep} onSubmit={() => form.handleSubmit(onSubmit)()} submitting={submitting} />
       ) : (
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
@@ -581,16 +594,10 @@ interface LessonPreviewProps {
   data: LessonFormValues;
   onBack: () => void;
   onSubmit: () => void;
+  submitting: boolean;
 }
 
-function LessonPreview({ data, onBack, onSubmit }: LessonPreviewProps) {
-  const [submitting, setSubmitting] = useState(false);
-
-  const handleSubmit = () => {
-    setSubmitting(true);
-    onSubmit();
-  };
-
+function LessonPreview({ data, onBack, onSubmit, submitting }: LessonPreviewProps) {
   return (
     <div className="space-y-6">
       <Card>
@@ -650,7 +657,7 @@ function LessonPreview({ data, onBack, onSubmit }: LessonPreviewProps) {
           <Button variant="outline" onClick={onBack}>
             Back to Edit
           </Button>
-          <Button onClick={handleSubmit} disabled={submitting}>
+          <Button onClick={onSubmit} disabled={submitting}>
             {submitting ? (
               <>Submitting...</>
             ) : (

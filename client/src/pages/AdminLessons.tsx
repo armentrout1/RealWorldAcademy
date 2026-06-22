@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Link } from "wouter";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, BookOpen, CheckCircle, Clock, MessageSquare, Search, ThumbsDown, ThumbsUp } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -13,97 +14,46 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 
-// Mock lesson data for review
-const mockPendingLessons = [
-  {
-    id: 1,
-    title: "Building a Personal Budget",
-    subject: "Financial Literacy",
-    ageGroup: "13-15",
-    contributorName: "Alex Johnson",
-    affiliation: "High School Economics Teacher",
-    submittedDate: "2025-04-05T14:30:00Z",
-    status: "pending"
-  },
-  {
-    id: 2,
-    title: "Digital Communication Ethics",
-    subject: "Communication",
-    ageGroup: "16-18",
-    contributorName: "Maria Rodriguez",
-    affiliation: "Digital Media Specialist",
-    submittedDate: "2025-04-04T09:15:00Z",
-    status: "pending"
-  },
-  {
-    id: 3,
-    title: "Coding Basics: Your First Webpage",
-    subject: "Technology",
-    ageGroup: "9-12",
-    contributorName: "David Chen",
-    affiliation: "Computer Science Teacher",
-    submittedDate: "2025-04-03T16:45:00Z",
-    status: "pending"
-  }
-];
-
-const mockApprovedLessons = [
-  {
-    id: 4,
-    title: "Managing Social Media Stress",
-    subject: "Well-Being",
-    ageGroup: "13-15",
-    contributorName: "Sarah Williams",
-    affiliation: "School Counselor",
-    submittedDate: "2025-04-01T11:20:00Z",
-    approvedDate: "2025-04-02T14:10:00Z",
-    status: "approved"
-  },
-  {
-    id: 5,
-    title: "Creative Problem Solving",
-    subject: "Critical Thinking",
-    ageGroup: "9-12",
-    contributorName: "James Lee",
-    affiliation: "STEM Program Coordinator",
-    submittedDate: "2025-03-29T10:05:00Z",
-    approvedDate: "2025-03-30T16:30:00Z",
-    status: "approved"
-  }
-];
-
-// Full mock lesson for viewing
-const mockFullLesson = {
-  id: 1,
-  title: "Building a Personal Budget",
-  subject: "Financial Literacy",
-  ageGroup: "13-15",
-  contributorName: "Alex Johnson",
-  contributorEmail: "alex.johnson@school.edu",
-  affiliation: "High School Economics Teacher",
-  submittedDate: "2025-04-05T14:30:00Z",
-  status: "pending",
-  objective: "By the end of this lesson, students will be able to create a basic personal budget, identify income sources and spending categories, and understand the importance of saving for future goals.",
-  warmUp: "Think about the last three things you spent money on. Were they needs or wants? How do you decide what to spend your money on?",
-  coreContent: "A personal budget is a financial plan that allocates income towards expenses, savings, and debt repayment. Creating a budget helps you take control of your finances, avoid overspending, and save for future goals.\n\nKey components of a budget include:\n\n1. Income: Money coming in from allowance, jobs, gifts, etc.\n2. Fixed Expenses: Regular costs that don't change (subscriptions, regular purchases)\n3. Variable Expenses: Costs that change month to month (entertainment, eating out)\n4. Savings: Money set aside for future goals\n\nThe 50/30/20 rule is a simple budgeting framework:\n- 50% for needs\n- 30% for wants\n- 20% for savings and debt repayment",
-  scenario: "Maya is a 14-year-old who receives $80 per month from allowance and helping neighbors with yard work. She wants to save for a $240 tablet, but also needs to pay for her $10 monthly music subscription and wants to have money for going out with friends.\n\nHow can Maya create a budget that allows her to save for her tablet while still having money for her needs and some wants?",
-  activity: "Create Your First Budget\n\n1. List all sources of income (allowance, jobs, gifts)\n2. Identify your regular expenses and categorize as needs or wants\n3. Set a savings goal (what are you saving for?)\n4. Create a budget sheet with these categories:\n   - Monthly Income\n   - Needs (___% of income)\n   - Wants (___% of income)\n   - Savings (___% of income)\n5. Track your spending for one month to see how well you stick to your budget",
-  reflection: "How did creating a budget change how you think about money? What was the most challenging part of making a budget? How might budgeting skills help you in the future?",
-  badge: "Budget Master"
-};
+interface CurriculumSubmission {
+  id: number;
+  contributorName: string;
+  contributorEmail: string;
+  affiliation: string;
+  title: string;
+  subject: string;
+  ageGroup: string;
+  objective: string;
+  warmUp: string;
+  coreContent: string;
+  scenario: string;
+  activity: string;
+  reflection: string;
+  badge?: string | null;
+  status: string;
+  reviewerNote?: string | null;
+  submittedAt?: string | null;
+  reviewedAt?: string | null;
+}
 
 export default function AdminLessons() {
   const [activeTab, setActiveTab] = useState("pending");
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedLesson, setSelectedLesson] = useState<any>(null);
+  const [selectedLesson, setSelectedLesson] = useState<CurriculumSubmission | null>(null);
   const [viewMode, setViewMode] = useState<"preview" | "feedback">("preview");
   const [feedbackText, setFeedbackText] = useState("");
   const [filterSubject, setFilterSubject] = useState("");
   const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const { data: submissions = [], isLoading } = useQuery<CurriculumSubmission[]>({
+    queryKey: ["/api/curriculum-submissions"],
+    queryFn: () => apiRequest<CurriculumSubmission[]>("/api/curriculum-submissions"),
+  });
 
   // Filter lessons based on search query and subject filter
-  const filterLessons = (lessons: any[]) => {
+  const filterLessons = (lessons: CurriculumSubmission[]) => {
     return lessons.filter(lesson => {
       const matchesSearch = 
         lesson.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -115,22 +65,49 @@ export default function AdminLessons() {
     });
   };
 
-  const pendingLessons = filterLessons(mockPendingLessons);
-  const approvedLessons = filterLessons(mockApprovedLessons);
+  const pendingLessons = filterLessons(submissions.filter((lesson) => lesson.status === "pending_review"));
+  const approvedLessons = filterLessons(submissions.filter((lesson) => lesson.status === "approved"));
+
+  const reviewMutation = useMutation({
+    mutationFn: ({ id, status, reviewerNote }: { id: number; status: "approved" | "changes_requested"; reviewerNote?: string }) =>
+      apiRequest<CurriculumSubmission>(`/api/curriculum-submissions/${id}/review`, {
+        method: "PATCH",
+        body: { status, reviewerNote },
+      }),
+    onSuccess: (_submission, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/curriculum-submissions"] });
+      toast({
+        title: variables.status === "approved" ? "Lesson approved" : "Changes requested",
+        description: variables.status === "approved"
+          ? "This submission has been approved for publication readiness."
+          : "The contributor feedback has been recorded.",
+      });
+      setSelectedLesson(null);
+      setFeedbackText("");
+    },
+    onError: (error) => {
+      toast({
+        title: "Review failed",
+        description: error instanceof Error ? error.message : "Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
 
   // View lesson details
-  const handleViewLesson = (lesson: any) => {
-    setSelectedLesson(mockFullLesson); // In a real app, we'd fetch the full lesson data
+  const handleViewLesson = (lesson: CurriculumSubmission) => {
+    setSelectedLesson(lesson);
     setViewMode("preview");
   };
 
   // Approve lesson
   const handleApproveLesson = () => {
-    toast({
-      title: "Lesson Approved!",
-      description: `"${selectedLesson.title}" has been approved and added to the curriculum.`,
+    if (!selectedLesson) return;
+    reviewMutation.mutate({
+      id: selectedLesson.id,
+      status: "approved",
+      reviewerNote: "Approved for publication readiness.",
     });
-    setSelectedLesson(null);
   };
 
   // Send feedback
@@ -144,16 +121,17 @@ export default function AdminLessons() {
       return;
     }
 
-    toast({
-      title: "Feedback Sent",
-      description: `Feedback for "${selectedLesson.title}" has been sent to the contributor.`,
+    if (!selectedLesson) return;
+    reviewMutation.mutate({
+      id: selectedLesson.id,
+      status: "changes_requested",
+      reviewerNote: feedbackText,
     });
-    setSelectedLesson(null);
-    setFeedbackText("");
   };
 
   // Format date for display
-  const formatDate = (dateString: string) => {
+  const formatDate = (dateString?: string | null) => {
+    if (!dateString) return "Not recorded";
     const date = new Date(dateString);
     return new Intl.DateTimeFormat('en-US', {
       month: 'short',
@@ -189,14 +167,14 @@ export default function AdminLessons() {
         </div>
         
         <Select 
-          value={filterSubject}
-          onValueChange={setFilterSubject}
+          value={filterSubject || "__all"}
+          onValueChange={(value) => setFilterSubject(value === "__all" ? "" : value)}
         >
           <SelectTrigger className="w-[200px]">
             <SelectValue placeholder="Filter by subject" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">All Subjects</SelectItem>
+            <SelectItem value="__all">All Subjects</SelectItem>
             <SelectItem value="Financial Literacy">Financial Literacy</SelectItem>
             <SelectItem value="Communication">Communication</SelectItem>
             <SelectItem value="Technology">Technology</SelectItem>
@@ -206,6 +184,13 @@ export default function AdminLessons() {
         </Select>
       </div>
       
+      {isLoading ? (
+        <Card>
+          <CardContent className="pt-6 text-center">
+            <p className="text-muted-foreground">Loading curriculum submissions...</p>
+          </CardContent>
+        </Card>
+      ) : (
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="grid w-full grid-cols-2 mb-6">
           <TabsTrigger value="pending" className="relative">
@@ -252,7 +237,7 @@ export default function AdminLessons() {
                         <TableCell>{lesson.subject}</TableCell>
                         <TableCell>{lesson.ageGroup}</TableCell>
                         <TableCell>{lesson.contributorName}</TableCell>
-                        <TableCell>{formatDate(lesson.submittedDate)}</TableCell>
+                        <TableCell>{formatDate(lesson.submittedAt)}</TableCell>
                         <TableCell className="text-right">
                           <Button variant="outline" size="sm" onClick={() => handleViewLesson(lesson)}>
                             Review
@@ -301,7 +286,7 @@ export default function AdminLessons() {
                         <TableCell>{lesson.subject}</TableCell>
                         <TableCell>{lesson.ageGroup}</TableCell>
                         <TableCell>{lesson.contributorName}</TableCell>
-                        <TableCell>{formatDate(lesson.approvedDate || '')}</TableCell>
+                        <TableCell>{formatDate(lesson.reviewedAt)}</TableCell>
                         <TableCell className="text-right">
                           <Button variant="outline" size="sm" onClick={() => handleViewLesson(lesson)}>
                             View
@@ -316,6 +301,7 @@ export default function AdminLessons() {
           )}
         </TabsContent>
       </Tabs>
+      )}
       
       {/* Lesson review dialog */}
       {selectedLesson && (
@@ -325,7 +311,7 @@ export default function AdminLessons() {
               <div className="flex items-center gap-2 mb-2">
                 <Badge>{selectedLesson.subject}</Badge>
                 <Badge variant="outline">{selectedLesson.ageGroup} years</Badge>
-                {selectedLesson.status === "pending" ? (
+                {selectedLesson.status === "pending_review" ? (
                   <Badge variant="outline" className="bg-yellow-50 text-yellow-800 border-yellow-200 dark:bg-yellow-950 dark:text-yellow-300 dark:border-yellow-800">
                     <Clock className="mr-1 h-3 w-3" />
                     Pending Review
@@ -339,10 +325,10 @@ export default function AdminLessons() {
               </div>
               <DialogTitle className="text-2xl">{selectedLesson.title}</DialogTitle>
               <DialogDescription className="text-base">
-                Submitted by {selectedLesson.contributorName} ({selectedLesson.affiliation}) on {formatDate(selectedLesson.submittedDate)}
+                Submitted by {selectedLesson.contributorName} ({selectedLesson.affiliation}) on {formatDate(selectedLesson.submittedAt)}
               </DialogDescription>
               
-              {selectedLesson.status === "pending" && (
+              {selectedLesson.status === "pending_review" && (
                 <div className="flex gap-2 mt-4">
                   <Button 
                     variant={viewMode === "preview" ? "default" : "outline"} 
@@ -424,14 +410,14 @@ export default function AdminLessons() {
                   )}
                 </div>
                 
-                {selectedLesson.status === "pending" && (
+                {selectedLesson.status === "pending_review" && (
                   <DialogFooter className="flex gap-2 mt-6 pt-4 border-t">
                     <div className="flex-1 text-left">
                       <Button variant="outline" onClick={() => setViewMode("feedback")}>
                         Request Changes
                       </Button>
                     </div>
-                    <Button onClick={handleApproveLesson} className="gap-1">
+                    <Button onClick={handleApproveLesson} className="gap-1" disabled={reviewMutation.isPending}>
                       <ThumbsUp className="h-4 w-4" />
                       Approve Lesson
                     </Button>
@@ -466,7 +452,7 @@ export default function AdminLessons() {
                   <Button 
                     variant="destructive" 
                     onClick={handleSendFeedback}
-                    disabled={!feedbackText.trim()}
+                    disabled={!feedbackText.trim() || reviewMutation.isPending}
                     className="gap-1"
                   >
                     <ThumbsDown className="h-4 w-4" />

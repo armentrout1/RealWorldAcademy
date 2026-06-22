@@ -24,6 +24,7 @@ import {
   buddyJournalEntries, type BuddyJournalEntry, type InsertBuddyJournalEntry,
   parentChildRelationships, type ParentChildRelationship, type InsertParentChildRelationship,
   parentLessonReviews, type ParentLessonReview, type InsertParentLessonReview,
+  curriculumSubmissions, type CurriculumSubmission, type InsertCurriculumSubmission,
   credentialDefinitions, type CredentialDefinition, type InsertCredentialDefinition,
   credentialRequirements, type CredentialRequirement, type InsertCredentialRequirement,
   issuedCredentials, type IssuedCredential, type InsertIssuedCredential
@@ -42,6 +43,10 @@ export interface IStorage {
   createParentChildRelationship(relationship: InsertParentChildRelationship): Promise<ParentChildRelationship>;
   getParentLessonReviewsForChild(childUserId: number): Promise<ParentLessonReview[]>;
   createParentLessonReview(review: InsertParentLessonReview): Promise<ParentLessonReview>;
+  getCurriculumSubmissions(status?: string): Promise<CurriculumSubmission[]>;
+  getCurriculumSubmission(id: number): Promise<CurriculumSubmission | undefined>;
+  createCurriculumSubmission(submission: InsertCurriculumSubmission): Promise<CurriculumSubmission>;
+  reviewCurriculumSubmission(id: number, updates: Partial<CurriculumSubmission>): Promise<CurriculumSubmission>;
 
   // Credential operations
   getAllCredentialDefinitions(): Promise<CredentialDefinition[]>;
@@ -251,6 +256,34 @@ export class DatabaseStorage implements IStorage {
 
   async createParentLessonReview(review: InsertParentLessonReview): Promise<ParentLessonReview> {
     const results = await db.insert(parentLessonReviews).values(review).returning();
+    return results[0];
+  }
+
+  async getCurriculumSubmissions(status?: string): Promise<CurriculumSubmission[]> {
+    if (status) {
+      return await db.select().from(curriculumSubmissions)
+        .where(eq(curriculumSubmissions.status, status));
+    }
+
+    return await db.select().from(curriculumSubmissions);
+  }
+
+  async getCurriculumSubmission(id: number): Promise<CurriculumSubmission | undefined> {
+    const results = await db.select().from(curriculumSubmissions)
+      .where(eq(curriculumSubmissions.id, id));
+    return results[0];
+  }
+
+  async createCurriculumSubmission(submission: InsertCurriculumSubmission): Promise<CurriculumSubmission> {
+    const results = await db.insert(curriculumSubmissions).values(submission).returning();
+    return results[0];
+  }
+
+  async reviewCurriculumSubmission(id: number, updates: Partial<CurriculumSubmission>): Promise<CurriculumSubmission> {
+    const results = await db.update(curriculumSubmissions)
+      .set(updates)
+      .where(eq(curriculumSubmissions.id, id))
+      .returning();
     return results[0];
   }
 
