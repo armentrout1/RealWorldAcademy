@@ -53,6 +53,66 @@ const staticLesson: LessonRecord = {
   xpReward: 50,
 };
 
+const subjectLabelBySlug: Record<string, string> = {
+  "money-basics": "Money Basics",
+  "career-exploration": "Career Exploration",
+  "digital-productivity": "Digital Productivity",
+  "communication-relationships": "Communication & Relationships",
+  "real-world-math": "Real-World Math",
+};
+
+const labelFromKey = (key: string) => key
+  .replace(/([A-Z])/g, " $1")
+  .replace(/[-_]/g, " ")
+  .replace(/\b\w/g, (letter) => letter.toUpperCase());
+
+const renderActivityContent = (content: unknown): React.ReactNode => {
+  if (!content) return null;
+
+  if (typeof content === "string") {
+    return <p>{content}</p>;
+  }
+
+  if (Array.isArray(content)) {
+    return (
+      <ul className="list-disc space-y-1 pl-5">
+        {content.map((item, index) => (
+          <li key={index}>{String(item)}</li>
+        ))}
+      </ul>
+    );
+  }
+
+  if (typeof content === "object") {
+    return (
+      <div className="space-y-4">
+        {Object.entries(content as Record<string, unknown>)
+          .filter(([key]) => key !== "contributor" && key !== "sourceSubmissionId")
+          .map(([key, value]) => (
+            <div key={key}>
+              <h4 className="mb-1 text-sm font-medium">{labelFromKey(key)}</h4>
+              {Array.isArray(value) ? (
+                <ul className="list-disc space-y-1 pl-5 text-sm">
+                  {value.map((item, index) => (
+                    <li key={index}>{String(item)}</li>
+                  ))}
+                </ul>
+              ) : typeof value === "object" && value !== null ? (
+                <div className="rounded-md border bg-white p-3 text-sm">
+                  {renderActivityContent(value)}
+                </div>
+              ) : (
+                <p className="text-sm">{String(value)}</p>
+              )}
+            </div>
+          ))}
+      </div>
+    );
+  }
+
+  return <p>{String(content)}</p>;
+};
+
 export default function LessonTemplate() {
   const [location] = useLocation();
   const lessonMatch = /^\/learn\/([^/]+)\/([^/]+)$/.exec(location);
@@ -76,6 +136,9 @@ export default function LessonTemplate() {
     },
     initialData: staticLesson,
   });
+
+  const subjectLabel = subjectSlug ? subjectLabelBySlug[subjectSlug] || labelFromKey(subjectSlug) : "Pathway";
+  const subjectHref = subjectSlug ? `/learn/${subjectSlug}` : "/learn";
 
   const { data: savedProgress } = useQuery<LessonProgressRecord | null>({
     queryKey: ["/api/users", user?.id, "lessons", lesson.id, "progress"],
@@ -145,10 +208,10 @@ export default function LessonTemplate() {
   return (
     <div className="container max-w-4xl py-8">
       <div className="flex items-center justify-between mb-6">
-        <Link href="/learn">
+        <Link href={subjectHref}>
           <Button variant="ghost" className="gap-1">
             <ArrowLeft className="h-4 w-4" />
-            Back to Pathways
+            Back to {subjectLabel}
           </Button>
         </Link>
 
@@ -168,7 +231,7 @@ export default function LessonTemplate() {
 
       <div className="space-y-6">
         <div>
-          <Badge className="mb-2">Money Basics</Badge>
+          <Badge className="mb-2">{subjectLabel}</Badge>
           <h1 className="text-3xl font-bold tracking-tight">{lesson.title}</h1>
           <p className="text-lg text-muted-foreground mt-2">{lesson.subtitle}</p>
         </div>
@@ -235,11 +298,17 @@ export default function LessonTemplate() {
                 <CardTitle>Activity</CardTitle>
               </CardHeader>
               <CardContent className="pt-4 space-y-4">
-                <p>Use this lesson to create a small real-world action plan. Write your plan or notes in the reflection section so your progress can be saved.</p>
+                <p>Complete the activity below, then save your notes or response in the reflection section.</p>
                 <div className="bg-muted p-4 rounded-md">
                   <h3 className="font-medium mb-2">Activity Type</h3>
                   <p className="capitalize">{lesson.activityType.replace(/-/g, " ")}</p>
                 </div>
+                {lesson.activityContent !== null && lesson.activityContent !== undefined && (
+                  <div className="rounded-md border p-4">
+                    <h3 className="mb-3 font-medium">Activity Details</h3>
+                    {renderActivityContent(lesson.activityContent)}
+                  </div>
+                )}
               </CardContent>
             </Card>
             <div className="flex justify-end">
@@ -289,7 +358,7 @@ export default function LessonTemplate() {
               </CardContent>
               <CardFooter className="flex flex-wrap justify-between gap-3 border-t pt-4">
                 <Button variant="outline" asChild>
-                  <Link href="/learn">Back to Pathways</Link>
+                  <Link href={subjectHref}>Back to {subjectLabel}</Link>
                 </Button>
                 <div className="flex gap-3">
                   <Button
