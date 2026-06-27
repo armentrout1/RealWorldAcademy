@@ -959,6 +959,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/curriculum-collections/:id", async (req, res) => {
+    try {
+      const collection = await storage.getCurriculumCollection(Number(req.params.id));
+      if (!collection || !["approved", "published"].includes(collection.status)) {
+        return res.status(404).json({ message: "Curriculum collection not found" });
+      }
+
+      const [enriched] = await attachCollectionDetails([collection]);
+      res.json(enriched);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch curriculum collection" });
+    }
+  });
+
   app.post("/api/curriculum-collections", express.json(), async (req, res) => {
     try {
       const sessionUserId = requireSessionUserId(req, res);

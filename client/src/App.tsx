@@ -32,6 +32,7 @@ import Journal from "@/pages/Journal";
 import LessonTemplate from "@/pages/LessonTemplate";
 import NotFound from "@/pages/not-found";
 import ContributeLesson from "@/pages/ContributeLesson";
+import CollectionLibrary from "@/pages/CollectionLibrary";
 import CurriculumCollections from "@/pages/CurriculumCollections";
 import ContributorDashboard from "@/pages/ContributorDashboard";
 import ContributorProfile from "@/pages/ContributorProfile";
@@ -293,6 +294,16 @@ function Router() {
             <Route path="/library">
               <PageWrapper>
                 <LessonLibrary />
+              </PageWrapper>
+            </Route>
+            <Route path="/collections">
+              <PageWrapper>
+                <CollectionLibrary />
+              </PageWrapper>
+            </Route>
+            <Route path="/collections/:id">
+              <PageWrapper>
+                <CollectionLibrary />
               </PageWrapper>
             </Route>
             <Route>
