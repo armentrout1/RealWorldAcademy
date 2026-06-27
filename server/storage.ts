@@ -13,6 +13,7 @@ import {
   visionBoardItems, type VisionBoardItem, type InsertVisionBoardItem,
   subjects, type Subject, type InsertSubject,
   lessons, type Lesson, type InsertLesson,
+  lessonResources, type LessonResource, type InsertLessonResource,
   userSubjectProgress, type UserSubjectProgress, type InsertUserSubjectProgress,
   userLessonProgress, type UserLessonProgress, type InsertUserLessonProgress,
   resources, type Resource, type InsertResource,
@@ -178,6 +179,8 @@ export interface IStorage {
   getLessonBySlug(subjectSlug: string, lessonSlug: string): Promise<Lesson | undefined>;
   createLesson(lesson: InsertLesson): Promise<Lesson>;
   updateLesson(id: number, lesson: Partial<Lesson>): Promise<Lesson>;
+  getLessonResources(lessonId: number): Promise<LessonResource[]>;
+  createLessonResource(resource: InsertLessonResource): Promise<LessonResource>;
   
   // User Subject Progress operations
   getUserSubjectProgress(userId: number, subjectId: number): Promise<UserSubjectProgress | undefined>;
@@ -862,6 +865,17 @@ export class DatabaseStorage implements IStorage {
       .set(lesson)
       .where(eq(lessons.id, id))
       .returning();
+    return results[0];
+  }
+
+  async getLessonResources(lessonId: number): Promise<LessonResource[]> {
+    const items = await db.select().from(lessonResources)
+      .where(eq(lessonResources.lessonId, lessonId));
+    return items.sort((left, right) => left.order - right.order);
+  }
+
+  async createLessonResource(resource: InsertLessonResource): Promise<LessonResource> {
+    const results = await db.insert(lessonResources).values(resource).returning();
     return results[0];
   }
   

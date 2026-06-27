@@ -1,5 +1,5 @@
 import React from "react";
-import { ArrowLeft, BadgeCheck, Brain, Clock, Target } from "lucide-react";
+import { ArrowLeft, BadgeCheck, Brain, Clock, ExternalLink, PlayCircle, Target } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -26,6 +26,21 @@ interface LessonRecord {
   reflectionPrompt: string;
   estimatedMinutes: number;
   xpReward: number;
+  resources?: LessonResourceRecord[];
+}
+
+interface LessonResourceRecord {
+  id: number;
+  resourceType: string;
+  title: string;
+  description?: string | null;
+  url: string;
+  embedUrl?: string | null;
+  sourceLabel?: string | null;
+  duration?: string | null;
+  safetyNotes?: string | null;
+  parentPrompt?: string | null;
+  studentPrompt?: string | null;
 }
 
 interface LessonProgressRecord {
@@ -285,6 +300,53 @@ export default function LessonTemplate() {
                   <h3 className="font-medium mb-2">Real-Life Scenario: {lesson.scenarioTitle}</h3>
                   <p>{lesson.scenarioContent}</p>
                 </div>
+                {lesson.resources && lesson.resources.length > 0 && (
+                  <div className="space-y-3 rounded-md border p-4">
+                    <h3 className="flex items-center gap-2 font-medium">
+                      <PlayCircle className="h-4 w-4 text-primary" />
+                      Curated Resources
+                    </h3>
+                    {lesson.resources.map((resource) => (
+                      <div key={resource.id} className="rounded-md border bg-white p-4">
+                        <div className="mb-2 flex flex-wrap gap-2">
+                          <Badge variant="secondary">{resource.resourceType}</Badge>
+                          {resource.duration && <Badge variant="outline">{resource.duration}</Badge>}
+                          {resource.sourceLabel && <Badge variant="outline">Source: {resource.sourceLabel}</Badge>}
+                        </div>
+                        <h4 className="font-medium">{resource.title}</h4>
+                        {resource.description && <p className="mt-1 text-sm text-muted-foreground">{resource.description}</p>}
+                        {resource.embedUrl && (
+                          <div className="mt-3 aspect-video overflow-hidden rounded-md border bg-black">
+                            <iframe
+                              className="h-full w-full"
+                              src={resource.embedUrl}
+                              title={resource.title}
+                              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                              allowFullScreen
+                            />
+                          </div>
+                        )}
+                        <Button variant="outline" className="mt-3" asChild>
+                          <a href={resource.url} target="_blank" rel="noreferrer">
+                            <ExternalLink className="mr-2 h-4 w-4" />
+                            Open Resource
+                          </a>
+                        </Button>
+                        {resource.safetyNotes && (
+                          <p className="mt-3 rounded-md border bg-amber-50 p-3 text-sm text-amber-900">
+                            <span className="font-medium">Parent note:</span> {resource.safetyNotes}
+                          </p>
+                        )}
+                        {resource.parentPrompt && (
+                          <p className="mt-2 text-sm"><span className="font-medium">Parent prompt:</span> {resource.parentPrompt}</p>
+                        )}
+                        {resource.studentPrompt && (
+                          <p className="mt-1 text-sm"><span className="font-medium">Student prompt:</span> {resource.studentPrompt}</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
             <div className="flex justify-end">

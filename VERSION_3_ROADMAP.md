@@ -148,7 +148,9 @@ Current build status:
 - `green`: public collection detail pages can embed YouTube videos in context with parent/student prompts.
 - `green`: contributors can submit standalone videos, links, guides, worksheets, and activities for review from `/contribute-resource`.
 - `green`: admins can review resource submissions and approve them into the public Resource Center.
-- `yellow`: lesson-level video/resource attachment still needs to be built.
+- `green`: lesson contributors can attach one curated resource/video during submission.
+- `green`: approved contributed lessons publish attached resources into `lesson_resources`.
+- `green`: lesson pages render attached videos/resources with source, safety notes, parent prompts, and student prompts.
 
 ### Phase 4: Review Rubric 2.0
 

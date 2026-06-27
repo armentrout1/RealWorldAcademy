@@ -10,6 +10,7 @@ import {
   insertTimelineEventSchema, insertUserProgressSummarySchema,
   insertCareerPathSchema, insertGoalSchema, insertVisionBoardItemSchema,
   insertSubjectSchema, insertLessonSchema,
+  insertLessonResourceSchema,
   insertResourceSchema, insertDailyChallengeSchema, insertUserChallengeSchema,
   insertBuddyProfileSchema, insertBuddyMessageSchema, insertBuddyEmotionLogSchema,
   insertBuddyJournalEntrySchema, insertParentChildRelationshipSchema,
@@ -89,6 +90,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.status(403).json({ message: "Admin access required" });
     return false;
   };
+
+  const withLessonResources = async <T extends { id: number }>(lesson: T) => ({
+    ...lesson,
+    resources: await storage.getLessonResources(lesson.id),
+  });
 
   app.get("/api/health", (_req, res) => {
     res.json({
@@ -392,7 +398,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!lesson) {
         return res.status(404).json({ message: "Lesson not found" });
       }
-      res.json(lesson);
+      res.json(await withLessonResources(lesson));
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch lesson" });
     }
@@ -404,7 +410,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!lesson) {
         return res.status(404).json({ message: "Lesson not found" });
       }
-      res.json(lesson);
+      res.json(await withLessonResources(lesson));
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch lesson" });
     }
@@ -777,7 +783,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       : undefined;
     const contributorName = contributorProfile?.displayName || submission.contributorName;
 
-    return await storage.createLesson(insertLessonSchema.parse({
+    const lesson = await storage.createLesson(insertLessonSchema.parse({
       subjectId: subject.id,
       title: submission.title,
       subtitle: `Community lesson by ${contributorName}`,
@@ -813,6 +819,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         },
       },
     }));
+
+    if (submission.resourceTitle && submission.resourceUrl) {
+      const resourceType = submission.resourceType || "link";
+      await storage.createLessonResource(insertLessonResourceSchema.parse({
+        lessonId: lesson.id,
+        resourceId: null,
+        resourceType,
+        title: submission.resourceTitle,
+        description: submission.resourceDescription || null,
+        url: submission.resourceUrl,
+        embedUrl: resourceType === "video" ? getYouTubeEmbedUrl(submission.resourceUrl) : null,
+        sourceLabel: submission.resourceSourceLabel || null,
+        duration: submission.resourceDuration || null,
+        safetyNotes: submission.resourceSafetyNotes || null,
+        parentPrompt: submission.resourceParentPrompt || null,
+        studentPrompt: submission.resourceStudentPrompt || null,
+        order: 1,
+      }));
+    }
+
+    return lesson;
   };
 
   const attachContributorProfiles = async (submissions: CurriculumSubmission[]) => {

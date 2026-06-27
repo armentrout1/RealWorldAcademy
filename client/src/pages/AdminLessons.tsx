@@ -31,6 +31,15 @@ interface CurriculumSubmission {
   activity: string;
   reflection: string;
   badge?: string | null;
+  resourceTitle?: string | null;
+  resourceType?: string | null;
+  resourceUrl?: string | null;
+  resourceDescription?: string | null;
+  resourceSourceLabel?: string | null;
+  resourceDuration?: string | null;
+  resourceSafetyNotes?: string | null;
+  resourceParentPrompt?: string | null;
+  resourceStudentPrompt?: string | null;
   status: string;
   reviewerNote?: string | null;
   submittedAt?: string | null;
@@ -1023,7 +1032,7 @@ export default function AdminLessons() {
                 )}
               </div>
 
-              {[
+              {[ 
                 ["Objective", selectedSubmission.objective],
                 ["Warm-Up", selectedSubmission.warmUp],
                 ["Core Content", selectedSubmission.coreContent],
@@ -1037,6 +1046,35 @@ export default function AdminLessons() {
                   <Separator className="mt-4" />
                 </div>
               ))}
+
+              {selectedSubmission.resourceTitle && selectedSubmission.resourceUrl && (
+                <div className="rounded-md border p-4">
+                  <h3 className="mb-2 font-semibold">Attached Resource</h3>
+                  <div className="mb-2 flex flex-wrap gap-2">
+                    <Badge variant="secondary">{selectedSubmission.resourceType || "link"}</Badge>
+                    {selectedSubmission.resourceDuration && <Badge variant="outline">{selectedSubmission.resourceDuration}</Badge>}
+                    {selectedSubmission.resourceSourceLabel && <Badge variant="outline">Source: {selectedSubmission.resourceSourceLabel}</Badge>}
+                  </div>
+                  <p className="font-medium">{selectedSubmission.resourceTitle}</p>
+                  <a className="break-all text-sm text-primary underline" href={selectedSubmission.resourceUrl} target="_blank" rel="noreferrer">
+                    {selectedSubmission.resourceUrl}
+                  </a>
+                  {selectedSubmission.resourceDescription && (
+                    <p className="mt-2 whitespace-pre-line text-sm text-muted-foreground">{selectedSubmission.resourceDescription}</p>
+                  )}
+                  {selectedSubmission.resourceSafetyNotes && (
+                    <p className="mt-2 rounded-md border bg-amber-50 p-2 text-sm text-amber-900">
+                      <span className="font-medium">Safety notes:</span> {selectedSubmission.resourceSafetyNotes}
+                    </p>
+                  )}
+                  {selectedSubmission.resourceParentPrompt && (
+                    <p className="mt-2 text-sm"><span className="font-medium">Parent:</span> {selectedSubmission.resourceParentPrompt}</p>
+                  )}
+                  {selectedSubmission.resourceStudentPrompt && (
+                    <p className="mt-1 text-sm"><span className="font-medium">Student:</span> {selectedSubmission.resourceStudentPrompt}</p>
+                  )}
+                </div>
+              )}
 
               <div className="space-y-2">
                 <h3 className="font-semibold">Reviewer Note</h3>

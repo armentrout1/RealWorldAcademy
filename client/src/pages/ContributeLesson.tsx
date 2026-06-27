@@ -60,6 +60,15 @@ const lessonFormSchema = z.object({
     message: "Reflection prompt should be at least 20 characters.",
   }),
   badge: z.string().optional(),
+  resourceTitle: z.string().optional(),
+  resourceType: z.string().optional(),
+  resourceUrl: z.string().optional(),
+  resourceDescription: z.string().optional(),
+  resourceSourceLabel: z.string().optional(),
+  resourceDuration: z.string().optional(),
+  resourceSafetyNotes: z.string().optional(),
+  resourceParentPrompt: z.string().optional(),
+  resourceStudentPrompt: z.string().optional(),
 });
 
 type LessonFormValues = z.infer<typeof lessonFormSchema>;
@@ -86,6 +95,15 @@ const defaultValues: Partial<LessonFormValues> = {
   activity: "",
   reflection: "",
   badge: "",
+  resourceTitle: "",
+  resourceType: "video",
+  resourceUrl: "",
+  resourceDescription: "",
+  resourceSourceLabel: "",
+  resourceDuration: "",
+  resourceSafetyNotes: "",
+  resourceParentPrompt: "",
+  resourceStudentPrompt: "",
 };
 
 export default function ContributeLesson() {
@@ -128,6 +146,15 @@ export default function ContributeLesson() {
         body: {
           ...data,
           badge: data.badge || null,
+          resourceTitle: data.resourceTitle || null,
+          resourceType: data.resourceType || null,
+          resourceUrl: data.resourceUrl || null,
+          resourceDescription: data.resourceDescription || null,
+          resourceSourceLabel: data.resourceSourceLabel || null,
+          resourceDuration: data.resourceDuration || null,
+          resourceSafetyNotes: data.resourceSafetyNotes || null,
+          resourceParentPrompt: data.resourceParentPrompt || null,
+          resourceStudentPrompt: data.resourceStudentPrompt || null,
         },
       });
       setSubmitting(false);
@@ -600,6 +627,146 @@ export default function ContributeLesson() {
                         </FormItem>
                       )}
                     />
+
+                    <div className="rounded-md border bg-slate-50 p-4">
+                      <div className="mb-4">
+                        <h3 className="font-semibold">Curated Resource (Optional)</h3>
+                        <p className="text-sm text-muted-foreground">
+                          Attach one video, guide, worksheet, activity, or link that supports this lesson.
+                        </p>
+                      </div>
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <FormField
+                          control={form.control}
+                          name="resourceTitle"
+                          render={({ field }) => (
+                            <FormItem className="md:col-span-2">
+                              <FormLabel>Resource Title</FormLabel>
+                              <FormControl>
+                                <Input placeholder="Helpful video or worksheet title" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="resourceType"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Resource Type</FormLabel>
+                              <Select onValueChange={field.onChange} defaultValue={field.value || "video"}>
+                                <FormControl>
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Select type" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  <SelectItem value="video">Video</SelectItem>
+                                  <SelectItem value="link">Link</SelectItem>
+                                  <SelectItem value="pdf">PDF</SelectItem>
+                                  <SelectItem value="worksheet">Worksheet</SelectItem>
+                                  <SelectItem value="guide">Guide</SelectItem>
+                                  <SelectItem value="activity">Activity</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="resourceSourceLabel"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Source / Channel</FormLabel>
+                              <FormControl>
+                                <Input placeholder="Khan Academy, CrashCourse..." {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="resourceUrl"
+                          render={({ field }) => (
+                            <FormItem className="md:col-span-2">
+                              <FormLabel>Resource URL</FormLabel>
+                              <FormControl>
+                                <Input placeholder="https://youtube.com/..." {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="resourceDuration"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Duration</FormLabel>
+                              <FormControl>
+                                <Input placeholder="12 min" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="resourceDescription"
+                          render={({ field }) => (
+                            <FormItem className="md:col-span-2">
+                              <FormLabel>Description</FormLabel>
+                              <FormControl>
+                                <Textarea className="min-h-[80px]" placeholder="What this resource covers" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="resourceSafetyNotes"
+                          render={({ field }) => (
+                            <FormItem className="md:col-span-2">
+                              <FormLabel>Safety / Parent Notes</FormLabel>
+                              <FormControl>
+                                <Textarea className="min-h-[80px]" placeholder="Why this resource is appropriate and useful" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="resourceParentPrompt"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Parent Prompt</FormLabel>
+                              <FormControl>
+                                <Textarea placeholder="Question a parent can ask" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="resourceStudentPrompt"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Student Prompt</FormLabel>
+                              <FormControl>
+                                <Textarea placeholder="Reflection or task for the student" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                    </div>
                   </CardContent>
                   <CardFooter className="flex justify-between border-t pt-4">
                     <Button type="button" variant="outline" onClick={prevStep}>Back</Button>
@@ -675,6 +842,23 @@ function LessonPreview({ data, onBack, onSubmit, submitting }: LessonPreviewProp
                 <Badge variant="outline" className="bg-yellow-50 text-yellow-800 border-yellow-200 dark:bg-yellow-950 dark:text-yellow-300 dark:border-yellow-800">
                   {data.badge}
                 </Badge>
+              </div>
+            </div>
+          )}
+
+          {data.resourceTitle && data.resourceUrl && (
+            <div className="border-t pt-4">
+              <h3 className="text-lg font-semibold mb-2">Curated Resource</h3>
+              <div className="rounded-md border p-4">
+                <div className="mb-2 flex flex-wrap gap-2">
+                  <Badge variant="secondary">{data.resourceType || "link"}</Badge>
+                  {data.resourceDuration && <Badge variant="outline">{data.resourceDuration}</Badge>}
+                  {data.resourceSourceLabel && <Badge variant="outline">Source: {data.resourceSourceLabel}</Badge>}
+                </div>
+                <p className="font-medium">{data.resourceTitle}</p>
+                <p className="break-all text-sm text-primary">{data.resourceUrl}</p>
+                {data.resourceDescription && <p className="mt-2 text-sm text-muted-foreground whitespace-pre-line">{data.resourceDescription}</p>}
+                {data.resourceSafetyNotes && <p className="mt-2 text-sm text-muted-foreground whitespace-pre-line">Parent notes: {data.resourceSafetyNotes}</p>}
               </div>
             </div>
           )}

@@ -412,6 +412,38 @@ export const resourcesRelations = relations(resources, ({ one }) => ({
   }),
 }));
 
+export const lessonResources = pgTable("lesson_resources", {
+  id: serial("id").primaryKey(),
+  lessonId: integer("lesson_id").notNull().references(() => lessons.id),
+  resourceId: integer("resource_id").references(() => resources.id),
+  resourceType: text("resource_type").notNull(),
+  title: text("title").notNull(),
+  description: text("description"),
+  url: text("url").notNull(),
+  embedUrl: text("embed_url"),
+  sourceLabel: text("source_label"),
+  duration: text("duration"),
+  safetyNotes: text("safety_notes"),
+  parentPrompt: text("parent_prompt"),
+  studentPrompt: text("student_prompt"),
+  order: integer("order").default(1).notNull(),
+});
+
+export const insertLessonResourceSchema = createInsertSchema(lessonResources).omit({ id: true });
+export type InsertLessonResource = z.infer<typeof insertLessonResourceSchema>;
+export type LessonResource = typeof lessonResources.$inferSelect;
+
+export const lessonResourcesRelations = relations(lessonResources, ({ one }) => ({
+  lesson: one(lessons, {
+    fields: [lessonResources.lessonId],
+    references: [lessons.id],
+  }),
+  resource: one(resources, {
+    fields: [lessonResources.resourceId],
+    references: [resources.id],
+  }),
+}));
+
 // Daily challenges model
 export const dailyChallenges = pgTable("daily_challenges", {
   id: serial("id").primaryKey(),
@@ -734,6 +766,15 @@ export const curriculumSubmissions = pgTable("curriculum_submissions", {
   activity: text("activity").notNull(),
   reflection: text("reflection").notNull(),
   badge: text("badge"),
+  resourceTitle: text("resource_title"),
+  resourceType: text("resource_type"),
+  resourceUrl: text("resource_url"),
+  resourceDescription: text("resource_description"),
+  resourceSourceLabel: text("resource_source_label"),
+  resourceDuration: text("resource_duration"),
+  resourceSafetyNotes: text("resource_safety_notes"),
+  resourceParentPrompt: text("resource_parent_prompt"),
+  resourceStudentPrompt: text("resource_student_prompt"),
   status: text("status").default("pending_review").notNull(), // draft, pending_review, changes_requested, approved, rejected, archived
   reviewerNote: text("reviewer_note"),
   submittedAt: timestamp("submitted_at").defaultNow(),
