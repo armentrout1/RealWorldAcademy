@@ -4,30 +4,30 @@
 
 Version 2 turned Real World Academy into a usable homeschool beta: students can learn, parents can review, contributors can submit lessons, admins can publish approved content, and credentials can be issued and verified.
 
-Version 3 should turn that beta into a creative curriculum platform.
+Version 3 should turn that beta into a creative curriculum platform and prepare the ground for a trusted educator marketplace.
 
-The core idea is simple: families, educators, creators, and mentors should be able to organize useful free learning into safe, reviewed, structured homeschool pathways. The platform should make creation easy while keeping publication trustworthy.
+The core idea is simple: families, educators, teachers, creators, and mentors should be able to organize useful free learning into safe, reviewed, structured homeschool pathways. The platform should make creation easy while keeping publication trustworthy.
 
 ## Version 3 Promise
 
-A contributor can create a lesson, resource, or full curriculum collection using original activities and curated free videos. Real World Academy reviews it for safety and quality, publishes it into discoverable pathways, and lets families use it as part of a student portfolio and credential journey.
+A teacher, educator, mentor, parent, or creator can create a lesson, resource, class sample, or full curriculum collection using original activities and curated free videos. Real World Academy reviews it for safety and quality, publishes it into discoverable pathways, and lets families use it as part of a student portfolio and credential journey.
 
 ## Core Version 3 User Journeys
 
-### Contributor Journey
+### Educator and Contributor Journey
 
-1. A contributor creates or claims a contributor profile.
-2. The contributor builds a lesson, resource, or curriculum collection.
-3. The contributor can add curated YouTube videos, discussion prompts, activities, parent notes, and reflection questions.
-4. The contributor submits the content for review.
+1. An educator, teacher, tutor, mentor, parent, or creator creates or claims a profile.
+2. The educator builds a lesson, resource, class sample, tutoring offer, or curriculum collection.
+3. The educator can add curated YouTube videos, discussion prompts, activities, parent notes, reflection questions, intro videos, and free samples.
+4. The educator submits the content or offering for review.
 5. Admins review the submission with a structured rubric.
 6. Approved content publishes into the public learning library.
-7. Contributor profile shows published work and trust status.
+7. The profile shows published work, free samples, teaching style, subjects, age groups, and trust status.
 
 ### Parent/Student Journey
 
 1. A family browses approved pathways, collections, and lessons.
-2. A parent can filter by age, subject, duration, format, and parent-led/student-led.
+2. A parent can filter by age, subject, duration, format, parent-led/student-led, free/paid, live/recorded, and educator type.
 3. A student starts a lesson or collection.
 4. Progress, reflections, and parent reviews continue feeding the portfolio and credential system.
 5. Families can report or flag content if something feels inaccurate, unsafe, or inappropriate.
@@ -37,7 +37,7 @@ A contributor can create a lesson, resource, or full curriculum collection using
 1. Admins see a queue of lesson, resource, and collection submissions.
 2. Admins review safety, age fit, source quality, originality, learning usefulness, and credential fit.
 3. Admins approve, reject, request changes, archive, or flag content.
-4. Admins can manage contributor trust levels and published content.
+4. Admins can manage educator/contributor trust levels, published content, and eventually paid offerings.
 
 ## MVP Scope for Version 3
 
@@ -45,6 +45,7 @@ A contributor can create a lesson, resource, or full curriculum collection using
 
 - Contributor profiles
 - Contributor dashboard
+- Educator profile foundation
 - Curriculum collection builder
 - YouTube/video resource support
 - Review rubric and structured review status
@@ -63,6 +64,9 @@ A contributor can create a lesson, resource, or full curriculum collection using
 ### Defer
 
 - Paid creator marketplace
+- Payment processing for educator classes/services
+- One-on-one tutoring scheduling
+- Live classroom tooling
 - Public social feeds
 - Ratings/reviews from students
 - Creator monetization
@@ -265,6 +269,28 @@ Exit criteria:
 - Community-created content can support credential pathways after review.
 - Credential requirements remain transparent.
 
+### Phase 9: Educator Marketplace Foundation
+
+Goal: prepare Real World Academy for teachers, educators, tutors, mentors, and creator-teachers to teach and earn without opening an uncontrolled marketplace.
+
+Tasks:
+
+- Expand contributor language into educator/teacher profile language.
+- Add educator profile fields for teaching style, subjects, age groups, intro video, sample lessons, availability, and offering types.
+- Add class/service offering model with free sample, live class, recorded course, tutoring/coaching, and curriculum bundle types.
+- Keep offerings in draft, pending review, approved, and archived states.
+- Add admin review queue for educator offerings.
+- Add public educator profile pages showing free samples and approved offerings.
+- Add interest/inquiry buttons before payment processing.
+- Document future platform fee/revenue-share model.
+
+Exit criteria:
+
+- Educators can present themselves as teachers on the platform.
+- Families can browse approved educator profiles and sample content.
+- Admins can review offerings before anything paid or student-facing is listed.
+- The product is ready for a later payments phase without compromising trust.
+
 ## Suggested Data Additions
 
 ### Contributor System
@@ -272,6 +298,11 @@ Exit criteria:
 - `contributor_profiles`
 - `contributor_expertise_tags`
 - `contributor_stats`
+- `educator_offerings`
+- `educator_availability`
+- `educator_profile_media`
+- `educator_reviews`
+- `educator_payout_accounts`
 
 ### Curriculum Collections
 
@@ -291,6 +322,14 @@ Exit criteria:
 - `content_reports`
 - `content_versions`
 - `published_content_audit_log`
+
+### Marketplace and Classes
+
+- `class_sessions`
+- `class_enrollments`
+- `learning_service_orders`
+- `platform_fees`
+- `refund_requests`
 
 ## Version 3 Quality Bar
 

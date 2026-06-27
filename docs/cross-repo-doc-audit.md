@@ -80,6 +80,9 @@ Useful transfer: phased roadmap structure, private-by-default sharing logic, and
 6. Demo/QA flows should use safe test data.
    Any future public beta demo should clearly use test users, test curriculum, and test credentials so production data and student information are not exposed.
 
+7. Marketplace structure can help educators earn.
+   Fiverr's public marketplace pattern is useful as a reference: profiles, categories, service listings, samples, packages, search, and platform fees. Real World Academy should adapt that into educator profiles, sample lessons, classes, tutoring, curriculum bundles, reviews, and admin-approved offerings rather than copying a generic gig marketplace.
+
 ## Docs Created From This Audit
 
 - `docs/brand-positioning.md`
@@ -90,6 +93,7 @@ Useful transfer: phased roadmap structure, private-by-default sharing logic, and
 
 - `docs/manual-beta-qa-run-template.md`
 - `docs/content-review-policy.md`
+- `docs/educator-marketplace-strategy.md`
 - `docs/contributor-guidelines.md`
 - `docs/parent-safety-guide.md`
 - `docs/credential-policy.md`
