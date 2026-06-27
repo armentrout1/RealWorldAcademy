@@ -32,6 +32,7 @@ import {
   curriculumCollectionItems, type CurriculumCollectionItem, type InsertCurriculumCollectionItem,
   userCurriculumCollectionProgress, type UserCurriculumCollectionProgress, type InsertUserCurriculumCollectionProgress,
   feedbackSubmissions, type FeedbackSubmission, type InsertFeedbackSubmission,
+  contentReports, type ContentReport, type InsertContentReport,
   credentialDefinitions, type CredentialDefinition, type InsertCredentialDefinition,
   credentialRequirements, type CredentialRequirement, type InsertCredentialRequirement,
   issuedCredentials, type IssuedCredential, type InsertIssuedCredential
@@ -86,6 +87,9 @@ export interface IStorage {
   getFeedbackSubmissions(): Promise<FeedbackSubmission[]>;
   createFeedbackSubmission(submission: InsertFeedbackSubmission): Promise<FeedbackSubmission>;
   updateFeedbackSubmission(id: number, updates: Partial<FeedbackSubmission>): Promise<FeedbackSubmission>;
+  getContentReports(status?: string): Promise<ContentReport[]>;
+  createContentReport(report: InsertContentReport): Promise<ContentReport>;
+  updateContentReport(id: number, updates: Partial<ContentReport>): Promise<ContentReport>;
 
   // Credential operations
   getAllCredentialDefinitions(): Promise<CredentialDefinition[]>;
@@ -553,6 +557,27 @@ export class DatabaseStorage implements IStorage {
     const results = await db.update(feedbackSubmissions)
       .set(updates)
       .where(eq(feedbackSubmissions.id, id))
+      .returning();
+    return results[0];
+  }
+
+  async getContentReports(status?: string): Promise<ContentReport[]> {
+    if (status) {
+      return await db.select().from(contentReports).where(eq(contentReports.status, status));
+    }
+
+    return await db.select().from(contentReports);
+  }
+
+  async createContentReport(report: InsertContentReport): Promise<ContentReport> {
+    const results = await db.insert(contentReports).values(report).returning();
+    return results[0];
+  }
+
+  async updateContentReport(id: number, updates: Partial<ContentReport>): Promise<ContentReport> {
+    const results = await db.update(contentReports)
+      .set(updates)
+      .where(eq(contentReports.id, id))
       .returning();
     return results[0];
   }

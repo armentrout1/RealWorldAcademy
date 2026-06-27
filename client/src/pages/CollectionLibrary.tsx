@@ -1,6 +1,6 @@
 import React from "react";
 import { Link, useLocation } from "wouter";
-import { ArrowLeft, BookMarked, CheckCircle2, Circle, ExternalLink, Filter, PlayCircle, Search } from "lucide-react";
+import { ArrowLeft, BookMarked, CheckCircle2, Circle, ExternalLink, Filter, Flag, PlayCircle, Search } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
+import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
@@ -66,6 +67,8 @@ function CollectionDetail({ collectionId }: { collectionId: number }) {
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [reportCategory, setReportCategory] = React.useState("other");
+  const [reportMessage, setReportMessage] = React.useState("");
   const { data: collection, isLoading } = useQuery<CurriculumCollection>({
     queryKey: [`/api/curriculum-collections/${collectionId}`],
     queryFn: () => apiRequest<CurriculumCollection>(`/api/curriculum-collections/${collectionId}`),
@@ -107,6 +110,34 @@ function CollectionDetail({ collectionId }: { collectionId: number }) {
       toast({
         title: "Progress was not updated",
         description: error instanceof Error ? error.message : "Please start the collection first.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const reportMutation = useMutation({
+    mutationFn: () => apiRequest("/api/content-reports", {
+      method: "POST",
+      body: {
+        contentType: "collection",
+        contentId: collectionId,
+        contentTitle: collection?.title || `Collection ${collectionId}`,
+        category: reportCategory,
+        message: reportMessage.trim() || "Reported from the collection detail page.",
+      },
+    }),
+    onSuccess: () => {
+      setReportCategory("other");
+      setReportMessage("");
+      toast({
+        title: "Report submitted",
+        description: "Thanks. The admin team will review this content concern.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Report was not submitted",
+        description: error instanceof Error ? error.message : "Please try again.",
         variant: "destructive",
       });
     },
@@ -288,6 +319,46 @@ function CollectionDetail({ collectionId }: { collectionId: number }) {
               </CardContent>
             </Card>
           )}
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <Flag className="h-4 w-4 text-primary" />
+                Report Concern
+              </CardTitle>
+              <CardDescription>Flag inaccurate, unsafe, or broken content for review.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <Select value={reportCategory} onValueChange={setReportCategory}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="inaccurate">Inaccurate</SelectItem>
+                  <SelectItem value="unsafe">Unsafe</SelectItem>
+                  <SelectItem value="age_mismatch">Wrong Age Fit</SelectItem>
+                  <SelectItem value="broken_link">Broken Link</SelectItem>
+                  <SelectItem value="copyright">Source Rights</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+              <Textarea
+                value={reportMessage}
+                onChange={(event) => setReportMessage(event.target.value)}
+                placeholder="What should an admin review?"
+                className="min-h-[90px]"
+              />
+              <Button
+                variant="outline"
+                className="w-full gap-2"
+                onClick={() => reportMutation.mutate()}
+                disabled={reportMutation.isPending}
+              >
+                <Flag className="h-4 w-4" />
+                {reportMutation.isPending ? "Submitting..." : "Submit Report"}
+              </Button>
+            </CardContent>
+          </Card>
 
           {collection.finalProject && (
             <Card>

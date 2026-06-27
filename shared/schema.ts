@@ -954,6 +954,27 @@ export const insertFeedbackSubmissionSchema = createInsertSchema(feedbackSubmiss
 export type InsertFeedbackSubmission = z.infer<typeof insertFeedbackSubmissionSchema>;
 export type FeedbackSubmission = typeof feedbackSubmissions.$inferSelect;
 
+export const contentReports = pgTable("content_reports", {
+  id: serial("id").primaryKey(),
+  reporterUserId: integer("reporter_user_id").references(() => users.id),
+  reporterName: text("reporter_name"),
+  reporterEmail: text("reporter_email"),
+  contentType: text("content_type").notNull(), // lesson, resource, collection
+  contentId: integer("content_id").notNull(),
+  contentTitle: text("content_title").notNull(),
+  category: text("category").notNull(), // inaccurate, unsafe, age_mismatch, broken_link, copyright, other
+  message: text("message").notNull(),
+  status: text("status").default("new").notNull(),
+  adminNote: text("admin_note"),
+  actionTaken: text("action_taken"),
+  createdAt: timestamp("created_at").defaultNow(),
+  resolvedAt: timestamp("resolved_at"),
+});
+
+export const insertContentReportSchema = createInsertSchema(contentReports).omit({ id: true });
+export type InsertContentReport = z.infer<typeof insertContentReportSchema>;
+export type ContentReport = typeof contentReports.$inferSelect;
+
 // Define the user relations after all models are defined
 export const usersRelations = relations(users, ({ many, one }) => ({
   badges: many(badges),
@@ -976,4 +997,5 @@ export const usersRelations = relations(users, ({ many, one }) => ({
   parentLessonReviews: many(parentLessonReviews, { relationName: "parentLessonReviews" }),
   childLessonReviews: many(parentLessonReviews, { relationName: "childLessonReviews" }),
   contributorProfile: one(contributorProfiles),
+  contentReports: many(contentReports),
 }));

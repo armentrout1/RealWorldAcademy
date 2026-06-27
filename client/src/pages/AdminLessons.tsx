@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Link } from "wouter";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, BookMarked, BookOpen, Inbox, LinkIcon, Search, ShieldCheck, Users } from "lucide-react";
+import { ArrowLeft, BookMarked, BookOpen, Flag, Inbox, LinkIcon, Search, ShieldCheck, Users } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -116,6 +116,22 @@ interface FeedbackSubmission {
   createdAt?: string | null;
 }
 
+interface ContentReport {
+  id: number;
+  reporterName?: string | null;
+  reporterEmail?: string | null;
+  contentType: string;
+  contentId: number;
+  contentTitle: string;
+  category: string;
+  message: string;
+  status: string;
+  adminNote?: string | null;
+  actionTaken?: string | null;
+  createdAt?: string | null;
+  resolvedAt?: string | null;
+}
+
 interface ResourceSubmission {
   id: number;
   contributorName: string;
@@ -167,6 +183,7 @@ const curriculumStatuses = ["pending_review", "approved", "changes_requested", "
 const collectionStatuses = ["approved", "published", "changes_requested", "rejected", "archived"];
 const resourceStatuses = ["approved", "changes_requested", "rejected", "archived"];
 const feedbackStatuses = ["new", "reviewing", "resolved", "archived"];
+const reportStatuses = ["new", "reviewing", "resolved", "archived"];
 const roles = ["student", "parent", "admin"];
 const rubricCriteria = [
   ["safety", "Safety"],
@@ -210,6 +227,11 @@ export default function AdminLessons() {
   const { data: feedback = [], isLoading: feedbackLoading } = useQuery<FeedbackSubmission[]>({
     queryKey: ["/api/feedback"],
     queryFn: () => apiRequest<FeedbackSubmission[]>("/api/feedback"),
+  });
+
+  const { data: contentReports = [], isLoading: reportsLoading } = useQuery<ContentReport[]>({
+    queryKey: ["/api/content-reports"],
+    queryFn: () => apiRequest<ContentReport[]>("/api/content-reports"),
   });
 
   const { data: users = [], isLoading: usersLoading } = useQuery<AdminUser[]>({
@@ -333,6 +355,25 @@ export default function AdminLessons() {
     },
   });
 
+  const reportMutation = useMutation({
+    mutationFn: ({ id, status }: { id: number; status: string }) =>
+      apiRequest<ContentReport>(`/api/content-reports/${id}`, {
+        method: "PATCH",
+        body: { status },
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/content-reports"] });
+      toast({ title: "Report updated", description: "The content report status has been saved." });
+    },
+    onError: (error) => {
+      toast({
+        title: "Report update failed",
+        description: error instanceof Error ? error.message : "Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
   const roleMutation = useMutation({
     mutationFn: ({ userId, role }: { userId: number; role: string }) =>
       apiRequest<AdminUser>(`/api/admin/users/${userId}/role`, {
@@ -387,6 +428,21 @@ export default function AdminLessons() {
 
   const filteredFeedback = feedback.filter((item) =>
     [item.name, item.email, item.audience, item.category, item.status, item.message]
+      .join(" ")
+      .toLowerCase()
+      .includes(searchQuery.toLowerCase())
+  );
+
+  const filteredReports = contentReports.filter((report) =>
+    [
+      report.reporterName,
+      report.reporterEmail,
+      report.contentType,
+      report.contentTitle,
+      report.category,
+      report.status,
+      report.message,
+    ]
       .join(" ")
       .toLowerCase()
       .includes(searchQuery.toLowerCase())
@@ -471,6 +527,7 @@ export default function AdminLessons() {
     collections: collections.filter((collection) => collection.status === "pending_review").length,
     resources: resourceSubmissions.filter((resource) => resource.status === "pending_review").length,
     feedback: feedback.filter((item) => item.status === "new" || item.status === "reviewing").length,
+    reports: contentReports.filter((item) => item.status === "new" || item.status === "reviewing").length,
     users: users.length,
   };
 
@@ -487,7 +544,7 @@ export default function AdminLessons() {
         <div className="w-[150px]" />
       </div>
 
-      <div className="mb-6 grid gap-4 md:grid-cols-5">
+      <div className="mb-6 grid gap-4 md:grid-cols-3 xl:grid-cols-6">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-sm font-medium">
@@ -539,6 +596,18 @@ export default function AdminLessons() {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-sm font-medium">
+              <Flag className="h-4 w-4 text-primary" />
+              Reports
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold">{counts.reports}</div>
+            <p className="text-sm text-muted-foreground">open concerns</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-sm font-medium">
               <Users className="h-4 w-4 text-primary" />
               Users
             </CardTitle>
@@ -553,7 +622,7 @@ export default function AdminLessons() {
       <div className="relative mb-6">
         <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
         <Input
-          placeholder="Search submissions, collections, resources, feedback, users..."
+          placeholder="Search submissions, collections, resources, reports, feedback, users..."
           className="pl-8"
           value={searchQuery}
           onChange={(event) => setSearchQuery(event.target.value)}
@@ -561,10 +630,11 @@ export default function AdminLessons() {
       </div>
 
       <Tabs defaultValue="curriculum">
-        <TabsList className="mb-6 grid w-full grid-cols-5">
+        <TabsList className="mb-6 grid w-full grid-cols-6">
           <TabsTrigger value="curriculum">Curriculum</TabsTrigger>
           <TabsTrigger value="collections">Collections</TabsTrigger>
           <TabsTrigger value="resources">Resources</TabsTrigger>
+          <TabsTrigger value="reports">Reports</TabsTrigger>
           <TabsTrigger value="feedback">Feedback</TabsTrigger>
           <TabsTrigger value="users">Users & Roles</TabsTrigger>
         </TabsList>
@@ -728,6 +798,73 @@ export default function AdminLessons() {
                             Manage
                           </Button>
                         </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="reports">
+          <Card>
+            <CardHeader>
+              <CardTitle>Content Reports</CardTitle>
+              <CardDescription>Review family concerns about accuracy, safety, age fit, broken links, and source rights.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {reportsLoading ? (
+                <p className="py-8 text-center text-muted-foreground">Loading reports...</p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Content</TableHead>
+                      <TableHead>Concern</TableHead>
+                      <TableHead>Message</TableHead>
+                      <TableHead>Reporter</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Received</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredReports.map((report) => (
+                      <TableRow key={report.id}>
+                        <TableCell>
+                          <div className="font-medium">{report.contentTitle}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {report.contentType} #{report.contentId}
+                          </div>
+                        </TableCell>
+                        <TableCell>{report.category.replace("_", " ")}</TableCell>
+                        <TableCell className="max-w-md">
+                          <p className="line-clamp-3 text-sm">{report.message}</p>
+                          {report.actionTaken && (
+                            <p className="mt-1 text-xs text-muted-foreground">Action: {report.actionTaken}</p>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <div className="font-medium">{report.reporterName || "Anonymous"}</div>
+                          <div className="text-xs text-muted-foreground">{report.reporterEmail || "No email"}</div>
+                        </TableCell>
+                        <TableCell>
+                          <Select
+                            value={report.status}
+                            onValueChange={(status) => reportMutation.mutate({ id: report.id, status })}
+                            disabled={reportMutation.isPending}
+                          >
+                            <SelectTrigger className="w-[150px]">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {reportStatuses.map((status) => (
+                                <SelectItem key={status} value={status}>{status}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </TableCell>
+                        <TableCell>{formatDate(report.createdAt)}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>

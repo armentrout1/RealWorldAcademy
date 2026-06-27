@@ -223,6 +223,15 @@ Exit criteria:
 - Admins can respond quickly.
 - The platform has a basic safety loop.
 
+Current build status:
+
+- `green`: `content_reports` stores reported content type, content id, title, category, reporter context, message, status, admin note, action taken, and resolution time.
+- `green`: public API lets families submit content reports for review.
+- `green`: collection detail pages include a report concern form with the agreed categories.
+- `green`: admin management includes a Reports lane with counts, search, report detail, reporter context, and status triage.
+- `yellow`: report actions do not yet unpublish or archive flagged lessons/resources/collections automatically.
+- `yellow`: lesson and resource detail surfaces still need their own polished report controls.
+
 ### Phase 7: Creator Trust Levels
 
 Goal: reward high-quality contributors while preserving review.

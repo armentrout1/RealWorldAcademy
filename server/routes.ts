@@ -17,7 +17,7 @@ import {
   insertParentLessonReviewSchema, insertCurriculumSubmissionSchema,
   insertResourceSubmissionSchema,
   insertCurriculumCollectionSchema, insertCurriculumCollectionItemSchema,
-  insertFeedbackSubmissionSchema,
+  insertFeedbackSubmissionSchema, insertContentReportSchema,
   insertCredentialDefinitionSchema, insertCredentialRequirementSchema,
   insertContributorProfileSchema,
   type CurriculumCollection,
@@ -1564,6 +1564,70 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(feedback);
     } catch (error) {
       res.status(400).json({ message: "Failed to update feedback" });
+    }
+  });
+
+  app.post("/api/content-reports", express.json(), async (req, res) => {
+    try {
+      const reporter = req.session?.userId ? await storage.getUser(req.session.userId) : undefined;
+      const allowedContentTypes = new Set(["lesson", "resource", "collection"]);
+      const allowedCategories = new Set(["inaccurate", "unsafe", "age_mismatch", "broken_link", "copyright", "other"]);
+
+      if (!allowedContentTypes.has(req.body.contentType)) {
+        return res.status(400).json({ message: "Invalid content type" });
+      }
+
+      if (!allowedCategories.has(req.body.category)) {
+        return res.status(400).json({ message: "Invalid report category" });
+      }
+
+      const validatedData = insertContentReportSchema.parse({
+        ...req.body,
+        reporterUserId: reporter?.id,
+        reporterName: req.body.reporterName || reporter?.fullName || reporter?.username || null,
+        reporterEmail: req.body.reporterEmail || reporter?.email || null,
+        status: "new",
+        createdAt: new Date(),
+      });
+
+      const report = await storage.createContentReport(validatedData);
+      res.status(201).json(report);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid content report" });
+    }
+  });
+
+  app.get("/api/content-reports", async (req, res) => {
+    try {
+      if (!(await requireAdminUser(req, res))) return;
+
+      const status = typeof req.query.status === "string" ? req.query.status : undefined;
+      const reports = await storage.getContentReports(status);
+      res.json(reports);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch content reports" });
+    }
+  });
+
+  app.patch("/api/content-reports/:id", express.json(), async (req, res) => {
+    try {
+      if (!(await requireAdminUser(req, res))) return;
+
+      const allowedStatuses = new Set(["new", "reviewing", "resolved", "archived"]);
+      if (req.body.status && !allowedStatuses.has(req.body.status)) {
+        return res.status(400).json({ message: "Invalid report status" });
+      }
+
+      const status = req.body.status;
+      const report = await storage.updateContentReport(Number(req.params.id), {
+        status,
+        adminNote: req.body.adminNote,
+        actionTaken: req.body.actionTaken,
+        resolvedAt: status === "resolved" || status === "archived" ? new Date() : undefined,
+      });
+      res.json(report);
+    } catch (error) {
+      res.status(400).json({ message: "Failed to update content report" });
     }
   });
 
