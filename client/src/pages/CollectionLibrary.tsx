@@ -1,11 +1,13 @@
 import React from "react";
 import { Link, useLocation } from "wouter";
-import { ArrowLeft, BookMarked, CheckCircle2, Circle, ExternalLink, PlayCircle } from "lucide-react";
+import { ArrowLeft, BookMarked, CheckCircle2, Circle, ExternalLink, Filter, PlayCircle, Search } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
@@ -306,11 +308,43 @@ function CollectionDetail({ collectionId }: { collectionId: number }) {
 export default function CollectionLibrary() {
   const [location] = useLocation();
   const collectionId = getCollectionIdFromPath(location);
+  const [searchQuery, setSearchQuery] = React.useState("");
+  const [subjectFilter, setSubjectFilter] = React.useState("all");
+  const [ageFilter, setAgeFilter] = React.useState("all");
+  const [formatFilter, setFormatFilter] = React.useState("all");
+  const [durationFilter, setDurationFilter] = React.useState("all");
 
   const { data: collections = [], isLoading } = useQuery<CurriculumCollection[]>({
     queryKey: ["/api/curriculum-collections"],
     queryFn: () => apiRequest<CurriculumCollection[]>("/api/curriculum-collections"),
     enabled: !collectionId,
+  });
+
+  const subjects = Array.from(new Set(collections.map((collection) => collection.subject))).sort();
+  const ageGroups = Array.from(new Set(collections.map((collection) => collection.ageGroup))).sort();
+  const formats = Array.from(new Set(collections.flatMap((collection) =>
+    (collection.items || []).map((item) => item.itemType)
+  ))).sort();
+
+  const filteredCollections = collections.filter((collection) => {
+    const haystack = [
+      collection.title,
+      collection.description,
+      collection.subject,
+      collection.ageGroup,
+      collection.contributorProfile?.displayName,
+      ...(collection.learningGoals || []),
+    ].join(" ").toLowerCase();
+
+    if (searchQuery && !haystack.includes(searchQuery.toLowerCase())) return false;
+    if (subjectFilter !== "all" && collection.subject !== subjectFilter) return false;
+    if (ageFilter !== "all" && collection.ageGroup !== ageFilter) return false;
+    if (formatFilter !== "all" && !(collection.items || []).some((item) => item.itemType === formatFilter)) return false;
+    if (durationFilter === "short" && collection.estimatedWeeks > 2) return false;
+    if (durationFilter === "medium" && (collection.estimatedWeeks < 3 || collection.estimatedWeeks > 6)) return false;
+    if (durationFilter === "long" && collection.estimatedWeeks < 7) return false;
+
+    return true;
   });
 
   return (
@@ -330,6 +364,59 @@ export default function CollectionLibrary() {
             </p>
           </div>
 
+          <div className="mb-6 rounded-md border bg-white p-4">
+            <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_180px_160px_160px_170px]">
+              <div className="relative">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  className="pl-8"
+                  placeholder="Search collections, goals, creators..."
+                  value={searchQuery}
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                />
+              </div>
+              <Select value={subjectFilter} onValueChange={setSubjectFilter}>
+                <SelectTrigger>
+                  <Filter className="mr-2 h-4 w-4" />
+                  <SelectValue placeholder="Subject" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Subjects</SelectItem>
+                  {subjects.map((subject) => <SelectItem key={subject} value={subject}>{subject}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <Select value={ageFilter} onValueChange={setAgeFilter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Age" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Ages</SelectItem>
+                  {ageGroups.map((ageGroup) => <SelectItem key={ageGroup} value={ageGroup}>{ageGroup}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <Select value={formatFilter} onValueChange={setFormatFilter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Format" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Formats</SelectItem>
+                  {formats.map((format) => <SelectItem key={format} value={format}>{format}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <Select value={durationFilter} onValueChange={setDurationFilter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Duration" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Any Duration</SelectItem>
+                  <SelectItem value="short">1-2 weeks</SelectItem>
+                  <SelectItem value="medium">3-6 weeks</SelectItem>
+                  <SelectItem value="long">7+ weeks</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
           {isLoading ? (
             <p className="py-12 text-center text-muted-foreground">Loading collections...</p>
           ) : collections.length === 0 ? (
@@ -344,9 +431,16 @@ export default function CollectionLibrary() {
                 </Button>
               </CardContent>
             </Card>
+          ) : filteredCollections.length === 0 ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>No Matching Collections</CardTitle>
+                <CardDescription>Try widening the subject, age, format, duration, or search filters.</CardDescription>
+              </CardHeader>
+            </Card>
           ) : (
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {collections.map((collection) => (
+              {filteredCollections.map((collection) => (
                 <Card key={collection.id} className="flex flex-col">
                   <CardHeader>
                     <div className="mb-2 flex flex-wrap gap-2">
@@ -355,6 +449,12 @@ export default function CollectionLibrary() {
                     </div>
                     <CardTitle>{collection.title}</CardTitle>
                     <CardDescription>{collection.description}</CardDescription>
+                    {collection.contributorProfile && (
+                      <p className="text-xs text-muted-foreground">
+                        Curated by {collection.contributorProfile.displayName}
+                        {collection.contributorProfile.trustLevel ? ` | ${collection.contributorProfile.trustLevel}` : ""}
+                      </p>
+                    )}
                   </CardHeader>
                   <CardContent className="mt-auto space-y-4">
                     <Separator />

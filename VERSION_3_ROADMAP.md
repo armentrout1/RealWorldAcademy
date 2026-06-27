@@ -197,6 +197,14 @@ Exit criteria:
 - Families can browse the creative library without needing to know exact pathway names.
 - Approved community content feels findable and safe.
 
+Current build status:
+
+- `green`: approved collections can be searched by title, description, goals, subject, age group, and creator.
+- `green`: collection library filters support subject, age group, format, and duration bands.
+- `green`: collection cards show creator attribution and trust level context.
+- `yellow`: unified search across lessons, resources, and collections still needs a single discovery surface.
+- `yellow`: featured collection management still needs admin controls.
+
 ### Phase 6: Family Reporting and Safety
 
 Goal: create a feedback loop for quality and trust.
