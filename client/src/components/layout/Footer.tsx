@@ -26,7 +26,12 @@ const Footer: React.FC = () => {
               </h2>
             </div>
             <p className="text-neutral-600 mb-5 leading-relaxed">
-              A homeschool-friendly way to organize free learning into guided pathways, parent review, and transparent credentials.
+              Real World Academy helps people get back to real learning: factual skills, practical understanding,
+              human creativity, useful work, and guided growth.
+            </p>
+            <p className="text-sm text-neutral-500 mb-5 leading-relaxed">
+              A homeschool-friendly way to organize free and educator-led learning into guided pathways,
+              parent review, and transparent completion credentials.
             </p>
             <div className="flex space-x-4">
               <a href="#" className="p-2 rounded-full text-neutral-500 hover:text-primary hover:bg-neutral-100 transition-all duration-200">

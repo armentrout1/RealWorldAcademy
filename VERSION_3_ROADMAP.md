@@ -273,6 +273,8 @@ Exit criteria:
 
 Goal: prepare Real World Academy for teachers, educators, tutors, mentors, and creator-teachers to teach and earn without opening an uncontrolled marketplace.
 
+Detailed follow-on plan: `VERSION_4_MARKETPLACE_ROADMAP.md`.
+
 Tasks:
 
 - Expand contributor language into educator/teacher profile language.

@@ -9,10 +9,11 @@ const HeroSection: React.FC = () => {
         <div className="flex flex-col md:flex-row items-center justify-between gap-8">
           <div className="md:w-1/2">
             <h1 className="font-inter font-bold text-3xl md:text-4xl lg:text-5xl text-neutral-900 mb-4">
-              Learn for the Real World
+              Real Learning for Real Life
             </h1>
             <p className="text-lg text-neutral-700 mb-6">
-              A new way for the modern generation to learn practical skills and knowledge that matter in today's world.
+              A modern place for learners, families, and educators to build factual skills, practical understanding,
+              human creativity, useful work, and guided growth.
             </p>
             <div className="flex flex-col sm:flex-row gap-4">
               <Link href="/learn">
