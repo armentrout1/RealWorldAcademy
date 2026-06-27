@@ -1124,6 +1124,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const updated = await storage.reviewResourceSubmission(id, {
         status: req.body.status,
         reviewerNote: req.body.reviewerNote,
+        internalReviewNote: req.body.internalReviewNote,
+        reviewRubric: req.body.reviewRubric,
         publishedResourceId: publishedResource?.id || existing.publishedResourceId,
         reviewedAt: new Date(),
       });
@@ -1425,6 +1427,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const updated = await storage.updateCurriculumCollection(id, {
         status: req.body.status,
         reviewerNote: req.body.reviewerNote,
+        internalReviewNote: req.body.internalReviewNote,
+        reviewRubric: req.body.reviewRubric,
         reviewedAt: new Date(),
       });
       const [enriched] = await attachCollectionDetails([updated]);
@@ -1507,6 +1511,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const updated = await storage.reviewCurriculumSubmission(id, {
         status: req.body.status,
         reviewerNote: req.body.reviewerNote,
+        internalReviewNote: req.body.internalReviewNote,
+        reviewRubric: req.body.reviewRubric,
         reviewedAt: new Date(),
       });
 

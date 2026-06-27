@@ -42,6 +42,8 @@ interface CurriculumSubmission {
   resourceStudentPrompt?: string | null;
   status: string;
   reviewerNote?: string | null;
+  internalReviewNote?: string | null;
+  reviewRubric?: ReviewRubric | null;
   submittedAt?: string | null;
   reviewedAt?: string | null;
   publishedLesson?: {
@@ -87,6 +89,8 @@ interface CurriculumCollection {
   finalProject?: string | null;
   status: string;
   reviewerNote?: string | null;
+  internalReviewNote?: string | null;
+  reviewRubric?: ReviewRubric | null;
   submittedAt?: string | null;
   reviewedAt?: string | null;
   contributorProfile?: {
@@ -132,6 +136,8 @@ interface ResourceSubmission {
   thumbnailUrl?: string | null;
   status: string;
   reviewerNote?: string | null;
+  internalReviewNote?: string | null;
+  reviewRubric?: ReviewRubric | null;
   submittedAt?: string | null;
   reviewedAt?: string | null;
   contributorProfile?: {
@@ -155,11 +161,25 @@ interface AdminUser {
   ageGroup?: string | null;
 }
 
+type ReviewRubric = Record<string, string>;
+
 const curriculumStatuses = ["pending_review", "approved", "changes_requested", "rejected", "archived"];
 const collectionStatuses = ["approved", "published", "changes_requested", "rejected", "archived"];
 const resourceStatuses = ["approved", "changes_requested", "rejected", "archived"];
 const feedbackStatuses = ["new", "reviewing", "resolved", "archived"];
 const roles = ["student", "parent", "admin"];
+const rubricCriteria = [
+  ["safety", "Safety"],
+  ["ageFit", "Age Fit"],
+  ["sourceTrust", "Source Trust"],
+  ["originality", "Originality"],
+  ["usefulness", "Learning Usefulness"],
+  ["clarity", "Clarity"],
+  ["credentialFit", "Credential Fit"],
+] as const;
+const rubricRatings = ["pass", "needs_changes", "concern"];
+
+const emptyRubric = (): ReviewRubric => Object.fromEntries(rubricCriteria.map(([key]) => [key, "pass"]));
 
 export default function AdminLessons() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -167,6 +187,8 @@ export default function AdminLessons() {
   const [selectedCollection, setSelectedCollection] = useState<CurriculumCollection | null>(null);
   const [selectedResource, setSelectedResource] = useState<ResourceSubmission | null>(null);
   const [reviewNote, setReviewNote] = useState("");
+  const [internalReviewNote, setInternalReviewNote] = useState("");
+  const [reviewRubric, setReviewRubric] = useState<ReviewRubric>(emptyRubric());
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -196,15 +218,23 @@ export default function AdminLessons() {
   });
 
   const reviewMutation = useMutation({
-    mutationFn: ({ id, status, reviewerNote }: { id: number; status: string; reviewerNote?: string }) =>
+    mutationFn: ({
+      id,
+      status,
+      reviewerNote,
+      internalReviewNote,
+      reviewRubric,
+    }: { id: number; status: string; reviewerNote?: string; internalReviewNote?: string; reviewRubric?: ReviewRubric }) =>
       apiRequest<CurriculumSubmission>(`/api/curriculum-submissions/${id}/review`, {
         method: "PATCH",
-        body: { status, reviewerNote },
+        body: { status, reviewerNote, internalReviewNote, reviewRubric },
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/curriculum-submissions"] });
       setSelectedSubmission(null);
       setReviewNote("");
+      setInternalReviewNote("");
+      setReviewRubric(emptyRubric());
       toast({
         title: "Review updated",
         description: "Approved submissions are now published into the lesson library.",
@@ -220,15 +250,23 @@ export default function AdminLessons() {
   });
 
   const collectionReviewMutation = useMutation({
-    mutationFn: ({ id, status, reviewerNote }: { id: number; status: string; reviewerNote?: string }) =>
+    mutationFn: ({
+      id,
+      status,
+      reviewerNote,
+      internalReviewNote,
+      reviewRubric,
+    }: { id: number; status: string; reviewerNote?: string; internalReviewNote?: string; reviewRubric?: ReviewRubric }) =>
       apiRequest<CurriculumCollection>(`/api/admin/curriculum-collections/${id}/review`, {
         method: "PATCH",
-        body: { status, reviewerNote },
+        body: { status, reviewerNote, internalReviewNote, reviewRubric },
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/curriculum-collections"] });
       setSelectedCollection(null);
       setReviewNote("");
+      setInternalReviewNote("");
+      setReviewRubric(emptyRubric());
       toast({
         title: "Collection review updated",
         description: "Approved collections are now available to public collection surfaces.",
@@ -244,16 +282,24 @@ export default function AdminLessons() {
   });
 
   const resourceReviewMutation = useMutation({
-    mutationFn: ({ id, status, reviewerNote }: { id: number; status: string; reviewerNote?: string }) =>
+    mutationFn: ({
+      id,
+      status,
+      reviewerNote,
+      internalReviewNote,
+      reviewRubric,
+    }: { id: number; status: string; reviewerNote?: string; internalReviewNote?: string; reviewRubric?: ReviewRubric }) =>
       apiRequest<ResourceSubmission>(`/api/resource-submissions/${id}/review`, {
         method: "PATCH",
-        body: { status, reviewerNote },
+        body: { status, reviewerNote, internalReviewNote, reviewRubric },
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/resource-submissions"] });
       queryClient.invalidateQueries({ queryKey: ["/api/resources"] });
       setSelectedResource(null);
       setReviewNote("");
+      setInternalReviewNote("");
+      setReviewRubric(emptyRubric());
       toast({
         title: "Resource review updated",
         description: "Approved resources are published into the Resource Center.",
@@ -353,6 +399,16 @@ export default function AdminLessons() {
       .includes(searchQuery.toLowerCase())
   );
 
+  const hydrateReviewState = (item: {
+    reviewerNote?: string | null;
+    internalReviewNote?: string | null;
+    reviewRubric?: ReviewRubric | null;
+  }) => {
+    setReviewNote(item.reviewerNote || "");
+    setInternalReviewNote(item.internalReviewNote || "");
+    setReviewRubric({ ...emptyRubric(), ...(item.reviewRubric || {}) });
+  };
+
   const formatDate = (dateString?: string | null) => {
     if (!dateString) return "Not recorded";
     return new Intl.DateTimeFormat("en-US", {
@@ -369,6 +425,46 @@ export default function AdminLessons() {
     if (status === "rejected" || status === "changes_requested") return <Badge variant="destructive">{normalized}</Badge>;
     return <Badge variant="secondary">{normalized}</Badge>;
   };
+
+  const renderReviewControls = () => (
+    <div className="space-y-4 rounded-md border bg-slate-50 p-4">
+      <div>
+        <h3 className="font-semibold">Structured Review Rubric</h3>
+        <p className="text-sm text-muted-foreground">
+          Use this as the internal quality gate before publishing community-created content.
+        </p>
+      </div>
+      <div className="grid gap-3 md:grid-cols-2">
+        {rubricCriteria.map(([key, label]) => (
+          <div key={key} className="space-y-1">
+            <div className="text-sm font-medium">{label}</div>
+            <Select
+              value={reviewRubric[key] || "pass"}
+              onValueChange={(value) => setReviewRubric((current) => ({ ...current, [key]: value }))}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {rubricRatings.map((rating) => (
+                  <SelectItem key={rating} value={rating}>{rating.replace("_", " ")}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        ))}
+      </div>
+      <div className="space-y-2">
+        <h3 className="font-semibold">Internal Admin Note</h3>
+        <Textarea
+          value={internalReviewNote}
+          onChange={(event) => setInternalReviewNote(event.target.value)}
+          placeholder="Internal-only notes about safety, quality, source trust, or future follow-up..."
+          className="min-h-[90px]"
+        />
+      </div>
+    </div>
+  );
 
   const counts = {
     pending: submissions.filter((submission) => submission.status === "pending_review").length,
@@ -512,7 +608,7 @@ export default function AdminLessons() {
                         <TableCell className="text-right">
                           <Button variant="outline" size="sm" onClick={() => {
                             setSelectedSubmission(submission);
-                            setReviewNote(submission.reviewerNote || "");
+                            hydrateReviewState(submission);
                           }}>
                             Manage
                           </Button>
@@ -573,7 +669,7 @@ export default function AdminLessons() {
                         <TableCell className="text-right">
                           <Button variant="outline" size="sm" onClick={() => {
                             setSelectedCollection(collection);
-                            setReviewNote(collection.reviewerNote || "");
+                            hydrateReviewState(collection);
                           }}>
                             Manage
                           </Button>
@@ -627,7 +723,7 @@ export default function AdminLessons() {
                         <TableCell className="text-right">
                           <Button variant="outline" size="sm" onClick={() => {
                             setSelectedResource(resource);
-                            setReviewNote(resource.reviewerNote || "");
+                            hydrateReviewState(resource);
                           }}>
                             Manage
                           </Button>
@@ -862,6 +958,8 @@ export default function AdminLessons() {
                 ))}
               </div>
 
+              {renderReviewControls()}
+
               <div className="space-y-2">
                 <h3 className="font-semibold">Reviewer Note</h3>
                 <Textarea
@@ -883,6 +981,8 @@ export default function AdminLessons() {
                     id: selectedCollection.id,
                     status,
                     reviewerNote: reviewNote || undefined,
+                    internalReviewNote: internalReviewNote || undefined,
+                    reviewRubric,
                   })}
                 >
                   {status.replace("_", " ")}
@@ -960,6 +1060,8 @@ export default function AdminLessons() {
                 <p className="whitespace-pre-line text-sm text-amber-900">{selectedResource.safetyNotes}</p>
               </div>
 
+              {renderReviewControls()}
+
               <div className="space-y-2">
                 <h3 className="font-semibold">Reviewer Note</h3>
                 <Textarea
@@ -981,6 +1083,8 @@ export default function AdminLessons() {
                     id: selectedResource.id,
                     status,
                     reviewerNote: reviewNote || undefined,
+                    internalReviewNote: internalReviewNote || undefined,
+                    reviewRubric,
                   })}
                 >
                   {status.replace("_", " ")}
@@ -1076,6 +1180,8 @@ export default function AdminLessons() {
                 </div>
               )}
 
+              {renderReviewControls()}
+
               <div className="space-y-2">
                 <h3 className="font-semibold">Reviewer Note</h3>
                 <Textarea
@@ -1097,6 +1203,8 @@ export default function AdminLessons() {
                     id: selectedSubmission.id,
                     status,
                     reviewerNote: reviewNote || undefined,
+                    internalReviewNote: internalReviewNote || undefined,
+                    reviewRubric,
                   })}
                 >
                   {status.replace("_", " ")}

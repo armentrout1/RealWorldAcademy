@@ -777,6 +777,8 @@ export const curriculumSubmissions = pgTable("curriculum_submissions", {
   resourceStudentPrompt: text("resource_student_prompt"),
   status: text("status").default("pending_review").notNull(), // draft, pending_review, changes_requested, approved, rejected, archived
   reviewerNote: text("reviewer_note"),
+  internalReviewNote: text("internal_review_note"),
+  reviewRubric: json("review_rubric"),
   submittedAt: timestamp("submitted_at").defaultNow(),
   reviewedAt: timestamp("reviewed_at"),
 });
@@ -813,6 +815,8 @@ export const resourceSubmissions = pgTable("resource_submissions", {
   thumbnailUrl: text("thumbnail_url"),
   status: text("status").default("pending_review").notNull(), // pending_review, changes_requested, approved, rejected, archived
   reviewerNote: text("reviewer_note"),
+  internalReviewNote: text("internal_review_note"),
+  reviewRubric: json("review_rubric"),
   publishedResourceId: integer("published_resource_id").references(() => resources.id),
   submittedAt: timestamp("submitted_at").defaultNow(),
   reviewedAt: timestamp("reviewed_at"),
@@ -846,6 +850,8 @@ export const curriculumCollections = pgTable("curriculum_collections", {
   finalProject: text("final_project"),
   status: text("status").default("draft").notNull(), // draft, pending_review, changes_requested, approved, published, rejected, archived
   reviewerNote: text("reviewer_note"),
+  internalReviewNote: text("internal_review_note"),
+  reviewRubric: json("review_rubric"),
   submittedAt: timestamp("submitted_at"),
   reviewedAt: timestamp("reviewed_at"),
   createdAt: timestamp("created_at").defaultNow(),

@@ -171,6 +171,15 @@ Exit criteria:
 - Contributors know what to fix.
 - Published content has a clear audit trail.
 
+Current build status:
+
+- `green`: lesson submissions, resource submissions, and curriculum collections store structured review rubric data.
+- `green`: admin review dialogs include safety, age fit, source trust, originality, usefulness, clarity, and credential-fit checks.
+- `green`: admin dialogs include internal-only review notes separate from contributor-facing reviewer notes.
+- `green`: contributor-facing reviewer notes remain available for requested changes.
+- `yellow`: content versioning and full published audit-log history still need to be built.
+- `yellow`: flagged/unpublish workflows are still part of the upcoming safety/reporting phase.
+
 ### Phase 5: Discovery and Search
 
 Goal: help families find useful material.
