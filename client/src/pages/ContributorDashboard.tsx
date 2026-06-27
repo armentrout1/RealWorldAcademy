@@ -1,6 +1,6 @@
 import React from "react";
 import { Link } from "wouter";
-import { BookOpen, ClipboardList, UserRound } from "lucide-react";
+import { BookMarked, BookOpen, ClipboardList, UserRound } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -116,6 +116,12 @@ export default function ContributorDashboard() {
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" asChild>
             <Link href="/contributor-profile">Edit Profile</Link>
+          </Button>
+          <Button variant="outline" asChild>
+            <Link href="/curriculum-collections">
+              <BookMarked className="mr-2 h-4 w-4" />
+              Build Collection
+            </Link>
           </Button>
           <Button asChild>
             <Link href="/contribute">Contribute Lesson</Link>

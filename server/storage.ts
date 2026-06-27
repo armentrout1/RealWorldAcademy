@@ -26,6 +26,8 @@ import {
   parentLessonReviews, type ParentLessonReview, type InsertParentLessonReview,
   contributorProfiles, type ContributorProfile, type InsertContributorProfile,
   curriculumSubmissions, type CurriculumSubmission, type InsertCurriculumSubmission,
+  curriculumCollections, type CurriculumCollection, type InsertCurriculumCollection,
+  curriculumCollectionItems, type CurriculumCollectionItem, type InsertCurriculumCollectionItem,
   feedbackSubmissions, type FeedbackSubmission, type InsertFeedbackSubmission,
   credentialDefinitions, type CredentialDefinition, type InsertCredentialDefinition,
   credentialRequirements, type CredentialRequirement, type InsertCredentialRequirement,
@@ -52,6 +54,16 @@ export interface IStorage {
   getCurriculumSubmission(id: number): Promise<CurriculumSubmission | undefined>;
   createCurriculumSubmission(submission: InsertCurriculumSubmission): Promise<CurriculumSubmission>;
   reviewCurriculumSubmission(id: number, updates: Partial<CurriculumSubmission>): Promise<CurriculumSubmission>;
+  getCurriculumCollections(status?: string): Promise<CurriculumCollection[]>;
+  getCurriculumCollectionsForContributor(contributorProfileId: number): Promise<CurriculumCollection[]>;
+  getCurriculumCollection(id: number): Promise<CurriculumCollection | undefined>;
+  createCurriculumCollection(collection: InsertCurriculumCollection): Promise<CurriculumCollection>;
+  updateCurriculumCollection(id: number, updates: Partial<CurriculumCollection>): Promise<CurriculumCollection>;
+  getCurriculumCollectionItems(collectionId: number): Promise<CurriculumCollectionItem[]>;
+  replaceCurriculumCollectionItems(
+    collectionId: number,
+    items: InsertCurriculumCollectionItem[],
+  ): Promise<CurriculumCollectionItem[]>;
   getAllContributorProfiles(): Promise<ContributorProfile[]>;
   getContributorProfile(id: number): Promise<ContributorProfile | undefined>;
   getContributorProfileByUserId(userId: number): Promise<ContributorProfile | undefined>;
@@ -323,6 +335,65 @@ export class DatabaseStorage implements IStorage {
       .where(eq(curriculumSubmissions.id, id))
       .returning();
     return results[0];
+  }
+
+  async getCurriculumCollections(status?: string): Promise<CurriculumCollection[]> {
+    if (status) {
+      return await db.select().from(curriculumCollections)
+        .where(eq(curriculumCollections.status, status));
+    }
+
+    return await db.select().from(curriculumCollections);
+  }
+
+  async getCurriculumCollectionsForContributor(contributorProfileId: number): Promise<CurriculumCollection[]> {
+    return await db.select().from(curriculumCollections)
+      .where(eq(curriculumCollections.contributorProfileId, contributorProfileId));
+  }
+
+  async getCurriculumCollection(id: number): Promise<CurriculumCollection | undefined> {
+    const results = await db.select().from(curriculumCollections)
+      .where(eq(curriculumCollections.id, id));
+    return results[0];
+  }
+
+  async createCurriculumCollection(collection: InsertCurriculumCollection): Promise<CurriculumCollection> {
+    const results = await db.insert(curriculumCollections).values(collection).returning();
+    return results[0];
+  }
+
+  async updateCurriculumCollection(
+    id: number,
+    updates: Partial<CurriculumCollection>,
+  ): Promise<CurriculumCollection> {
+    const results = await db.update(curriculumCollections)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(curriculumCollections.id, id))
+      .returning();
+    return results[0];
+  }
+
+  async getCurriculumCollectionItems(collectionId: number): Promise<CurriculumCollectionItem[]> {
+    const items = await db.select().from(curriculumCollectionItems)
+      .where(eq(curriculumCollectionItems.collectionId, collectionId));
+    return items.sort((left, right) => left.order - right.order);
+  }
+
+  async replaceCurriculumCollectionItems(
+    collectionId: number,
+    items: InsertCurriculumCollectionItem[],
+  ): Promise<CurriculumCollectionItem[]> {
+    await db.delete(curriculumCollectionItems)
+      .where(eq(curriculumCollectionItems.collectionId, collectionId));
+
+    if (items.length === 0) {
+      return [];
+    }
+
+    const results = await db.insert(curriculumCollectionItems)
+      .values(items)
+      .returning();
+    return results.sort((left, right) => left.order - right.order);
   }
 
   async getAllContributorProfiles(): Promise<ContributorProfile[]> {

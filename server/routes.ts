@@ -14,9 +14,11 @@ import {
   insertBuddyProfileSchema, insertBuddyMessageSchema, insertBuddyEmotionLogSchema,
   insertBuddyJournalEntrySchema, insertParentChildRelationshipSchema,
   insertParentLessonReviewSchema, insertCurriculumSubmissionSchema,
+  insertCurriculumCollectionSchema, insertCurriculumCollectionItemSchema,
   insertFeedbackSubmissionSchema,
   insertCredentialDefinitionSchema, insertCredentialRequirementSchema,
   insertContributorProfileSchema,
+  type CurriculumCollection,
   type CurriculumSubmission,
   type User
 } from "@shared/schema";
@@ -826,6 +828,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }));
   };
 
+  const attachCollectionDetails = async (collections: CurriculumCollection[]) => {
+    const profiles = await storage.getAllContributorProfiles();
+    const profileById = new Map(profiles.map((profile) => [profile.id, profile]));
+
+    return Promise.all(collections.map(async (collection) => ({
+      ...collection,
+      contributorProfile: profileById.get(collection.contributorProfileId) || null,
+      items: await storage.getCurriculumCollectionItems(collection.id),
+    })));
+  };
+
+  const normalizeCollectionItems = (collectionId: number, rawItems: unknown[]) =>
+    rawItems.map((rawItem, index) => {
+      const item = rawItem as Record<string, unknown>;
+      return insertCurriculumCollectionItemSchema.parse({
+        collectionId,
+        itemType: String(item.itemType || "link"),
+        title: String(item.title || "").trim(),
+        description: item.description ? String(item.description).trim() : null,
+        url: item.url ? String(item.url).trim() : null,
+        lessonId: item.lessonId ? Number(item.lessonId) : null,
+        resourceId: item.resourceId ? Number(item.resourceId) : null,
+        order: index + 1,
+        parentPrompt: item.parentPrompt ? String(item.parentPrompt).trim() : null,
+        studentPrompt: item.studentPrompt ? String(item.studentPrompt).trim() : null,
+      });
+    });
+
   app.get("/api/contributor-profiles/me", async (req, res) => {
     try {
       const sessionUserId = requireSessionUserId(req, res);
@@ -897,6 +927,182 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(await attachContributorProfiles(submissions));
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch contributor submissions" });
+    }
+  });
+
+  app.get("/api/curriculum-collections", async (_req, res) => {
+    try {
+      const collections = await storage.getCurriculumCollections();
+      const publicCollections = collections.filter((collection) =>
+        collection.status === "approved" || collection.status === "published"
+      );
+      res.json(await attachCollectionDetails(publicCollections));
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch curriculum collections" });
+    }
+  });
+
+  app.get("/api/curriculum-collections/me", async (req, res) => {
+    try {
+      const sessionUserId = requireSessionUserId(req, res);
+      if (!sessionUserId) return;
+
+      const profile = await storage.getContributorProfileByUserId(sessionUserId);
+      if (!profile) {
+        return res.json([]);
+      }
+
+      const collections = await storage.getCurriculumCollectionsForContributor(profile.id);
+      res.json(await attachCollectionDetails(collections));
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch contributor collections" });
+    }
+  });
+
+  app.post("/api/curriculum-collections", express.json(), async (req, res) => {
+    try {
+      const sessionUserId = requireSessionUserId(req, res);
+      if (!sessionUserId) return;
+
+      const profile = await storage.getContributorProfileByUserId(sessionUserId);
+      if (!profile) {
+        return res.status(403).json({ message: "Create a contributor profile before building collections" });
+      }
+
+      const now = new Date();
+      const collection = insertCurriculumCollectionSchema.parse({
+        contributorProfileId: profile.id,
+        title: String(req.body.title || "").trim(),
+        description: String(req.body.description || "").trim(),
+        subject: String(req.body.subject || "").trim(),
+        ageGroup: String(req.body.ageGroup || "").trim(),
+        estimatedWeeks: Number(req.body.estimatedWeeks || 1),
+        learningGoals: Array.isArray(req.body.learningGoals)
+          ? req.body.learningGoals.map(String).map((goal: string) => goal.trim()).filter(Boolean)
+          : [],
+        parentNotes: req.body.parentNotes ? String(req.body.parentNotes).trim() : null,
+        finalProject: req.body.finalProject ? String(req.body.finalProject).trim() : null,
+        status: "draft",
+        reviewerNote: null,
+        submittedAt: null,
+        reviewedAt: null,
+        createdAt: now,
+        updatedAt: now,
+      });
+
+      const rawItems = Array.isArray(req.body.items) ? req.body.items : [];
+      if (!collection.title || !collection.description || !collection.subject || !collection.ageGroup) {
+        return res.status(400).json({ message: "Title, description, subject, and age group are required" });
+      }
+
+      const created = await storage.createCurriculumCollection(collection);
+      const items = await storage.replaceCurriculumCollectionItems(
+        created.id,
+        normalizeCollectionItems(created.id, rawItems).filter((item) => item.title),
+      );
+
+      const [enriched] = await attachCollectionDetails([{ ...created, items } as CurriculumCollection]);
+      res.status(201).json(enriched);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid curriculum collection data" });
+    }
+  });
+
+  app.put("/api/curriculum-collections/:id", express.json(), async (req, res) => {
+    try {
+      const sessionUserId = requireSessionUserId(req, res);
+      if (!sessionUserId) return;
+
+      const id = Number(req.params.id);
+      const existing = await storage.getCurriculumCollection(id);
+      const profile = await storage.getContributorProfileByUserId(sessionUserId);
+      const user = await storage.getUser(sessionUserId);
+      const isOwner = existing && profile && existing.contributorProfileId === profile.id;
+      const isAdmin = user?.role === "admin";
+
+      if (!existing) {
+        return res.status(404).json({ message: "Curriculum collection not found" });
+      }
+
+      if (!isOwner && !isAdmin) {
+        return res.status(403).json({ message: "You can only edit your own collections" });
+      }
+
+      if (!isAdmin && !["draft", "changes_requested"].includes(existing.status)) {
+        return res.status(400).json({ message: "Submitted collections cannot be edited until review returns them" });
+      }
+
+      const updates = insertCurriculumCollectionSchema.partial().parse({
+        title: String(req.body.title || "").trim(),
+        description: String(req.body.description || "").trim(),
+        subject: String(req.body.subject || "").trim(),
+        ageGroup: String(req.body.ageGroup || "").trim(),
+        estimatedWeeks: Number(req.body.estimatedWeeks || existing.estimatedWeeks || 1),
+        learningGoals: Array.isArray(req.body.learningGoals)
+          ? req.body.learningGoals.map(String).map((goal: string) => goal.trim()).filter(Boolean)
+          : [],
+        parentNotes: req.body.parentNotes ? String(req.body.parentNotes).trim() : null,
+        finalProject: req.body.finalProject ? String(req.body.finalProject).trim() : null,
+        status: isAdmin ? req.body.status || existing.status : "draft",
+      });
+
+      const rawItems = Array.isArray(req.body.items) ? req.body.items : [];
+      const updated = await storage.updateCurriculumCollection(id, updates);
+      await storage.replaceCurriculumCollectionItems(
+        id,
+        normalizeCollectionItems(id, rawItems).filter((item) => item.title),
+      );
+
+      const [enriched] = await attachCollectionDetails([updated]);
+      res.json(enriched);
+    } catch (error) {
+      res.status(400).json({ message: "Failed to update curriculum collection" });
+    }
+  });
+
+  app.patch("/api/curriculum-collections/:id/submit", async (req, res) => {
+    try {
+      const sessionUserId = requireSessionUserId(req, res);
+      if (!sessionUserId) return;
+
+      const id = Number(req.params.id);
+      const existing = await storage.getCurriculumCollection(id);
+      const profile = await storage.getContributorProfileByUserId(sessionUserId);
+
+      if (!existing) {
+        return res.status(404).json({ message: "Curriculum collection not found" });
+      }
+
+      if (!profile || existing.contributorProfileId !== profile.id) {
+        return res.status(403).json({ message: "You can only submit your own collections" });
+      }
+
+      const items = await storage.getCurriculumCollectionItems(id);
+      if (items.length === 0) {
+        return res.status(400).json({ message: "Add at least one collection item before submitting" });
+      }
+
+      const updated = await storage.updateCurriculumCollection(id, {
+        status: "pending_review",
+        submittedAt: new Date(),
+        reviewerNote: null,
+      });
+      const [enriched] = await attachCollectionDetails([updated]);
+      res.json(enriched);
+    } catch (error) {
+      res.status(400).json({ message: "Failed to submit curriculum collection" });
+    }
+  });
+
+  app.get("/api/admin/curriculum-collections", async (req, res) => {
+    try {
+      if (!(await requireAdminUser(req, res))) return;
+
+      const status = typeof req.query.status === "string" ? req.query.status : undefined;
+      const collections = await storage.getCurriculumCollections(status);
+      res.json(await attachCollectionDetails(collections));
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch curriculum collections" });
     }
   });
 

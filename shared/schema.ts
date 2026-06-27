@@ -751,6 +751,70 @@ export const curriculumSubmissionsRelations = relations(curriculumSubmissions, (
   }),
 }));
 
+export const curriculumCollections = pgTable("curriculum_collections", {
+  id: serial("id").primaryKey(),
+  contributorProfileId: integer("contributor_profile_id").notNull().references(() => contributorProfiles.id),
+  title: text("title").notNull(),
+  description: text("description").notNull(),
+  subject: text("subject").notNull(),
+  ageGroup: text("age_group").notNull(),
+  estimatedWeeks: integer("estimated_weeks").default(1).notNull(),
+  learningGoals: text("learning_goals").array(),
+  parentNotes: text("parent_notes"),
+  finalProject: text("final_project"),
+  status: text("status").default("draft").notNull(), // draft, pending_review, changes_requested, approved, published, rejected, archived
+  reviewerNote: text("reviewer_note"),
+  submittedAt: timestamp("submitted_at"),
+  reviewedAt: timestamp("reviewed_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertCurriculumCollectionSchema = createInsertSchema(curriculumCollections).omit({ id: true });
+export type InsertCurriculumCollection = z.infer<typeof insertCurriculumCollectionSchema>;
+export type CurriculumCollection = typeof curriculumCollections.$inferSelect;
+
+export const curriculumCollectionItems = pgTable("curriculum_collection_items", {
+  id: serial("id").primaryKey(),
+  collectionId: integer("collection_id").notNull().references(() => curriculumCollections.id),
+  itemType: text("item_type").notNull(), // lesson, resource, video, link, activity
+  title: text("title").notNull(),
+  description: text("description"),
+  url: text("url"),
+  lessonId: integer("lesson_id").references(() => lessons.id),
+  resourceId: integer("resource_id").references(() => resources.id),
+  order: integer("order").notNull(),
+  parentPrompt: text("parent_prompt"),
+  studentPrompt: text("student_prompt"),
+});
+
+export const insertCurriculumCollectionItemSchema = createInsertSchema(curriculumCollectionItems).omit({ id: true });
+export type InsertCurriculumCollectionItem = z.infer<typeof insertCurriculumCollectionItemSchema>;
+export type CurriculumCollectionItem = typeof curriculumCollectionItems.$inferSelect;
+
+export const curriculumCollectionsRelations = relations(curriculumCollections, ({ one, many }) => ({
+  contributorProfile: one(contributorProfiles, {
+    fields: [curriculumCollections.contributorProfileId],
+    references: [contributorProfiles.id],
+  }),
+  items: many(curriculumCollectionItems),
+}));
+
+export const curriculumCollectionItemsRelations = relations(curriculumCollectionItems, ({ one }) => ({
+  collection: one(curriculumCollections, {
+    fields: [curriculumCollectionItems.collectionId],
+    references: [curriculumCollections.id],
+  }),
+  lesson: one(lessons, {
+    fields: [curriculumCollectionItems.lessonId],
+    references: [lessons.id],
+  }),
+  resource: one(resources, {
+    fields: [curriculumCollectionItems.resourceId],
+    references: [resources.id],
+  }),
+}));
+
 export const feedbackSubmissions = pgTable("feedback_submissions", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
