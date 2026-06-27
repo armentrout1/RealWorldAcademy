@@ -252,6 +252,115 @@ Exit criteria:
 - Published content is searchable by age, topic, format, and duration.
 - Credential-eligible content clearly says what it counts toward.
 
+## Checkpoints
+
+Use these checkpoints before moving from one phase to the next. Each checkpoint should be marked `green`, `yellow`, or `red` in a short project note or commit summary.
+
+### Checkpoint 1: Contributor Identity
+
+Questions:
+
+- Can a real user create or update a contributor profile?
+- Does the profile make the creator more trustworthy to a parent?
+- Can admins see contributor context while reviewing submissions?
+- Can published lessons show creator attribution?
+
+Pass condition:
+
+Contributor identity exists in the product and is tied to submitted or published curriculum.
+
+### Checkpoint 2: Creative Curriculum Building
+
+Questions:
+
+- Can a contributor build a full collection, not just one lesson?
+- Can a collection include lessons, resources, videos, parent notes, and a final project?
+- Is the draft/review/publish path clear?
+- Does the collection feel usable by a homeschool family?
+
+Pass condition:
+
+A contributor can submit a multi-step learning path and a family can use the approved version.
+
+### Checkpoint 3: Video Curation
+
+Questions:
+
+- Can contributors add YouTube links safely?
+- Does the app extract or store enough video metadata to make review practical?
+- Can parents see why the video is included?
+- Can students watch/open the video in context with activity and reflection prompts?
+
+Pass condition:
+
+The app can organize free video learning into structured, reviewable lessons.
+
+### Checkpoint 4: Review Quality
+
+Questions:
+
+- Is the admin review process more than a status dropdown?
+- Are safety, age fit, originality, source quality, and learning usefulness captured?
+- Can contributors understand requested changes?
+- Can admins unpublish or flag content if needed?
+
+Pass condition:
+
+Review is consistent enough that the platform can accept more creators without losing trust.
+
+### Checkpoint 5: Discovery
+
+Questions:
+
+- Can families browse by age, subject, duration, format, and credential eligibility?
+- Are creator attribution and trust signals visible?
+- Can approved community content be found without knowing its exact name?
+- Are unreviewed submissions hidden from public/student surfaces?
+
+Pass condition:
+
+Families can discover useful approved content with confidence.
+
+### Checkpoint 6: Safety and Reporting
+
+Questions:
+
+- Can families report content concerns?
+- Can admins triage reports?
+- Can content be archived or unpublished quickly?
+- Does the product explain parent responsibility around external resources?
+
+Pass condition:
+
+The creative ecosystem has a basic safety loop.
+
+### Checkpoint 7: Credential Alignment
+
+Questions:
+
+- Can approved community content count toward credentials only when admins choose?
+- Is credential eligibility visible to families?
+- Do credentials still clearly explain what was completed?
+- Is contributor-created content kept separate from official/accredited language?
+
+Pass condition:
+
+Creative curriculum can support transparent credentials without overclaiming.
+
+### Final Version 3 Checkpoint
+
+Questions:
+
+- Can a creator create meaningful curriculum?
+- Can an admin review and publish it safely?
+- Can a family find and use it?
+- Can a student complete it and have the work appear in their learning record?
+- Can the platform preserve trust while encouraging creativity?
+
+Pass condition:
+
+Real World Academy feels like a controlled creative curriculum ecosystem, not just a static lesson app.
+
 ## Recommended First Sprint
 
 Sprint goal: make contributors real people in the system.

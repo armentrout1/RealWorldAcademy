@@ -24,6 +24,7 @@ import {
   buddyJournalEntries, type BuddyJournalEntry, type InsertBuddyJournalEntry,
   parentChildRelationships, type ParentChildRelationship, type InsertParentChildRelationship,
   parentLessonReviews, type ParentLessonReview, type InsertParentLessonReview,
+  contributorProfiles, type ContributorProfile, type InsertContributorProfile,
   curriculumSubmissions, type CurriculumSubmission, type InsertCurriculumSubmission,
   feedbackSubmissions, type FeedbackSubmission, type InsertFeedbackSubmission,
   credentialDefinitions, type CredentialDefinition, type InsertCredentialDefinition,
@@ -50,6 +51,10 @@ export interface IStorage {
   getCurriculumSubmission(id: number): Promise<CurriculumSubmission | undefined>;
   createCurriculumSubmission(submission: InsertCurriculumSubmission): Promise<CurriculumSubmission>;
   reviewCurriculumSubmission(id: number, updates: Partial<CurriculumSubmission>): Promise<CurriculumSubmission>;
+  getAllContributorProfiles(): Promise<ContributorProfile[]>;
+  getContributorProfile(id: number): Promise<ContributorProfile | undefined>;
+  getContributorProfileByUserId(userId: number): Promise<ContributorProfile | undefined>;
+  upsertContributorProfile(profile: InsertContributorProfile): Promise<ContributorProfile>;
   getFeedbackSubmissions(): Promise<FeedbackSubmission[]>;
   createFeedbackSubmission(submission: InsertFeedbackSubmission): Promise<FeedbackSubmission>;
   updateFeedbackSubmission(id: number, updates: Partial<FeedbackSubmission>): Promise<FeedbackSubmission>;
@@ -302,6 +307,39 @@ export class DatabaseStorage implements IStorage {
     const results = await db.update(curriculumSubmissions)
       .set(updates)
       .where(eq(curriculumSubmissions.id, id))
+      .returning();
+    return results[0];
+  }
+
+  async getAllContributorProfiles(): Promise<ContributorProfile[]> {
+    return await db.select().from(contributorProfiles);
+  }
+
+  async getContributorProfile(id: number): Promise<ContributorProfile | undefined> {
+    const results = await db.select().from(contributorProfiles)
+      .where(eq(contributorProfiles.id, id));
+    return results[0];
+  }
+
+  async getContributorProfileByUserId(userId: number): Promise<ContributorProfile | undefined> {
+    const results = await db.select().from(contributorProfiles)
+      .where(eq(contributorProfiles.userId, userId));
+    return results[0];
+  }
+
+  async upsertContributorProfile(profile: InsertContributorProfile): Promise<ContributorProfile> {
+    const existing = await this.getContributorProfileByUserId(profile.userId);
+
+    if (existing) {
+      const results = await db.update(contributorProfiles)
+        .set({ ...profile, updatedAt: new Date() })
+        .where(eq(contributorProfiles.userId, profile.userId))
+        .returning();
+      return results[0];
+    }
+
+    const results = await db.insert(contributorProfiles)
+      .values(profile)
       .returning();
     return results[0];
   }

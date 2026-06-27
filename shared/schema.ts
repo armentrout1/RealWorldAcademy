@@ -692,6 +692,32 @@ export const insertParentLessonReviewSchema = createInsertSchema(parentLessonRev
 export type InsertParentLessonReview = z.infer<typeof insertParentLessonReviewSchema>;
 export type ParentLessonReview = typeof parentLessonReviews.$inferSelect;
 
+export const contributorProfiles = pgTable("contributor_profiles", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id).unique(),
+  displayName: text("display_name").notNull(),
+  bio: text("bio"),
+  affiliation: text("affiliation"),
+  website: text("website"),
+  avatarUrl: text("avatar_url"),
+  expertiseTags: text("expertise_tags").array(),
+  trustLevel: text("trust_level").default("new").notNull(), // new, verified, trusted, partner, restricted
+  status: text("status").default("active").notNull(), // active, restricted, archived
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const contributorProfilesRelations = relations(contributorProfiles, ({ one }) => ({
+  user: one(users, {
+    fields: [contributorProfiles.userId],
+    references: [users.id],
+  }),
+}));
+
+export const insertContributorProfileSchema = createInsertSchema(contributorProfiles).omit({ id: true });
+export type InsertContributorProfile = z.infer<typeof insertContributorProfileSchema>;
+export type ContributorProfile = typeof contributorProfiles.$inferSelect;
+
 export const curriculumSubmissions = pgTable("curriculum_submissions", {
   id: serial("id").primaryKey(),
   contributorName: text("contributor_name").notNull(),
@@ -752,4 +778,5 @@ export const usersRelations = relations(users, ({ many, one }) => ({
   childRelationships: many(parentChildRelationships, { relationName: "childRelationships" }),
   parentLessonReviews: many(parentLessonReviews, { relationName: "parentLessonReviews" }),
   childLessonReviews: many(parentLessonReviews, { relationName: "childLessonReviews" }),
+  contributorProfile: one(contributorProfiles),
 }));

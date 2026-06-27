@@ -16,6 +16,7 @@ import {
   insertParentLessonReviewSchema, insertCurriculumSubmissionSchema,
   insertFeedbackSubmissionSchema,
   insertCredentialDefinitionSchema, insertCredentialRequirementSchema,
+  insertContributorProfileSchema,
   type CurriculumSubmission,
   type User
 } from "@shared/schema";
@@ -802,6 +803,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
       },
     }));
   };
+
+  app.get("/api/contributor-profiles/me", async (req, res) => {
+    try {
+      const sessionUserId = requireSessionUserId(req, res);
+      if (!sessionUserId) return;
+
+      const profile = await storage.getContributorProfileByUserId(sessionUserId);
+      res.json(profile || null);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch contributor profile" });
+    }
+  });
+
+  app.put("/api/contributor-profiles/me", express.json(), async (req, res) => {
+    try {
+      const sessionUserId = requireSessionUserId(req, res);
+      if (!sessionUserId) return;
+
+      const existingProfile = await storage.getContributorProfileByUserId(sessionUserId);
+      const validatedData = insertContributorProfileSchema.parse({
+        userId: sessionUserId,
+        displayName: String(req.body.displayName || "").trim(),
+        bio: req.body.bio ? String(req.body.bio).trim() : null,
+        affiliation: req.body.affiliation ? String(req.body.affiliation).trim() : null,
+        website: req.body.website ? String(req.body.website).trim() : null,
+        avatarUrl: req.body.avatarUrl ? String(req.body.avatarUrl).trim() : null,
+        expertiseTags: Array.isArray(req.body.expertiseTags)
+          ? req.body.expertiseTags.map(String).map((tag: string) => tag.trim()).filter(Boolean)
+          : [],
+        trustLevel: existingProfile?.trustLevel || "new",
+        status: existingProfile?.status || "active",
+        createdAt: existingProfile?.createdAt || new Date(),
+        updatedAt: new Date(),
+      });
+
+      if (!validatedData.displayName) {
+        return res.status(400).json({ message: "Display name is required" });
+      }
+
+      const profile = await storage.upsertContributorProfile(validatedData);
+      res.json(profile);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid contributor profile" });
+    }
+  });
+
+  app.get("/api/admin/contributor-profiles", async (req, res) => {
+    try {
+      if (!(await requireAdminUser(req, res))) return;
+
+      const profiles = await storage.getAllContributorProfiles();
+      res.json(profiles);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch contributor profiles" });
+    }
+  });
 
   // Curriculum contribution and review endpoints
   app.get("/api/curriculum-submissions", async (req, res) => {

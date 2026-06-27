@@ -32,6 +32,7 @@ import Journal from "@/pages/Journal";
 import LessonTemplate from "@/pages/LessonTemplate";
 import NotFound from "@/pages/not-found";
 import ContributeLesson from "@/pages/ContributeLesson";
+import ContributorProfile from "@/pages/ContributorProfile";
 import AdminLessons from "@/pages/AdminLessons";
 import LessonLibrary from "@/pages/LessonLibrary";
 import Credentials from "@/pages/Credentials";
@@ -265,6 +266,11 @@ function Router() {
             <Route path="/contribute">
               <PageWrapper>
                 <ContributeLesson />
+              </PageWrapper>
+            </Route>
+            <Route path="/contributor-profile">
+              <PageWrapper>
+                <ContributorProfile />
               </PageWrapper>
             </Route>
             <Route path="/admin/lessons">
