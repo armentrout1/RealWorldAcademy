@@ -839,15 +839,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
     })));
   };
 
+  const getYouTubeEmbedUrl = (url: string | null) => {
+    if (!url) return null;
+
+    try {
+      const parsed = new URL(url);
+      const host = parsed.hostname.replace(/^www\./, "");
+      const videoId = host === "youtu.be"
+        ? parsed.pathname.split("/").filter(Boolean)[0]
+        : parsed.searchParams.get("v");
+
+      if (!videoId || !["youtube.com", "m.youtube.com", "youtu.be"].includes(host)) {
+        return null;
+      }
+
+      return `https://www.youtube.com/embed/${videoId}`;
+    } catch {
+      return null;
+    }
+  };
+
   const normalizeCollectionItems = (collectionId: number, rawItems: unknown[]) =>
     rawItems.map((rawItem, index) => {
       const item = rawItem as Record<string, unknown>;
+      const url = item.url ? String(item.url).trim() : null;
+      const embedUrl = item.embedUrl ? String(item.embedUrl).trim() : getYouTubeEmbedUrl(url);
+
       return insertCurriculumCollectionItemSchema.parse({
         collectionId,
         itemType: String(item.itemType || "link"),
         title: String(item.title || "").trim(),
         description: item.description ? String(item.description).trim() : null,
-        url: item.url ? String(item.url).trim() : null,
+        url,
+        embedUrl,
+        sourceLabel: item.sourceLabel ? String(item.sourceLabel).trim() : null,
+        duration: item.duration ? String(item.duration).trim() : null,
+        safetyNotes: item.safetyNotes ? String(item.safetyNotes).trim() : null,
         lessonId: item.lessonId ? Number(item.lessonId) : null,
         resourceId: item.resourceId ? Number(item.resourceId) : null,
         order: index + 1,

@@ -26,6 +26,9 @@ interface CollectionItemForm {
   title: string;
   description: string;
   url: string;
+  sourceLabel: string;
+  duration: string;
+  safetyNotes: string;
   parentPrompt: string;
   studentPrompt: string;
 }
@@ -47,6 +50,9 @@ const emptyItem = (): CollectionItemForm => ({
   title: "",
   description: "",
   url: "",
+  sourceLabel: "",
+  duration: "",
+  safetyNotes: "",
   parentPrompt: "",
   studentPrompt: "",
 });
@@ -348,6 +354,35 @@ export default function CurriculumCollections() {
                       <Label>URL</Label>
                       <Input value={item.url} onChange={(event) => updateItem(index, { url: event.target.value })} placeholder="https://youtube.com/..." />
                     </div>
+                    {item.itemType === "video" && (
+                      <>
+                        <div className="space-y-2">
+                          <Label>Source / Channel</Label>
+                          <Input
+                            value={item.sourceLabel}
+                            onChange={(event) => updateItem(index, { sourceLabel: event.target.value })}
+                            placeholder="CrashCourse, Khan Academy, local mentor..."
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Duration</Label>
+                          <Input
+                            value={item.duration}
+                            onChange={(event) => updateItem(index, { duration: event.target.value })}
+                            placeholder="12 min"
+                          />
+                        </div>
+                        <div className="space-y-2 md:col-span-2">
+                          <Label>Safety / Parent Notes For This Video</Label>
+                          <Textarea
+                            value={item.safetyNotes}
+                            onChange={(event) => updateItem(index, { safetyNotes: event.target.value })}
+                            rows={2}
+                            placeholder="Why is this video appropriate, useful, and worth a parent's attention?"
+                          />
+                        </div>
+                      </>
+                    )}
                     <div className="space-y-2 md:col-span-2">
                       <Label>Description</Label>
                       <Textarea value={item.description} onChange={(event) => updateItem(index, { description: event.target.value })} rows={2} />

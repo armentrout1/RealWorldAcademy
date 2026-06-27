@@ -140,6 +140,15 @@ Exit criteria:
 - Students can watch/open curated resources from the lesson.
 - Parents can see why the resource was included.
 
+Current build status:
+
+- `green`: collection video items store source/channel, duration, safety notes, and derived YouTube embed URLs.
+- `green`: creator collection builder asks for parent-facing video context.
+- `green`: admin review shows video source, duration, embed URL, and safety notes.
+- `green`: public collection detail pages can embed YouTube videos in context with parent/student prompts.
+- `yellow`: standalone resource submission workflow still needs to be built.
+- `yellow`: lesson-level video/resource attachment still needs to be built.
+
 ### Phase 4: Review Rubric 2.0
 
 Goal: make review consistent enough to scale.

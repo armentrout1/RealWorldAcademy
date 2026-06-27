@@ -17,6 +17,10 @@ interface CollectionItem {
   title: string;
   description?: string | null;
   url?: string | null;
+  embedUrl?: string | null;
+  sourceLabel?: string | null;
+  duration?: string | null;
+  safetyNotes?: string | null;
   order: number;
   parentPrompt?: string | null;
   studentPrompt?: string | null;
@@ -191,6 +195,28 @@ function CollectionDetail({ collectionId }: { collectionId: number }) {
                       Open Resource
                     </a>
                   </Button>
+                )}
+                {item.embedUrl && (
+                  <div className="aspect-video overflow-hidden rounded-md border bg-black">
+                    <iframe
+                      className="h-full w-full"
+                      src={item.embedUrl}
+                      title={item.title}
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
+                    />
+                  </div>
+                )}
+                {(item.sourceLabel || item.duration) && (
+                  <div className="flex flex-wrap gap-2 text-sm text-muted-foreground">
+                    {item.sourceLabel && <Badge variant="outline">Source: {item.sourceLabel}</Badge>}
+                    {item.duration && <Badge variant="outline">{item.duration}</Badge>}
+                  </div>
+                )}
+                {item.safetyNotes && (
+                  <p className="rounded-md border bg-amber-50 p-3 text-sm text-amber-900">
+                    <span className="font-medium">Parent note:</span> {item.safetyNotes}
+                  </p>
                 )}
                 {item.parentPrompt && (
                   <p className="text-sm"><span className="font-medium">Parent prompt:</span> {item.parentPrompt}</p>

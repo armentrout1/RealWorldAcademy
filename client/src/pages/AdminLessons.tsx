@@ -57,6 +57,10 @@ interface CurriculumCollectionItem {
   title: string;
   description?: string | null;
   url?: string | null;
+  embedUrl?: string | null;
+  sourceLabel?: string | null;
+  duration?: string | null;
+  safetyNotes?: string | null;
   order: number;
   parentPrompt?: string | null;
   studentPrompt?: string | null;
@@ -681,6 +685,20 @@ export default function AdminLessons() {
                       <a className="break-all text-sm text-primary underline" href={item.url} target="_blank" rel="noreferrer">
                         {item.url}
                       </a>
+                    )}
+                    {(item.sourceLabel || item.duration) && (
+                      <div className="mt-2 flex flex-wrap gap-2 text-sm text-muted-foreground">
+                        {item.sourceLabel && <Badge variant="outline">Source: {item.sourceLabel}</Badge>}
+                        {item.duration && <Badge variant="outline">{item.duration}</Badge>}
+                      </div>
+                    )}
+                    {item.embedUrl && (
+                      <p className="mt-2 break-all text-xs text-muted-foreground">Embed: {item.embedUrl}</p>
+                    )}
+                    {item.safetyNotes && (
+                      <p className="mt-2 rounded-md border bg-amber-50 p-2 text-sm text-amber-900">
+                        <span className="font-medium">Safety notes:</span> {item.safetyNotes}
+                      </p>
                     )}
                     {item.description && <p className="mt-2 whitespace-pre-line text-sm text-muted-foreground">{item.description}</p>}
                     {item.parentPrompt && <p className="mt-2 text-sm"><span className="font-medium">Parent:</span> {item.parentPrompt}</p>}
