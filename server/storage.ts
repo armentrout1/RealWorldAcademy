@@ -28,6 +28,7 @@ import {
   curriculumSubmissions, type CurriculumSubmission, type InsertCurriculumSubmission,
   curriculumCollections, type CurriculumCollection, type InsertCurriculumCollection,
   curriculumCollectionItems, type CurriculumCollectionItem, type InsertCurriculumCollectionItem,
+  userCurriculumCollectionProgress, type UserCurriculumCollectionProgress, type InsertUserCurriculumCollectionProgress,
   feedbackSubmissions, type FeedbackSubmission, type InsertFeedbackSubmission,
   credentialDefinitions, type CredentialDefinition, type InsertCredentialDefinition,
   credentialRequirements, type CredentialRequirement, type InsertCredentialRequirement,
@@ -64,6 +65,13 @@ export interface IStorage {
     collectionId: number,
     items: InsertCurriculumCollectionItem[],
   ): Promise<CurriculumCollectionItem[]>;
+  getUserCurriculumCollectionProgress(userId: number, collectionId: number): Promise<UserCurriculumCollectionProgress | undefined>;
+  getAllUserCurriculumCollectionProgress(userId: number): Promise<UserCurriculumCollectionProgress[]>;
+  upsertUserCurriculumCollectionProgress(
+    userId: number,
+    collectionId: number,
+    updates: Partial<UserCurriculumCollectionProgress>,
+  ): Promise<UserCurriculumCollectionProgress>;
   getAllContributorProfiles(): Promise<ContributorProfile[]>;
   getContributorProfile(id: number): Promise<ContributorProfile | undefined>;
   getContributorProfileByUserId(userId: number): Promise<ContributorProfile | undefined>;
@@ -394,6 +402,59 @@ export class DatabaseStorage implements IStorage {
       .values(items)
       .returning();
     return results.sort((left, right) => left.order - right.order);
+  }
+
+  async getUserCurriculumCollectionProgress(
+    userId: number,
+    collectionId: number,
+  ): Promise<UserCurriculumCollectionProgress | undefined> {
+    const results = await db.select().from(userCurriculumCollectionProgress)
+      .where(and(
+        eq(userCurriculumCollectionProgress.userId, userId),
+        eq(userCurriculumCollectionProgress.collectionId, collectionId),
+      ));
+    return results[0];
+  }
+
+  async getAllUserCurriculumCollectionProgress(userId: number): Promise<UserCurriculumCollectionProgress[]> {
+    return await db.select().from(userCurriculumCollectionProgress)
+      .where(eq(userCurriculumCollectionProgress.userId, userId));
+  }
+
+  async upsertUserCurriculumCollectionProgress(
+    userId: number,
+    collectionId: number,
+    updates: Partial<UserCurriculumCollectionProgress>,
+  ): Promise<UserCurriculumCollectionProgress> {
+    const existing = await this.getUserCurriculumCollectionProgress(userId, collectionId);
+
+    if (existing) {
+      const results = await db.update(userCurriculumCollectionProgress)
+        .set({ ...updates, updatedAt: new Date() })
+        .where(and(
+          eq(userCurriculumCollectionProgress.userId, userId),
+          eq(userCurriculumCollectionProgress.collectionId, collectionId),
+        ))
+        .returning();
+      return results[0];
+    }
+
+    const newProgress: InsertUserCurriculumCollectionProgress = {
+      userId,
+      collectionId,
+      status: updates.status || "in_progress",
+      currentItemId: updates.currentItemId,
+      completedItemIds: updates.completedItemIds || [],
+      percentComplete: updates.percentComplete || 0,
+      startedAt: updates.startedAt || new Date(),
+      completedAt: updates.completedAt,
+      updatedAt: new Date(),
+    };
+
+    const results = await db.insert(userCurriculumCollectionProgress)
+      .values(newProgress)
+      .returning();
+    return results[0];
   }
 
   async getAllContributorProfiles(): Promise<ContributorProfile[]> {

@@ -118,7 +118,8 @@ Current build status:
 - `green`: admins can review collections from the admin management console and approve, publish, request changes, reject, or archive them.
 - `green`: families can browse approved/published collections from `/collections`.
 - `green`: public collection detail pages show sequence items, creator attribution, learning goals, parent notes, and final project.
-- `yellow`: collection start-flow and progress tracking still need to be built.
+- `green`: logged-in users can start approved collections and mark ordered steps complete.
+- `green`: collection detail pages show percent complete and completed step counts.
 
 ### Phase 3: Video and Resource Curation
 
@@ -307,7 +308,7 @@ Current build status:
 - `green`: collections can include ordered videos, lesson references, resources, activities, links, parent prompts, student prompts, parent notes, and a final project.
 - `green`: draft, submit-for-review, admin review, and publish states are wired.
 - `green`: families can inspect approved collection detail pages.
-- `yellow`: the homeschool family experience needs start and progress tracking before this checkpoint fully passes.
+- `green`: families can start approved collections and track step completion.
 
 ### Checkpoint 3: Video Curation
 

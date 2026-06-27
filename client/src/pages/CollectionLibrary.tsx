@@ -1,11 +1,14 @@
 import React from "react";
 import { Link, useLocation } from "wouter";
-import { ArrowLeft, BookMarked, ExternalLink, PlayCircle } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
+import { ArrowLeft, BookMarked, CheckCircle2, Circle, ExternalLink, PlayCircle } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
+import { useAuth } from "@/contexts/AuthContext";
+import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 
 interface CollectionItem {
@@ -37,15 +40,70 @@ interface CurriculumCollection {
   items?: CollectionItem[];
 }
 
+interface CollectionProgress {
+  id: number;
+  collectionId: number;
+  status: string;
+  currentItemId?: number | null;
+  completedItemIds?: number[] | null;
+  percentComplete: number;
+  startedAt?: string | null;
+  completedAt?: string | null;
+}
+
 const getCollectionIdFromPath = (path: string) => {
   const match = path.match(/^\/collections\/(\d+)/);
   return match ? Number(match[1]) : null;
 };
 
 function CollectionDetail({ collectionId }: { collectionId: number }) {
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
   const { data: collection, isLoading } = useQuery<CurriculumCollection>({
     queryKey: [`/api/curriculum-collections/${collectionId}`],
     queryFn: () => apiRequest<CurriculumCollection>(`/api/curriculum-collections/${collectionId}`),
+  });
+
+  const { data: progress } = useQuery<CollectionProgress | null>({
+    queryKey: [`/api/curriculum-collections/${collectionId}/progress`],
+    queryFn: () => apiRequest<CollectionProgress | null>(`/api/curriculum-collections/${collectionId}/progress`),
+    enabled: Boolean(user?.id),
+  });
+
+  const startCollectionMutation = useMutation({
+    mutationFn: () => apiRequest<CollectionProgress>(`/api/curriculum-collections/${collectionId}/start`, {
+      method: "POST",
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/curriculum-collections/${collectionId}/progress`] });
+      toast({ title: "Collection started", description: "Your progress is now being tracked." });
+    },
+    onError: (error) => {
+      toast({
+        title: "Could not start collection",
+        description: error instanceof Error ? error.message : "Please sign in and try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const completeItemMutation = useMutation({
+    mutationFn: (itemId: number) => apiRequest<CollectionProgress>(`/api/curriculum-collections/${collectionId}/progress`, {
+      method: "PATCH",
+      body: { itemId },
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/curriculum-collections/${collectionId}/progress`] });
+      toast({ title: "Step marked complete", description: "Collection progress has been updated." });
+    },
+    onError: (error) => {
+      toast({
+        title: "Progress was not updated",
+        description: error instanceof Error ? error.message : "Please start the collection first.",
+        variant: "destructive",
+      });
+    },
   });
 
   if (isLoading) {
@@ -68,6 +126,10 @@ function CollectionDetail({ collectionId }: { collectionId: number }) {
     );
   }
 
+  const completedItemIds = progress?.completedItemIds || [];
+  const hasStarted = Boolean(progress);
+  const isCompleted = progress?.status === "completed";
+
   return (
     <div className="space-y-6">
       <Button variant="ghost" asChild>
@@ -89,6 +151,21 @@ function CollectionDetail({ collectionId }: { collectionId: number }) {
           Curated by {collection.contributorProfile?.displayName || "Real World Academy contributor"}
           {collection.contributorProfile?.affiliation ? `, ${collection.contributorProfile.affiliation}` : ""}
         </p>
+        <div className="mt-6 flex flex-wrap gap-2">
+          {user ? (
+            <Button
+              onClick={() => startCollectionMutation.mutate()}
+              disabled={startCollectionMutation.isPending || hasStarted}
+            >
+              <PlayCircle className="mr-2 h-4 w-4" />
+              {hasStarted ? isCompleted ? "Collection Completed" : "Collection Started" : "Start Collection"}
+            </Button>
+          ) : (
+            <Button asChild>
+              <Link href="/login">Log In To Track Progress</Link>
+            </Button>
+          )}
+        </div>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
@@ -121,12 +198,45 @@ function CollectionDetail({ collectionId }: { collectionId: number }) {
                 {item.studentPrompt && (
                   <p className="text-sm"><span className="font-medium">Student prompt:</span> {item.studentPrompt}</p>
                 )}
+                {user && hasStarted && (
+                  <Button
+                    variant={completedItemIds.includes(item.id) ? "secondary" : "default"}
+                    onClick={() => completeItemMutation.mutate(item.id)}
+                    disabled={completeItemMutation.isPending || completedItemIds.includes(item.id)}
+                  >
+                    {completedItemIds.includes(item.id) ? (
+                      <CheckCircle2 className="mr-2 h-4 w-4" />
+                    ) : (
+                      <Circle className="mr-2 h-4 w-4" />
+                    )}
+                    {completedItemIds.includes(item.id) ? "Completed" : "Mark Step Complete"}
+                  </Button>
+                )}
               </CardContent>
             </Card>
           ))}
         </div>
 
         <aside className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Your Progress</CardTitle>
+              <CardDescription>
+                {user
+                  ? hasStarted ? `${progress?.percentComplete || 0}% complete` : "Start this collection to track progress."
+                  : "Log in to track this collection."}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <Progress value={progress?.percentComplete || 0} className="h-2" />
+              <div className="flex items-center justify-between text-sm text-muted-foreground">
+                <span>{completedItemIds.length} completed</span>
+                <span>{collection.items?.length || 0} total</span>
+              </div>
+              {isCompleted && <Badge className="bg-emerald-600">completed</Badge>}
+            </CardContent>
+          </Card>
+
           {collection.learningGoals?.length ? (
             <Card>
               <CardHeader>

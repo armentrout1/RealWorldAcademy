@@ -973,6 +973,88 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/curriculum-collections/:id/progress", async (req, res) => {
+    try {
+      const sessionUserId = requireSessionUserId(req, res);
+      if (!sessionUserId) return;
+
+      const collection = await storage.getCurriculumCollection(Number(req.params.id));
+      if (!collection || !["approved", "published"].includes(collection.status)) {
+        return res.status(404).json({ message: "Curriculum collection not found" });
+      }
+
+      const progress = await storage.getUserCurriculumCollectionProgress(sessionUserId, collection.id);
+      res.json(progress || null);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch collection progress" });
+    }
+  });
+
+  app.post("/api/curriculum-collections/:id/start", async (req, res) => {
+    try {
+      const sessionUserId = requireSessionUserId(req, res);
+      if (!sessionUserId) return;
+
+      const collection = await storage.getCurriculumCollection(Number(req.params.id));
+      if (!collection || !["approved", "published"].includes(collection.status)) {
+        return res.status(404).json({ message: "Curriculum collection not found" });
+      }
+
+      const items = await storage.getCurriculumCollectionItems(collection.id);
+      const existing = await storage.getUserCurriculumCollectionProgress(sessionUserId, collection.id);
+      const progress = await storage.upsertUserCurriculumCollectionProgress(sessionUserId, collection.id, {
+        status: existing?.status === "completed" ? "completed" : "in_progress",
+        currentItemId: existing?.currentItemId || items[0]?.id,
+        completedItemIds: existing?.completedItemIds || [],
+        percentComplete: existing?.percentComplete || 0,
+        startedAt: existing?.startedAt || new Date(),
+      });
+
+      res.status(existing ? 200 : 201).json(progress);
+    } catch (error) {
+      res.status(400).json({ message: "Failed to start curriculum collection" });
+    }
+  });
+
+  app.patch("/api/curriculum-collections/:id/progress", express.json(), async (req, res) => {
+    try {
+      const sessionUserId = requireSessionUserId(req, res);
+      if (!sessionUserId) return;
+
+      const collection = await storage.getCurriculumCollection(Number(req.params.id));
+      if (!collection || !["approved", "published"].includes(collection.status)) {
+        return res.status(404).json({ message: "Curriculum collection not found" });
+      }
+
+      const items = await storage.getCurriculumCollectionItems(collection.id);
+      const itemId = Number(req.body.itemId);
+      if (!items.some((item) => item.id === itemId)) {
+        return res.status(400).json({ message: "Collection item not found" });
+      }
+
+      const existing = await storage.getUserCurriculumCollectionProgress(sessionUserId, collection.id);
+      const completedItemIds = Array.from(new Set([...(existing?.completedItemIds || []), itemId]));
+      const nextItem = items.find((item) => !completedItemIds.includes(item.id));
+      const percentComplete = items.length > 0
+        ? Math.round((completedItemIds.length / items.length) * 100)
+        : 100;
+      const isComplete = items.length > 0 && completedItemIds.length >= items.length;
+
+      const progress = await storage.upsertUserCurriculumCollectionProgress(sessionUserId, collection.id, {
+        status: isComplete ? "completed" : "in_progress",
+        currentItemId: nextItem?.id || itemId,
+        completedItemIds,
+        percentComplete,
+        startedAt: existing?.startedAt || new Date(),
+        completedAt: isComplete ? existing?.completedAt || new Date() : undefined,
+      });
+
+      res.json(progress);
+    } catch (error) {
+      res.status(400).json({ message: "Failed to update collection progress" });
+    }
+  });
+
   app.post("/api/curriculum-collections", express.json(), async (req, res) => {
     try {
       const sessionUserId = requireSessionUserId(req, res);

@@ -815,6 +815,38 @@ export const curriculumCollectionItemsRelations = relations(curriculumCollection
   }),
 }));
 
+export const userCurriculumCollectionProgress = pgTable("user_curriculum_collection_progress", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id),
+  collectionId: integer("collection_id").notNull().references(() => curriculumCollections.id),
+  status: text("status").default("not_started").notNull(), // not_started, in_progress, completed
+  currentItemId: integer("current_item_id").references(() => curriculumCollectionItems.id),
+  completedItemIds: integer("completed_item_ids").array(),
+  percentComplete: integer("percent_complete").default(0).notNull(),
+  startedAt: timestamp("started_at"),
+  completedAt: timestamp("completed_at"),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertUserCurriculumCollectionProgressSchema = createInsertSchema(userCurriculumCollectionProgress).omit({ id: true });
+export type InsertUserCurriculumCollectionProgress = z.infer<typeof insertUserCurriculumCollectionProgressSchema>;
+export type UserCurriculumCollectionProgress = typeof userCurriculumCollectionProgress.$inferSelect;
+
+export const userCurriculumCollectionProgressRelations = relations(userCurriculumCollectionProgress, ({ one }) => ({
+  user: one(users, {
+    fields: [userCurriculumCollectionProgress.userId],
+    references: [users.id],
+  }),
+  collection: one(curriculumCollections, {
+    fields: [userCurriculumCollectionProgress.collectionId],
+    references: [curriculumCollections.id],
+  }),
+  currentItem: one(curriculumCollectionItems, {
+    fields: [userCurriculumCollectionProgress.currentItemId],
+    references: [curriculumCollectionItems.id],
+  }),
+}));
+
 export const feedbackSubmissions = pgTable("feedback_submissions", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
@@ -846,6 +878,7 @@ export const usersRelations = relations(users, ({ many, one }) => ({
   buddyEmotionLogs: many(buddyEmotionLogs),
   buddyJournalEntries: many(buddyJournalEntries),
   issuedCredentials: many(issuedCredentials),
+  collectionProgress: many(userCurriculumCollectionProgress),
   parentRelationships: many(parentChildRelationships, { relationName: "parentRelationships" }),
   childRelationships: many(parentChildRelationships, { relationName: "childRelationships" }),
   parentLessonReviews: many(parentLessonReviews, { relationName: "parentLessonReviews" }),
