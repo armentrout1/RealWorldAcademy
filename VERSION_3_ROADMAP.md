@@ -115,7 +115,7 @@ Current build status:
 - `green`: collection items can represent lessons, resources, videos, activities, or external links.
 - `green`: logged-in contributors with creator profiles can save draft collections from `/curriculum-collections`.
 - `green`: contributors can submit draft collections into `pending_review`.
-- `yellow`: admin list endpoint exists, but the full admin review UI and publish action still need to be built.
+- `green`: admins can review collections from the admin management console and approve, publish, request changes, reject, or archive them.
 - `yellow`: public collection browse endpoint only exposes approved/published collections; public detail and start-flow screens still need to be built.
 
 ### Phase 3: Video and Resource Curation
@@ -303,7 +303,7 @@ Current build status:
 
 - `green`: creators can draft a full collection instead of only one lesson.
 - `green`: collections can include ordered videos, lesson references, resources, activities, links, parent prompts, student prompts, parent notes, and a final project.
-- `yellow`: draft and submit-for-review are clear; review and publish need the admin UI.
+- `green`: draft, submit-for-review, admin review, and publish states are wired.
 - `yellow`: the homeschool family experience needs public detail, start, and progress tracking before this checkpoint fully passes.
 
 ### Checkpoint 3: Video Curation

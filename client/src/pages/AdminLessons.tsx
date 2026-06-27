@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Link } from "wouter";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, BookOpen, Inbox, Search, ShieldCheck, Users } from "lucide-react";
+import { ArrowLeft, BookMarked, BookOpen, Inbox, Search, ShieldCheck, Users } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -51,6 +51,43 @@ interface CurriculumSubmission {
   } | null;
 }
 
+interface CurriculumCollectionItem {
+  id: number;
+  itemType: string;
+  title: string;
+  description?: string | null;
+  url?: string | null;
+  order: number;
+  parentPrompt?: string | null;
+  studentPrompt?: string | null;
+}
+
+interface CurriculumCollection {
+  id: number;
+  title: string;
+  description: string;
+  subject: string;
+  ageGroup: string;
+  estimatedWeeks: number;
+  learningGoals?: string[] | null;
+  parentNotes?: string | null;
+  finalProject?: string | null;
+  status: string;
+  reviewerNote?: string | null;
+  submittedAt?: string | null;
+  reviewedAt?: string | null;
+  contributorProfile?: {
+    id: number;
+    displayName: string;
+    affiliation?: string | null;
+    bio?: string | null;
+    expertiseTags?: string[] | null;
+    trustLevel: string;
+    status: string;
+  } | null;
+  items?: CurriculumCollectionItem[];
+}
+
 interface FeedbackSubmission {
   id: number;
   name: string;
@@ -73,12 +110,14 @@ interface AdminUser {
 }
 
 const curriculumStatuses = ["pending_review", "approved", "changes_requested", "rejected", "archived"];
+const collectionStatuses = ["approved", "published", "changes_requested", "rejected", "archived"];
 const feedbackStatuses = ["new", "reviewing", "resolved", "archived"];
 const roles = ["student", "parent", "admin"];
 
 export default function AdminLessons() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedSubmission, setSelectedSubmission] = useState<CurriculumSubmission | null>(null);
+  const [selectedCollection, setSelectedCollection] = useState<CurriculumCollection | null>(null);
   const [reviewNote, setReviewNote] = useState("");
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -86,6 +125,11 @@ export default function AdminLessons() {
   const { data: submissions = [], isLoading: submissionsLoading } = useQuery<CurriculumSubmission[]>({
     queryKey: ["/api/curriculum-submissions"],
     queryFn: () => apiRequest<CurriculumSubmission[]>("/api/curriculum-submissions"),
+  });
+
+  const { data: collections = [], isLoading: collectionsLoading } = useQuery<CurriculumCollection[]>({
+    queryKey: ["/api/admin/curriculum-collections"],
+    queryFn: () => apiRequest<CurriculumCollection[]>("/api/admin/curriculum-collections"),
   });
 
   const { data: feedback = [], isLoading: feedbackLoading } = useQuery<FeedbackSubmission[]>({
@@ -116,6 +160,30 @@ export default function AdminLessons() {
     onError: (error) => {
       toast({
         title: "Review failed",
+        description: error instanceof Error ? error.message : "Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const collectionReviewMutation = useMutation({
+    mutationFn: ({ id, status, reviewerNote }: { id: number; status: string; reviewerNote?: string }) =>
+      apiRequest<CurriculumCollection>(`/api/admin/curriculum-collections/${id}/review`, {
+        method: "PATCH",
+        body: { status, reviewerNote },
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/curriculum-collections"] });
+      setSelectedCollection(null);
+      setReviewNote("");
+      toast({
+        title: "Collection review updated",
+        description: "Approved collections are now available to public collection surfaces.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Collection review failed",
         description: error instanceof Error ? error.message : "Please try again.",
         variant: "destructive",
       });
@@ -167,6 +235,19 @@ export default function AdminLessons() {
       .includes(searchQuery.toLowerCase())
   );
 
+  const filteredCollections = collections.filter((collection) =>
+    [
+      collection.title,
+      collection.contributorProfile?.displayName,
+      collection.subject,
+      collection.ageGroup,
+      collection.status,
+    ]
+      .join(" ")
+      .toLowerCase()
+      .includes(searchQuery.toLowerCase())
+  );
+
   const filteredFeedback = feedback.filter((item) =>
     [item.name, item.email, item.audience, item.category, item.status, item.message]
       .join(" ")
@@ -200,6 +281,7 @@ export default function AdminLessons() {
 
   const counts = {
     pending: submissions.filter((submission) => submission.status === "pending_review").length,
+    collections: collections.filter((collection) => collection.status === "pending_review").length,
     feedback: feedback.filter((item) => item.status === "new" || item.status === "reviewing").length,
     users: users.length,
   };
@@ -217,7 +299,7 @@ export default function AdminLessons() {
         <div className="w-[150px]" />
       </div>
 
-      <div className="mb-6 grid gap-4 md:grid-cols-3">
+      <div className="mb-6 grid gap-4 md:grid-cols-4">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-sm font-medium">
@@ -228,6 +310,18 @@ export default function AdminLessons() {
           <CardContent>
             <div className="text-3xl font-bold">{counts.pending}</div>
             <p className="text-sm text-muted-foreground">pending submissions</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-sm font-medium">
+              <BookMarked className="h-4 w-4 text-primary" />
+              Collection Queue
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold">{counts.collections}</div>
+            <p className="text-sm text-muted-foreground">pending collections</p>
           </CardContent>
         </Card>
         <Card>
@@ -259,7 +353,7 @@ export default function AdminLessons() {
       <div className="relative mb-6">
         <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
         <Input
-          placeholder="Search submissions, feedback, users..."
+          placeholder="Search submissions, collections, feedback, users..."
           className="pl-8"
           value={searchQuery}
           onChange={(event) => setSearchQuery(event.target.value)}
@@ -267,8 +361,9 @@ export default function AdminLessons() {
       </div>
 
       <Tabs defaultValue="curriculum">
-        <TabsList className="mb-6 grid w-full grid-cols-3">
+        <TabsList className="mb-6 grid w-full grid-cols-4">
           <TabsTrigger value="curriculum">Curriculum</TabsTrigger>
+          <TabsTrigger value="collections">Collections</TabsTrigger>
           <TabsTrigger value="feedback">Feedback</TabsTrigger>
           <TabsTrigger value="users">Users & Roles</TabsTrigger>
         </TabsList>
@@ -313,6 +408,67 @@ export default function AdminLessons() {
                           <Button variant="outline" size="sm" onClick={() => {
                             setSelectedSubmission(submission);
                             setReviewNote(submission.reviewerNote || "");
+                          }}>
+                            Manage
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="collections">
+          <Card>
+            <CardHeader>
+              <CardTitle>Collection Review Queue</CardTitle>
+              <CardDescription>Review multi-step curriculum paths before families can browse them.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {collectionsLoading ? (
+                <p className="py-8 text-center text-muted-foreground">Loading collections...</p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Collection</TableHead>
+                      <TableHead>Contributor</TableHead>
+                      <TableHead>Subject</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Submitted</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredCollections.map((collection) => (
+                      <TableRow key={collection.id}>
+                        <TableCell>
+                          <div className="font-medium">{collection.title}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {collection.estimatedWeeks} weeks | {collection.items?.length || 0} items
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="font-medium">{collection.contributorProfile?.displayName || "Unknown creator"}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {collection.contributorProfile
+                              ? `${collection.contributorProfile.trustLevel} creator`
+                              : "No linked profile"}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div>{collection.subject}</div>
+                          <div className="text-xs text-muted-foreground">{collection.ageGroup}</div>
+                        </TableCell>
+                        <TableCell>{statusBadge(collection.status)}</TableCell>
+                        <TableCell>{formatDate(collection.submittedAt)}</TableCell>
+                        <TableCell className="text-right">
+                          <Button variant="outline" size="sm" onClick={() => {
+                            setSelectedCollection(collection);
+                            setReviewNote(collection.reviewerNote || "");
                           }}>
                             Manage
                           </Button>
@@ -439,6 +595,130 @@ export default function AdminLessons() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {selectedCollection && (
+        <Dialog open={Boolean(selectedCollection)} onOpenChange={(open) => !open && setSelectedCollection(null)}>
+          <DialogContent className="max-h-[90vh] max-w-4xl overflow-y-auto">
+            <DialogHeader>
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge>{selectedCollection.subject}</Badge>
+                <Badge variant="outline">{selectedCollection.ageGroup}</Badge>
+                <Badge variant="secondary">{selectedCollection.estimatedWeeks} weeks</Badge>
+                {statusBadge(selectedCollection.status)}
+              </div>
+              <DialogTitle>{selectedCollection.title}</DialogTitle>
+              <DialogDescription>
+                Built by {selectedCollection.contributorProfile?.displayName || "unknown creator"}
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-5">
+              <div className="rounded-md border bg-slate-50 p-4">
+                <h3 className="mb-2 font-semibold">Contributor Context</h3>
+                {selectedCollection.contributorProfile ? (
+                  <div className="space-y-2 text-sm text-muted-foreground">
+                    <div className="flex flex-wrap gap-2">
+                      <Badge variant="secondary">{selectedCollection.contributorProfile.trustLevel} creator</Badge>
+                      <Badge variant="outline">{selectedCollection.contributorProfile.status}</Badge>
+                    </div>
+                    {selectedCollection.contributorProfile.affiliation && (
+                      <p>Affiliation: {selectedCollection.contributorProfile.affiliation}</p>
+                    )}
+                    {selectedCollection.contributorProfile.expertiseTags?.length ? (
+                      <p>Expertise: {selectedCollection.contributorProfile.expertiseTags.join(", ")}</p>
+                    ) : null}
+                    {selectedCollection.contributorProfile.bio && (
+                      <p className="whitespace-pre-line">{selectedCollection.contributorProfile.bio}</p>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">No contributor profile is linked to this collection.</p>
+                )}
+              </div>
+
+              <div>
+                <h3 className="mb-1 font-semibold">Description</h3>
+                <p className="whitespace-pre-line text-sm text-muted-foreground">{selectedCollection.description}</p>
+              </div>
+
+              {selectedCollection.learningGoals?.length ? (
+                <div>
+                  <h3 className="mb-2 font-semibold">Learning Goals</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {selectedCollection.learningGoals.map((goal) => (
+                      <Badge key={goal} variant="secondary">{goal}</Badge>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
+              {selectedCollection.parentNotes && (
+                <div>
+                  <h3 className="mb-1 font-semibold">Parent Notes</h3>
+                  <p className="whitespace-pre-line text-sm text-muted-foreground">{selectedCollection.parentNotes}</p>
+                </div>
+              )}
+
+              {selectedCollection.finalProject && (
+                <div>
+                  <h3 className="mb-1 font-semibold">Final Project</h3>
+                  <p className="whitespace-pre-line text-sm text-muted-foreground">{selectedCollection.finalProject}</p>
+                </div>
+              )}
+
+              <Separator />
+
+              <div className="space-y-3">
+                <h3 className="font-semibold">Collection Items</h3>
+                {(selectedCollection.items || []).map((item) => (
+                  <div key={item.id} className="rounded-md border p-4">
+                    <div className="mb-2 flex flex-wrap items-center gap-2">
+                      <Badge variant="outline">Step {item.order}</Badge>
+                      <Badge variant="secondary">{item.itemType}</Badge>
+                      <h4 className="font-medium">{item.title}</h4>
+                    </div>
+                    {item.url && (
+                      <a className="break-all text-sm text-primary underline" href={item.url} target="_blank" rel="noreferrer">
+                        {item.url}
+                      </a>
+                    )}
+                    {item.description && <p className="mt-2 whitespace-pre-line text-sm text-muted-foreground">{item.description}</p>}
+                    {item.parentPrompt && <p className="mt-2 text-sm"><span className="font-medium">Parent:</span> {item.parentPrompt}</p>}
+                    {item.studentPrompt && <p className="mt-1 text-sm"><span className="font-medium">Student:</span> {item.studentPrompt}</p>}
+                  </div>
+                ))}
+              </div>
+
+              <div className="space-y-2">
+                <h3 className="font-semibold">Reviewer Note</h3>
+                <Textarea
+                  value={reviewNote}
+                  onChange={(event) => setReviewNote(event.target.value)}
+                  placeholder="Add notes for the contributor or internal review history..."
+                  className="min-h-[120px]"
+                />
+              </div>
+            </div>
+
+            <DialogFooter className="flex flex-wrap gap-2">
+              {collectionStatuses.map((status) => (
+                <Button
+                  key={status}
+                  variant={status === "approved" || status === "published" ? "default" : status === "rejected" ? "destructive" : "outline"}
+                  disabled={collectionReviewMutation.isPending}
+                  onClick={() => collectionReviewMutation.mutate({
+                    id: selectedCollection.id,
+                    status,
+                    reviewerNote: reviewNote || undefined,
+                  })}
+                >
+                  {status.replace("_", " ")}
+                </Button>
+              ))}
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
 
       {selectedSubmission && (
         <Dialog open={Boolean(selectedSubmission)} onOpenChange={(open) => !open && setSelectedSubmission(null)}>

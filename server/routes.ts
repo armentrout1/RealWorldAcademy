@@ -1106,6 +1106,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.patch("/api/admin/curriculum-collections/:id/review", express.json(), async (req, res) => {
+    try {
+      if (!(await requireAdminUser(req, res))) return;
+
+      const id = Number(req.params.id);
+      const existing = await storage.getCurriculumCollection(id);
+      if (!existing) {
+        return res.status(404).json({ message: "Curriculum collection not found" });
+      }
+
+      const allowedStatuses = new Set(["approved", "published", "changes_requested", "rejected", "archived"]);
+      if (!allowedStatuses.has(req.body.status)) {
+        return res.status(400).json({ message: "Invalid review status" });
+      }
+
+      const updated = await storage.updateCurriculumCollection(id, {
+        status: req.body.status,
+        reviewerNote: req.body.reviewerNote,
+        reviewedAt: new Date(),
+      });
+      const [enriched] = await attachCollectionDetails([updated]);
+      res.json(enriched);
+    } catch (error) {
+      res.status(400).json({ message: "Failed to review curriculum collection" });
+    }
+  });
+
   // Curriculum contribution and review endpoints
   app.get("/api/curriculum-submissions", async (req, res) => {
     try {
