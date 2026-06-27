@@ -720,6 +720,7 @@ export type ContributorProfile = typeof contributorProfiles.$inferSelect;
 
 export const curriculumSubmissions = pgTable("curriculum_submissions", {
   id: serial("id").primaryKey(),
+  contributorProfileId: integer("contributor_profile_id").references(() => contributorProfiles.id),
   contributorName: text("contributor_name").notNull(),
   contributorEmail: text("contributor_email").notNull(),
   affiliation: text("affiliation").notNull(),
@@ -742,6 +743,13 @@ export const curriculumSubmissions = pgTable("curriculum_submissions", {
 export const insertCurriculumSubmissionSchema = createInsertSchema(curriculumSubmissions).omit({ id: true });
 export type InsertCurriculumSubmission = z.infer<typeof insertCurriculumSubmissionSchema>;
 export type CurriculumSubmission = typeof curriculumSubmissions.$inferSelect;
+
+export const curriculumSubmissionsRelations = relations(curriculumSubmissions, ({ one }) => ({
+  contributorProfile: one(contributorProfiles, {
+    fields: [curriculumSubmissions.contributorProfileId],
+    references: [contributorProfiles.id],
+  }),
+}));
 
 export const feedbackSubmissions = pgTable("feedback_submissions", {
   id: serial("id").primaryKey(),

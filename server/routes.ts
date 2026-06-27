@@ -768,10 +768,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
 
     const existingLessons = await storage.getLessonsBySubject(subject.id);
+    const contributorProfile = submission.contributorProfileId
+      ? await storage.getContributorProfile(submission.contributorProfileId)
+      : undefined;
+    const contributorName = contributorProfile?.displayName || submission.contributorName;
+
     return await storage.createLesson(insertLessonSchema.parse({
       subjectId: subject.id,
       title: submission.title,
-      subtitle: `Community lesson by ${submission.contributorName}`,
+      subtitle: `Community lesson by ${contributorName}`,
       slug,
       order: existingLessons.length + 1,
       learningObjective: submission.objective,
@@ -783,8 +788,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       activityContent: {
         instructions: submission.activity,
         contributor: {
-          name: submission.contributorName,
-          affiliation: submission.affiliation,
+          id: contributorProfile?.id,
+          name: contributorName,
+          affiliation: contributorProfile?.affiliation || submission.affiliation,
+          trustLevel: contributorProfile?.trustLevel,
         },
         sourceSubmissionId: submission.id,
       },
@@ -801,6 +808,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
           reflectionPrompt: submission.reflection,
         },
       },
+    }));
+  };
+
+  const attachContributorProfiles = async (submissions: CurriculumSubmission[]) => {
+    const profiles = await storage.getAllContributorProfiles();
+    const profileById = new Map(profiles.map((profile) => [profile.id, profile]));
+
+    return submissions.map((submission) => ({
+      ...submission,
+      contributorProfile: submission.contributorProfileId
+        ? profileById.get(submission.contributorProfileId) || null
+        : profiles.find((profile) =>
+            profile.displayName.toLowerCase() === submission.contributorName.toLowerCase() ||
+            profile.affiliation?.toLowerCase() === submission.affiliation.toLowerCase()
+          ) || null,
     }));
   };
 
@@ -860,6 +882,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/contributor-submissions/me", async (req, res) => {
+    try {
+      const sessionUserId = requireSessionUserId(req, res);
+      if (!sessionUserId) return;
+
+      const user = await storage.getUser(sessionUserId);
+      const profile = await storage.getContributorProfileByUserId(sessionUserId);
+      if (!user || !profile) {
+        return res.json([]);
+      }
+
+      const submissions = await storage.getCurriculumSubmissionsForContributor(profile.id, user.email);
+      res.json(await attachContributorProfiles(submissions));
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch contributor submissions" });
+    }
+  });
+
   // Curriculum contribution and review endpoints
   app.get("/api/curriculum-submissions", async (req, res) => {
     try {
@@ -867,7 +907,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const status = typeof req.query.status === "string" ? req.query.status : undefined;
       const submissions = await storage.getCurriculumSubmissions(status);
-      res.json(submissions);
+      res.json(await attachContributorProfiles(submissions));
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch curriculum submissions" });
     }
@@ -882,7 +922,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Curriculum submission not found" });
       }
 
-      res.json(submission);
+      const enriched = await attachContributorProfiles([submission]);
+      res.json(enriched[0]);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch curriculum submission" });
     }
@@ -890,8 +931,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/curriculum-submissions", express.json(), async (req, res) => {
     try {
+      const sessionUserId = req.session.userId;
+      const contributorProfile = sessionUserId
+        ? await storage.getContributorProfileByUserId(sessionUserId)
+        : undefined;
       const validatedData = insertCurriculumSubmissionSchema.parse({
         ...req.body,
+        contributorProfileId: contributorProfile?.id,
+        contributorName: contributorProfile?.displayName || req.body.contributorName,
+        contributorEmail: req.body.contributorEmail,
+        affiliation: contributorProfile?.affiliation || req.body.affiliation,
         status: "pending_review",
         submittedAt: new Date(),
       });

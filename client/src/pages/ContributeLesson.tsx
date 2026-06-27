@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Link } from "wouter";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -18,6 +18,8 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { apiRequest } from "@/lib/queryClient";
+import { useAuth } from "@/contexts/AuthContext";
+import { useQuery } from "@tanstack/react-query";
 
 // Form schema
 const lessonFormSchema = z.object({
@@ -62,6 +64,13 @@ const lessonFormSchema = z.object({
 
 type LessonFormValues = z.infer<typeof lessonFormSchema>;
 
+interface ContributorProfileRecord {
+  id: number;
+  displayName: string;
+  affiliation?: string | null;
+  trustLevel: string;
+}
+
 // Default form values
 const defaultValues: Partial<LessonFormValues> = {
   contributorName: "",
@@ -84,6 +93,12 @@ export default function ContributeLesson() {
   const [submitted, setSubmitted] = useState(false);
   const [formStep, setFormStep] = useState<'info' | 'content' | 'details' | 'preview'>('info');
   const { toast } = useToast();
+  const { user } = useAuth();
+  const { data: contributorProfile } = useQuery<ContributorProfileRecord | null>({
+    queryKey: ["/api/contributor-profiles/me"],
+    queryFn: () => apiRequest<ContributorProfileRecord | null>("/api/contributor-profiles/me"),
+    enabled: Boolean(user?.id),
+  });
 
   // Initialize form
   const form = useForm<LessonFormValues>({
@@ -91,6 +106,17 @@ export default function ContributeLesson() {
     defaultValues,
     mode: "onChange",
   });
+
+  useEffect(() => {
+    if (!contributorProfile && !user) return;
+
+    form.reset({
+      ...form.getValues(),
+      contributorName: contributorProfile?.displayName || form.getValues("contributorName") || user?.fullName || "",
+      contributorEmail: form.getValues("contributorEmail") || user?.email || "",
+      affiliation: contributorProfile?.affiliation || form.getValues("affiliation") || "",
+    });
+  }, [contributorProfile, form, user]);
 
   // Submit handler
   async function onSubmit(data: LessonFormValues) {

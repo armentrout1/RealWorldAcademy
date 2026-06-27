@@ -269,6 +269,14 @@ Pass condition:
 
 Contributor identity exists in the product and is tied to submitted or published curriculum.
 
+Current build status:
+
+- `green`: contributor profiles can be created and edited by logged-in users.
+- `green`: contributor submissions can link to creator profiles.
+- `green`: contributors can see their own submission status in a dashboard.
+- `green`: admins can see contributor profile context in the curriculum review queue.
+- `yellow`: published lesson pages show creator attribution indirectly through lesson metadata; a richer public creator card can come next.
+
 ### Checkpoint 2: Creative Curriculum Building
 
 Questions:

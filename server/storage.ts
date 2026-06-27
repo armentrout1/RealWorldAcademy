@@ -48,6 +48,7 @@ export interface IStorage {
   getParentLessonReviewsForChild(childUserId: number): Promise<ParentLessonReview[]>;
   createParentLessonReview(review: InsertParentLessonReview): Promise<ParentLessonReview>;
   getCurriculumSubmissions(status?: string): Promise<CurriculumSubmission[]>;
+  getCurriculumSubmissionsForContributor(contributorProfileId: number, contributorEmail: string): Promise<CurriculumSubmission[]>;
   getCurriculumSubmission(id: number): Promise<CurriculumSubmission | undefined>;
   createCurriculumSubmission(submission: InsertCurriculumSubmission): Promise<CurriculumSubmission>;
   reviewCurriculumSubmission(id: number, updates: Partial<CurriculumSubmission>): Promise<CurriculumSubmission>;
@@ -290,6 +291,19 @@ export class DatabaseStorage implements IStorage {
     }
 
     return await db.select().from(curriculumSubmissions);
+  }
+
+  async getCurriculumSubmissionsForContributor(
+    contributorProfileId: number,
+    contributorEmail: string,
+  ): Promise<CurriculumSubmission[]> {
+    const allSubmissions = await this.getCurriculumSubmissions();
+    const normalizedEmail = contributorEmail.trim().toLowerCase();
+
+    return allSubmissions.filter((submission) =>
+      submission.contributorProfileId === contributorProfileId ||
+      submission.contributorEmail.trim().toLowerCase() === normalizedEmail
+    );
   }
 
   async getCurriculumSubmission(id: number): Promise<CurriculumSubmission | undefined> {

@@ -40,6 +40,15 @@ interface CurriculumSubmission {
     title: string;
     slug: string;
   };
+  contributorProfile?: {
+    id: number;
+    displayName: string;
+    affiliation?: string | null;
+    bio?: string | null;
+    expertiseTags?: string[] | null;
+    trustLevel: string;
+    status: string;
+  } | null;
 }
 
 interface FeedbackSubmission {
@@ -289,7 +298,14 @@ export default function AdminLessons() {
                     {filteredSubmissions.map((submission) => (
                       <TableRow key={submission.id}>
                         <TableCell className="font-medium">{submission.title}</TableCell>
-                        <TableCell>{submission.contributorName}</TableCell>
+                        <TableCell>
+                          <div className="font-medium">{submission.contributorProfile?.displayName || submission.contributorName}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {submission.contributorProfile
+                              ? `${submission.contributorProfile.trustLevel} creator`
+                              : submission.contributorEmail}
+                          </div>
+                        </TableCell>
                         <TableCell>{submission.subject}</TableCell>
                         <TableCell>{statusBadge(submission.status)}</TableCell>
                         <TableCell>{formatDate(submission.submittedAt)}</TableCell>
@@ -435,11 +451,36 @@ export default function AdminLessons() {
               </div>
               <DialogTitle>{selectedSubmission.title}</DialogTitle>
               <DialogDescription>
-                Submitted by {selectedSubmission.contributorName} ({selectedSubmission.contributorEmail})
+                Submitted by {selectedSubmission.contributorProfile?.displayName || selectedSubmission.contributorName} ({selectedSubmission.contributorEmail})
               </DialogDescription>
             </DialogHeader>
 
             <div className="space-y-5">
+              <div className="rounded-md border bg-slate-50 p-4">
+                <h3 className="mb-2 font-semibold">Contributor Context</h3>
+                {selectedSubmission.contributorProfile ? (
+                  <div className="space-y-2 text-sm text-muted-foreground">
+                    <div className="flex flex-wrap gap-2">
+                      <Badge variant="secondary">{selectedSubmission.contributorProfile.trustLevel} creator</Badge>
+                      <Badge variant="outline">{selectedSubmission.contributorProfile.status}</Badge>
+                    </div>
+                    {selectedSubmission.contributorProfile.affiliation && (
+                      <p>Affiliation: {selectedSubmission.contributorProfile.affiliation}</p>
+                    )}
+                    {selectedSubmission.contributorProfile.expertiseTags?.length ? (
+                      <p>Expertise: {selectedSubmission.contributorProfile.expertiseTags.join(", ")}</p>
+                    ) : null}
+                    {selectedSubmission.contributorProfile.bio && (
+                      <p className="whitespace-pre-line">{selectedSubmission.contributorProfile.bio}</p>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    This submission is not linked to a creator profile yet. Review with the contributor's typed name and email only.
+                  </p>
+                )}
+              </div>
+
               {[
                 ["Objective", selectedSubmission.objective],
                 ["Warm-Up", selectedSubmission.warmUp],
