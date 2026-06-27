@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Link } from "wouter";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, BookMarked, BookOpen, Flag, Inbox, LinkIcon, Search, ShieldCheck, Users } from "lucide-react";
+import { ArrowLeft, BookMarked, BookOpen, Flag, GraduationCap, Inbox, LinkIcon, Search, ShieldCheck, Users } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -132,6 +132,29 @@ interface ContentReport {
   resolvedAt?: string | null;
 }
 
+interface EducatorOffering {
+  id: number;
+  title: string;
+  description: string;
+  offeringType: string;
+  subject: string;
+  ageGroup: string;
+  format: string;
+  duration?: string | null;
+  priceCents?: number | null;
+  status: string;
+  reviewerNote?: string | null;
+  submittedAt?: string | null;
+  contributorProfile?: {
+    id: number;
+    displayName: string;
+    affiliation?: string | null;
+    trustLevel: string;
+    subjectsTaught?: string[] | null;
+    ageGroupsServed?: string[] | null;
+  } | null;
+}
+
 interface ResourceSubmission {
   id: number;
   contributorName: string;
@@ -184,6 +207,7 @@ const collectionStatuses = ["approved", "published", "changes_requested", "rejec
 const resourceStatuses = ["approved", "changes_requested", "rejected", "archived"];
 const feedbackStatuses = ["new", "reviewing", "resolved", "archived"];
 const reportStatuses = ["new", "reviewing", "resolved", "archived"];
+const offeringReviewStatuses = ["approved", "changes_requested", "rejected", "archived"];
 const roles = ["student", "parent", "admin"];
 const rubricCriteria = [
   ["safety", "Safety"],
@@ -232,6 +256,11 @@ export default function AdminLessons() {
   const { data: contentReports = [], isLoading: reportsLoading } = useQuery<ContentReport[]>({
     queryKey: ["/api/content-reports"],
     queryFn: () => apiRequest<ContentReport[]>("/api/content-reports"),
+  });
+
+  const { data: educatorOfferings = [], isLoading: offeringsLoading } = useQuery<EducatorOffering[]>({
+    queryKey: ["/api/admin/educator-offerings"],
+    queryFn: () => apiRequest<EducatorOffering[]>("/api/admin/educator-offerings"),
   });
 
   const { data: users = [], isLoading: usersLoading } = useQuery<AdminUser[]>({
@@ -374,6 +403,25 @@ export default function AdminLessons() {
     },
   });
 
+  const offeringReviewMutation = useMutation({
+    mutationFn: ({ id, status }: { id: number; status: string }) =>
+      apiRequest<EducatorOffering>(`/api/admin/educator-offerings/${id}/review`, {
+        method: "PATCH",
+        body: { status },
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/educator-offerings"] });
+      toast({ title: "Offering reviewed", description: "The educator offering review status has been saved." });
+    },
+    onError: (error) => {
+      toast({
+        title: "Offering review failed",
+        description: error instanceof Error ? error.message : "Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
   const roleMutation = useMutation({
     mutationFn: ({ userId, role }: { userId: number; role: string }) =>
       apiRequest<AdminUser>(`/api/admin/users/${userId}/role`, {
@@ -442,6 +490,21 @@ export default function AdminLessons() {
       report.category,
       report.status,
       report.message,
+    ]
+      .join(" ")
+      .toLowerCase()
+      .includes(searchQuery.toLowerCase())
+  );
+
+  const filteredOfferings = educatorOfferings.filter((offering) =>
+    [
+      offering.title,
+      offering.contributorProfile?.displayName,
+      offering.offeringType,
+      offering.subject,
+      offering.ageGroup,
+      offering.status,
+      offering.description,
     ]
       .join(" ")
       .toLowerCase()
@@ -526,6 +589,7 @@ export default function AdminLessons() {
     pending: submissions.filter((submission) => submission.status === "pending_review").length,
     collections: collections.filter((collection) => collection.status === "pending_review").length,
     resources: resourceSubmissions.filter((resource) => resource.status === "pending_review").length,
+    offerings: educatorOfferings.filter((offering) => offering.status === "pending_review").length,
     feedback: feedback.filter((item) => item.status === "new" || item.status === "reviewing").length,
     reports: contentReports.filter((item) => item.status === "new" || item.status === "reviewing").length,
     users: users.length,
@@ -544,7 +608,7 @@ export default function AdminLessons() {
         <div className="w-[150px]" />
       </div>
 
-      <div className="mb-6 grid gap-4 md:grid-cols-3 xl:grid-cols-6">
+      <div className="mb-6 grid gap-4 md:grid-cols-3 xl:grid-cols-7">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-sm font-medium">
@@ -579,6 +643,18 @@ export default function AdminLessons() {
           <CardContent>
             <div className="text-3xl font-bold">{counts.resources}</div>
             <p className="text-sm text-muted-foreground">pending resources</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-sm font-medium">
+              <GraduationCap className="h-4 w-4 text-primary" />
+              Offering Queue
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold">{counts.offerings}</div>
+            <p className="text-sm text-muted-foreground">pending offerings</p>
           </CardContent>
         </Card>
         <Card>
@@ -622,7 +698,7 @@ export default function AdminLessons() {
       <div className="relative mb-6">
         <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
         <Input
-          placeholder="Search submissions, collections, resources, reports, feedback, users..."
+          placeholder="Search submissions, collections, resources, offerings, reports, feedback, users..."
           className="pl-8"
           value={searchQuery}
           onChange={(event) => setSearchQuery(event.target.value)}
@@ -630,10 +706,11 @@ export default function AdminLessons() {
       </div>
 
       <Tabs defaultValue="curriculum">
-        <TabsList className="mb-6 grid w-full grid-cols-6">
+        <TabsList className="mb-6 grid w-full grid-cols-7">
           <TabsTrigger value="curriculum">Curriculum</TabsTrigger>
           <TabsTrigger value="collections">Collections</TabsTrigger>
           <TabsTrigger value="resources">Resources</TabsTrigger>
+          <TabsTrigger value="offerings">Offerings</TabsTrigger>
           <TabsTrigger value="reports">Reports</TabsTrigger>
           <TabsTrigger value="feedback">Feedback</TabsTrigger>
           <TabsTrigger value="users">Users & Roles</TabsTrigger>
@@ -798,6 +875,79 @@ export default function AdminLessons() {
                             Manage
                           </Button>
                         </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="offerings">
+          <Card>
+            <CardHeader>
+              <CardTitle>Educator Offering Review Queue</CardTitle>
+              <CardDescription>Review free samples, classes, tutoring, coaching, and bundles before marketplace discovery.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {offeringsLoading ? (
+                <p className="py-8 text-center text-muted-foreground">Loading educator offerings...</p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Offering</TableHead>
+                      <TableHead>Educator</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Price</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Submitted</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredOfferings.map((offering) => (
+                      <TableRow key={offering.id}>
+                        <TableCell>
+                          <div className="font-medium">{offering.title}</div>
+                          <div className="text-xs text-muted-foreground">{offering.subject} | {offering.ageGroup}</div>
+                          <p className="mt-1 line-clamp-2 max-w-md text-xs text-muted-foreground">{offering.description}</p>
+                        </TableCell>
+                        <TableCell>
+                          <div className="font-medium">{offering.contributorProfile?.displayName || "Unknown educator"}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {offering.contributorProfile
+                              ? `${offering.contributorProfile.trustLevel} educator`
+                              : "No linked profile"}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div>{offering.offeringType.replace("_", " ")}</div>
+                          <div className="text-xs text-muted-foreground">{offering.format.replace("_", " ")}</div>
+                        </TableCell>
+                        <TableCell>
+                          {offering.priceCents ? `$${(offering.priceCents / 100).toFixed(2)}` : "Free/TBD"}
+                        </TableCell>
+                        <TableCell>
+                          {offering.status === "pending_review" ? (
+                            <Select
+                              value={offering.status}
+                              onValueChange={(status) => offeringReviewMutation.mutate({ id: offering.id, status })}
+                              disabled={offeringReviewMutation.isPending}
+                            >
+                              <SelectTrigger className="w-[170px]">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="pending_review">pending review</SelectItem>
+                                {offeringReviewStatuses.map((status) => (
+                                  <SelectItem key={status} value={status}>{status.replace("_", " ")}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          ) : statusBadge(offering.status)}
+                        </TableCell>
+                        <TableCell>{formatDate(offering.submittedAt)}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>

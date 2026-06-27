@@ -18,6 +18,7 @@ import {
   insertResourceSubmissionSchema,
   insertCurriculumCollectionSchema, insertCurriculumCollectionItemSchema,
   insertFeedbackSubmissionSchema, insertContentReportSchema,
+  insertEducatorOfferingSchema,
   insertCredentialDefinitionSchema, insertCredentialRequirementSchema,
   insertContributorProfileSchema,
   type CurriculumCollection,
@@ -947,6 +948,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     });
 
+  const normalizeStringArray = (value: unknown) =>
+    Array.isArray(value)
+      ? value.map(String).map((item: string) => item.trim()).filter(Boolean)
+      : [];
+
   app.get("/api/contributor-profiles/me", async (req, res) => {
     try {
       const sessionUserId = requireSessionUserId(req, res);
@@ -972,9 +978,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         affiliation: req.body.affiliation ? String(req.body.affiliation).trim() : null,
         website: req.body.website ? String(req.body.website).trim() : null,
         avatarUrl: req.body.avatarUrl ? String(req.body.avatarUrl).trim() : null,
-        expertiseTags: Array.isArray(req.body.expertiseTags)
-          ? req.body.expertiseTags.map(String).map((tag: string) => tag.trim()).filter(Boolean)
-          : [],
+        expertiseTags: normalizeStringArray(req.body.expertiseTags),
+        teachingStyle: req.body.teachingStyle ? String(req.body.teachingStyle).trim() : null,
+        subjectsTaught: normalizeStringArray(req.body.subjectsTaught),
+        ageGroupsServed: normalizeStringArray(req.body.ageGroupsServed),
+        introVideoUrl: req.body.introVideoUrl ? String(req.body.introVideoUrl).trim() : null,
+        sampleLessonUrls: normalizeStringArray(req.body.sampleLessonUrls),
+        availabilitySummary: req.body.availabilitySummary ? String(req.body.availabilitySummary).trim() : null,
+        timeZone: req.body.timeZone ? String(req.body.timeZone).trim() : null,
+        offeringTypes: normalizeStringArray(req.body.offeringTypes),
         trustLevel: existingProfile?.trustLevel || "new",
         status: existingProfile?.status || "active",
         createdAt: existingProfile?.createdAt || new Date(),
@@ -1036,6 +1048,155 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(await attachResourceContributorProfiles(submissions));
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch contributor resource submissions" });
+    }
+  });
+
+  const buildEducatorOfferingPayload = (profileId: number, body: Record<string, unknown>, status = "draft") => {
+    const allowedTypes = new Set(["free_sample", "live_class", "recorded_course", "tutoring", "coaching", "curriculum_bundle"]);
+    const allowedFormats = new Set(["free", "paid_placeholder", "live", "recorded", "one_on_one", "group"]);
+    const offeringType = String(body.offeringType || "free_sample");
+    const format = String(body.format || "free");
+
+    if (!allowedTypes.has(offeringType)) {
+      throw new Error("Invalid offering type");
+    }
+
+    if (!allowedFormats.has(format)) {
+      throw new Error("Invalid offering format");
+    }
+
+    return insertEducatorOfferingSchema.parse({
+      contributorProfileId: profileId,
+      title: String(body.title || "").trim(),
+      description: String(body.description || "").trim(),
+      offeringType,
+      subject: String(body.subject || "").trim(),
+      ageGroup: String(body.ageGroup || "").trim(),
+      format,
+      duration: body.duration ? String(body.duration).trim() : null,
+      priceCents: body.priceCents ? Number(body.priceCents) : null,
+      currency: body.currency ? String(body.currency).trim().toUpperCase() : "USD",
+      sampleUrl: body.sampleUrl ? String(body.sampleUrl).trim() : null,
+      meetingUrl: body.meetingUrl ? String(body.meetingUrl).trim() : null,
+      parentExpectations: body.parentExpectations ? String(body.parentExpectations).trim() : null,
+      completionEvidence: body.completionEvidence ? String(body.completionEvidence).trim() : null,
+      status,
+      reviewerNote: null,
+      internalReviewNote: null,
+      submittedAt: status === "pending_review" ? new Date() : null,
+      reviewedAt: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+  };
+
+  app.get("/api/educator-offerings/me", async (req, res) => {
+    try {
+      const sessionUserId = requireSessionUserId(req, res);
+      if (!sessionUserId) return;
+
+      const profile = await storage.getContributorProfileByUserId(sessionUserId);
+      if (!profile) return res.json([]);
+
+      res.json(await storage.getEducatorOfferingsForContributor(profile.id));
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch educator offerings" });
+    }
+  });
+
+  app.post("/api/educator-offerings", express.json(), async (req, res) => {
+    try {
+      const sessionUserId = requireSessionUserId(req, res);
+      if (!sessionUserId) return;
+
+      const profile = await storage.getContributorProfileByUserId(sessionUserId);
+      if (!profile) {
+        return res.status(400).json({ message: "Create an educator profile before adding offerings" });
+      }
+
+      const status = req.body.submitForReview ? "pending_review" : "draft";
+      const offeringData = buildEducatorOfferingPayload(profile.id, req.body, status);
+
+      if (!offeringData.title || !offeringData.description || !offeringData.subject || !offeringData.ageGroup) {
+        return res.status(400).json({ message: "Title, description, subject, and age group are required" });
+      }
+
+      const offering = await storage.createEducatorOffering(offeringData);
+      res.status(201).json(offering);
+    } catch (error) {
+      res.status(400).json({ message: error instanceof Error ? error.message : "Invalid educator offering" });
+    }
+  });
+
+  app.patch("/api/educator-offerings/:id", express.json(), async (req, res) => {
+    try {
+      const sessionUserId = requireSessionUserId(req, res);
+      if (!sessionUserId) return;
+
+      const profile = await storage.getContributorProfileByUserId(sessionUserId);
+      if (!profile) {
+        return res.status(400).json({ message: "Create an educator profile before editing offerings" });
+      }
+
+      const id = Number(req.params.id);
+      const existing = (await storage.getEducatorOfferingsForContributor(profile.id)).find((offering) => offering.id === id);
+      if (!existing) {
+        return res.status(404).json({ message: "Offering not found" });
+      }
+
+      if (!["draft", "changes_requested"].includes(existing.status)) {
+        return res.status(400).json({ message: "Only draft or changes requested offerings can be edited" });
+      }
+
+      const status = req.body.submitForReview ? "pending_review" : existing.status;
+      const offeringData = buildEducatorOfferingPayload(profile.id, req.body, status);
+      const offering = await storage.updateEducatorOffering(id, {
+        ...offeringData,
+        createdAt: existing.createdAt,
+        updatedAt: new Date(),
+      });
+      res.json(offering);
+    } catch (error) {
+      res.status(400).json({ message: error instanceof Error ? error.message : "Failed to update educator offering" });
+    }
+  });
+
+  app.get("/api/admin/educator-offerings", async (req, res) => {
+    try {
+      if (!(await requireAdminUser(req, res))) return;
+
+      const status = typeof req.query.status === "string" ? req.query.status : undefined;
+      const profiles = await storage.getAllContributorProfiles();
+      const profileById = new Map(profiles.map((profile) => [profile.id, profile]));
+      const offerings = await storage.getEducatorOfferings(status);
+      res.json(offerings.map((offering) => ({
+        ...offering,
+        contributorProfile: profileById.get(offering.contributorProfileId) || null,
+      })));
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch educator offerings" });
+    }
+  });
+
+  app.patch("/api/admin/educator-offerings/:id/review", express.json(), async (req, res) => {
+    try {
+      if (!(await requireAdminUser(req, res))) return;
+
+      const allowedStatuses = new Set(["approved", "changes_requested", "rejected", "archived"]);
+      if (!allowedStatuses.has(req.body.status)) {
+        return res.status(400).json({ message: "Invalid offering review status" });
+      }
+
+      const offering = await storage.updateEducatorOffering(Number(req.params.id), {
+        status: req.body.status,
+        reviewerNote: req.body.reviewerNote ? String(req.body.reviewerNote).trim() : null,
+        internalReviewNote: req.body.internalReviewNote ? String(req.body.internalReviewNote).trim() : null,
+        reviewedAt: new Date(),
+        updatedAt: new Date(),
+      });
+      res.json(offering);
+    } catch (error) {
+      res.status(400).json({ message: "Failed to review educator offering" });
     }
   });
 

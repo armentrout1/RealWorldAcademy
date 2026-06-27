@@ -66,6 +66,13 @@ Exit criteria:
 - A teacher or educator can present themselves professionally.
 - Families can understand who the educator is and what they teach.
 
+Current build status:
+
+- `green`: contributor profiles now include educator-ready fields for teaching style, subjects, age groups, intro video, sample lessons, availability, time zone, and future offering types.
+- `green`: educator profile editor lets teachers describe how and what they teach.
+- `green`: educator dashboard shows a profile snapshot for marketplace discovery readiness.
+- `yellow`: public educator profile pages still need to be built.
+
 ### Phase 2: Offering Schema and Review
 
 Goal: model the things educators can offer before adding payments.
@@ -84,6 +91,14 @@ Exit criteria:
 - Educators can draft offerings.
 - Admins can review offerings.
 - Approved offerings can appear on educator profiles.
+
+Current build status:
+
+- `green`: `educator_offerings` schema exists with free sample, live class, recorded course, tutoring, coaching, and curriculum bundle support.
+- `green`: educator dashboard can create draft offerings or submit them for review.
+- `green`: admin management has an educator offering review queue.
+- `yellow`: approved offerings are not yet shown on public educator profiles.
+- `yellow`: editing existing offerings from the dashboard still needs a polished UI.
 
 ### Phase 3: Discovery and Marketplace Browse
 
@@ -206,4 +221,3 @@ Start with Phase 1 and Phase 2 together:
 5. Show approved free/pending paid offerings on public educator profiles.
 
 This creates the marketplace skeleton without taking payment risk too early.
-

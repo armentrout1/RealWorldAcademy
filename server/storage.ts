@@ -26,6 +26,7 @@ import {
   parentChildRelationships, type ParentChildRelationship, type InsertParentChildRelationship,
   parentLessonReviews, type ParentLessonReview, type InsertParentLessonReview,
   contributorProfiles, type ContributorProfile, type InsertContributorProfile,
+  educatorOfferings, type EducatorOffering, type InsertEducatorOffering,
   curriculumSubmissions, type CurriculumSubmission, type InsertCurriculumSubmission,
   resourceSubmissions, type ResourceSubmission, type InsertResourceSubmission,
   curriculumCollections, type CurriculumCollection, type InsertCurriculumCollection,
@@ -84,6 +85,10 @@ export interface IStorage {
   getContributorProfile(id: number): Promise<ContributorProfile | undefined>;
   getContributorProfileByUserId(userId: number): Promise<ContributorProfile | undefined>;
   upsertContributorProfile(profile: InsertContributorProfile): Promise<ContributorProfile>;
+  getEducatorOfferings(status?: string): Promise<EducatorOffering[]>;
+  getEducatorOfferingsForContributor(contributorProfileId: number): Promise<EducatorOffering[]>;
+  createEducatorOffering(offering: InsertEducatorOffering): Promise<EducatorOffering>;
+  updateEducatorOffering(id: number, updates: Partial<EducatorOffering>): Promise<EducatorOffering>;
   getFeedbackSubmissions(): Promise<FeedbackSubmission[]>;
   createFeedbackSubmission(submission: InsertFeedbackSubmission): Promise<FeedbackSubmission>;
   updateFeedbackSubmission(id: number, updates: Partial<FeedbackSubmission>): Promise<FeedbackSubmission>;
@@ -540,6 +545,32 @@ export class DatabaseStorage implements IStorage {
 
     const results = await db.insert(contributorProfiles)
       .values(profile)
+      .returning();
+    return results[0];
+  }
+
+  async getEducatorOfferings(status?: string): Promise<EducatorOffering[]> {
+    if (status) {
+      return await db.select().from(educatorOfferings).where(eq(educatorOfferings.status, status));
+    }
+
+    return await db.select().from(educatorOfferings);
+  }
+
+  async getEducatorOfferingsForContributor(contributorProfileId: number): Promise<EducatorOffering[]> {
+    return await db.select().from(educatorOfferings)
+      .where(eq(educatorOfferings.contributorProfileId, contributorProfileId));
+  }
+
+  async createEducatorOffering(offering: InsertEducatorOffering): Promise<EducatorOffering> {
+    const results = await db.insert(educatorOfferings).values(offering).returning();
+    return results[0];
+  }
+
+  async updateEducatorOffering(id: number, updates: Partial<EducatorOffering>): Promise<EducatorOffering> {
+    const results = await db.update(educatorOfferings)
+      .set(updates)
+      .where(eq(educatorOfferings.id, id))
       .returning();
     return results[0];
   }

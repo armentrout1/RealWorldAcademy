@@ -733,6 +733,14 @@ export const contributorProfiles = pgTable("contributor_profiles", {
   website: text("website"),
   avatarUrl: text("avatar_url"),
   expertiseTags: text("expertise_tags").array(),
+  teachingStyle: text("teaching_style"),
+  subjectsTaught: text("subjects_taught").array(),
+  ageGroupsServed: text("age_groups_served").array(),
+  introVideoUrl: text("intro_video_url"),
+  sampleLessonUrls: text("sample_lesson_urls").array(),
+  availabilitySummary: text("availability_summary"),
+  timeZone: text("time_zone"),
+  offeringTypes: text("offering_types").array(), // free_sample, live_class, recorded_course, tutoring, coaching, curriculum_bundle
   trustLevel: text("trust_level").default("new").notNull(), // new, verified, trusted, partner, restricted
   status: text("status").default("active").notNull(), // active, restricted, archived
   createdAt: timestamp("created_at").defaultNow(),
@@ -749,6 +757,42 @@ export const contributorProfilesRelations = relations(contributorProfiles, ({ on
 export const insertContributorProfileSchema = createInsertSchema(contributorProfiles).omit({ id: true });
 export type InsertContributorProfile = z.infer<typeof insertContributorProfileSchema>;
 export type ContributorProfile = typeof contributorProfiles.$inferSelect;
+
+export const educatorOfferings = pgTable("educator_offerings", {
+  id: serial("id").primaryKey(),
+  contributorProfileId: integer("contributor_profile_id").notNull().references(() => contributorProfiles.id),
+  title: text("title").notNull(),
+  description: text("description").notNull(),
+  offeringType: text("offering_type").notNull(), // free_sample, live_class, recorded_course, tutoring, coaching, curriculum_bundle
+  subject: text("subject").notNull(),
+  ageGroup: text("age_group").notNull(),
+  format: text("format").notNull(), // free, paid_placeholder, live, recorded, one_on_one, group
+  duration: text("duration"),
+  priceCents: integer("price_cents"),
+  currency: text("currency").default("USD").notNull(),
+  sampleUrl: text("sample_url"),
+  meetingUrl: text("meeting_url"),
+  parentExpectations: text("parent_expectations"),
+  completionEvidence: text("completion_evidence"),
+  status: text("status").default("draft").notNull(), // draft, pending_review, approved, changes_requested, rejected, archived
+  reviewerNote: text("reviewer_note"),
+  internalReviewNote: text("internal_review_note"),
+  submittedAt: timestamp("submitted_at"),
+  reviewedAt: timestamp("reviewed_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const educatorOfferingsRelations = relations(educatorOfferings, ({ one }) => ({
+  contributorProfile: one(contributorProfiles, {
+    fields: [educatorOfferings.contributorProfileId],
+    references: [contributorProfiles.id],
+  }),
+}));
+
+export const insertEducatorOfferingSchema = createInsertSchema(educatorOfferings).omit({ id: true });
+export type InsertEducatorOffering = z.infer<typeof insertEducatorOfferingSchema>;
+export type EducatorOffering = typeof educatorOfferings.$inferSelect;
 
 export const curriculumSubmissions = pgTable("curriculum_submissions", {
   id: serial("id").primaryKey(),
