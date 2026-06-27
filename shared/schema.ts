@@ -751,6 +751,47 @@ export const curriculumSubmissionsRelations = relations(curriculumSubmissions, (
   }),
 }));
 
+export const resourceSubmissions = pgTable("resource_submissions", {
+  id: serial("id").primaryKey(),
+  contributorProfileId: integer("contributor_profile_id").references(() => contributorProfiles.id),
+  contributorName: text("contributor_name").notNull(),
+  contributorEmail: text("contributor_email").notNull(),
+  affiliation: text("affiliation").notNull(),
+  title: text("title").notNull(),
+  description: text("description").notNull(),
+  resourceType: text("resource_type").notNull(), // video, link, pdf, worksheet, guide, activity
+  category: text("category").notNull(),
+  audience: text("audience").array(),
+  ageGroup: text("age_group").notNull(),
+  url: text("url").notNull(),
+  embedUrl: text("embed_url"),
+  sourceLabel: text("source_label"),
+  duration: text("duration"),
+  learningUse: text("learning_use").notNull(),
+  safetyNotes: text("safety_notes").notNull(),
+  thumbnailUrl: text("thumbnail_url"),
+  status: text("status").default("pending_review").notNull(), // pending_review, changes_requested, approved, rejected, archived
+  reviewerNote: text("reviewer_note"),
+  publishedResourceId: integer("published_resource_id").references(() => resources.id),
+  submittedAt: timestamp("submitted_at").defaultNow(),
+  reviewedAt: timestamp("reviewed_at"),
+});
+
+export const insertResourceSubmissionSchema = createInsertSchema(resourceSubmissions).omit({ id: true });
+export type InsertResourceSubmission = z.infer<typeof insertResourceSubmissionSchema>;
+export type ResourceSubmission = typeof resourceSubmissions.$inferSelect;
+
+export const resourceSubmissionsRelations = relations(resourceSubmissions, ({ one }) => ({
+  contributorProfile: one(contributorProfiles, {
+    fields: [resourceSubmissions.contributorProfileId],
+    references: [contributorProfiles.id],
+  }),
+  publishedResource: one(resources, {
+    fields: [resourceSubmissions.publishedResourceId],
+    references: [resources.id],
+  }),
+}));
+
 export const curriculumCollections = pgTable("curriculum_collections", {
   id: serial("id").primaryKey(),
   contributorProfileId: integer("contributor_profile_id").notNull().references(() => contributorProfiles.id),

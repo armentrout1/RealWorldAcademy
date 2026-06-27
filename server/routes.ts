@@ -14,12 +14,14 @@ import {
   insertBuddyProfileSchema, insertBuddyMessageSchema, insertBuddyEmotionLogSchema,
   insertBuddyJournalEntrySchema, insertParentChildRelationshipSchema,
   insertParentLessonReviewSchema, insertCurriculumSubmissionSchema,
+  insertResourceSubmissionSchema,
   insertCurriculumCollectionSchema, insertCurriculumCollectionItemSchema,
   insertFeedbackSubmissionSchema,
   insertCredentialDefinitionSchema, insertCredentialRequirementSchema,
   insertContributorProfileSchema,
   type CurriculumCollection,
   type CurriculumSubmission,
+  type ResourceSubmission,
   type User
 } from "@shared/schema";
 
@@ -828,6 +830,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }));
   };
 
+  const attachResourceContributorProfiles = async (submissions: ResourceSubmission[]) => {
+    const profiles = await storage.getAllContributorProfiles();
+    const profileById = new Map(profiles.map((profile) => [profile.id, profile]));
+
+    return submissions.map((submission) => ({
+      ...submission,
+      contributorProfile: submission.contributorProfileId
+        ? profileById.get(submission.contributorProfileId) || null
+        : profiles.find((profile) =>
+            profile.displayName.toLowerCase() === submission.contributorName.toLowerCase() ||
+            profile.affiliation?.toLowerCase() === submission.affiliation.toLowerCase()
+          ) || null,
+    }));
+  };
+
   const attachCollectionDetails = async (collections: CurriculumCollection[]) => {
     const profiles = await storage.getAllContributorProfiles();
     const profileById = new Map(profiles.map((profile) => [profile.id, profile]));
@@ -857,6 +874,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch {
       return null;
     }
+  };
+
+  const publishResourceSubmission = async (submission: ResourceSubmission) => {
+    const isVideo = submission.resourceType === "video";
+
+    return await storage.createResource({
+      title: submission.title,
+      description: `${submission.description}\n\nLearning use: ${submission.learningUse}\n\nSafety notes: ${submission.safetyNotes}`,
+      resourceType: submission.resourceType,
+      category: submission.category,
+      audience: submission.audience || ["student", "parent"],
+      fileUrl: isVideo ? null : submission.url,
+      embedUrl: isVideo ? submission.embedUrl || getYouTubeEmbedUrl(submission.url) || submission.url : null,
+      thumbnailUrl: submission.thumbnailUrl,
+      downloadCount: 0,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      relatedSubjectId: null,
+      featured: false,
+    });
   };
 
   const normalizeCollectionItems = (collectionId: number, rawItems: unknown[]) =>
@@ -954,6 +991,120 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(await attachContributorProfiles(submissions));
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch contributor submissions" });
+    }
+  });
+
+  app.get("/api/contributor-resource-submissions/me", async (req, res) => {
+    try {
+      const sessionUserId = requireSessionUserId(req, res);
+      if (!sessionUserId) return;
+
+      const user = await storage.getUser(sessionUserId);
+      const profile = await storage.getContributorProfileByUserId(sessionUserId);
+      if (!user || !profile) {
+        return res.json([]);
+      }
+
+      const submissions = await storage.getResourceSubmissionsForContributor(profile.id, user.email);
+      res.json(await attachResourceContributorProfiles(submissions));
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch contributor resource submissions" });
+    }
+  });
+
+  app.post("/api/resource-submissions", express.json(), async (req, res) => {
+    try {
+      const sessionUserId = requireSessionUserId(req, res);
+      if (!sessionUserId) return;
+
+      const user = await storage.getUser(sessionUserId);
+      const contributorProfile = await storage.getContributorProfileByUserId(sessionUserId);
+      if (!user || !contributorProfile) {
+        return res.status(403).json({ message: "Create a contributor profile before submitting resources" });
+      }
+
+      const url = String(req.body.url || "").trim();
+      const isVideo = req.body.resourceType === "video";
+      const validatedData = insertResourceSubmissionSchema.parse({
+        contributorProfileId: contributorProfile.id,
+        contributorName: contributorProfile.displayName,
+        contributorEmail: user.email,
+        affiliation: contributorProfile.affiliation || "Independent contributor",
+        title: String(req.body.title || "").trim(),
+        description: String(req.body.description || "").trim(),
+        resourceType: String(req.body.resourceType || "link"),
+        category: String(req.body.category || "").trim(),
+        audience: Array.isArray(req.body.audience)
+          ? req.body.audience.map(String).filter(Boolean)
+          : ["student", "parent"],
+        ageGroup: String(req.body.ageGroup || "").trim(),
+        url,
+        embedUrl: req.body.embedUrl ? String(req.body.embedUrl).trim() : isVideo ? getYouTubeEmbedUrl(url) : null,
+        sourceLabel: req.body.sourceLabel ? String(req.body.sourceLabel).trim() : null,
+        duration: req.body.duration ? String(req.body.duration).trim() : null,
+        learningUse: String(req.body.learningUse || "").trim(),
+        safetyNotes: String(req.body.safetyNotes || "").trim(),
+        thumbnailUrl: req.body.thumbnailUrl ? String(req.body.thumbnailUrl).trim() : null,
+        status: "pending_review",
+        reviewerNote: null,
+        publishedResourceId: null,
+        submittedAt: new Date(),
+        reviewedAt: null,
+      });
+
+      if (!validatedData.title || !validatedData.description || !validatedData.category || !validatedData.ageGroup || !validatedData.url) {
+        return res.status(400).json({ message: "Title, description, category, age group, and URL are required" });
+      }
+
+      const submission = await storage.createResourceSubmission(validatedData);
+      res.status(201).json(submission);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid resource submission data" });
+    }
+  });
+
+  app.get("/api/resource-submissions", async (req, res) => {
+    try {
+      if (!(await requireAdminUser(req, res))) return;
+
+      const status = typeof req.query.status === "string" ? req.query.status : undefined;
+      const submissions = await storage.getResourceSubmissions(status);
+      res.json(await attachResourceContributorProfiles(submissions));
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch resource submissions" });
+    }
+  });
+
+  app.patch("/api/resource-submissions/:id/review", express.json(), async (req, res) => {
+    try {
+      if (!(await requireAdminUser(req, res))) return;
+
+      const id = Number(req.params.id);
+      const existing = await storage.getResourceSubmission(id);
+      if (!existing) {
+        return res.status(404).json({ message: "Resource submission not found" });
+      }
+
+      const allowedStatuses = new Set(["approved", "changes_requested", "rejected", "archived"]);
+      if (!allowedStatuses.has(req.body.status)) {
+        return res.status(400).json({ message: "Invalid review status" });
+      }
+
+      const publishedResource = req.body.status === "approved"
+        ? await publishResourceSubmission(existing)
+        : undefined;
+
+      const updated = await storage.reviewResourceSubmission(id, {
+        status: req.body.status,
+        reviewerNote: req.body.reviewerNote,
+        publishedResourceId: publishedResource?.id || existing.publishedResourceId,
+        reviewedAt: new Date(),
+      });
+
+      const [enriched] = await attachResourceContributorProfiles([updated]);
+      res.json({ ...enriched, publishedResource });
+    } catch (error) {
+      res.status(400).json({ message: "Failed to review resource submission" });
     }
   });
 

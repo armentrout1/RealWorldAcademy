@@ -126,6 +126,9 @@ export default function ContributorDashboard() {
           <Button asChild>
             <Link href="/contribute">Contribute Lesson</Link>
           </Button>
+          <Button asChild>
+            <Link href="/contribute-resource">Submit Resource</Link>
+          </Button>
         </div>
       </div>
 

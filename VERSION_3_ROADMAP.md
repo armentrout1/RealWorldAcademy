@@ -146,7 +146,8 @@ Current build status:
 - `green`: creator collection builder asks for parent-facing video context.
 - `green`: admin review shows video source, duration, embed URL, and safety notes.
 - `green`: public collection detail pages can embed YouTube videos in context with parent/student prompts.
-- `yellow`: standalone resource submission workflow still needs to be built.
+- `green`: contributors can submit standalone videos, links, guides, worksheets, and activities for review from `/contribute-resource`.
+- `green`: admins can review resource submissions and approve them into the public Resource Center.
 - `yellow`: lesson-level video/resource attachment still needs to be built.
 
 ### Phase 4: Review Rubric 2.0

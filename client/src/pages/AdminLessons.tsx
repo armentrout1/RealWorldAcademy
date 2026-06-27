@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Link } from "wouter";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, BookMarked, BookOpen, Inbox, Search, ShieldCheck, Users } from "lucide-react";
+import { ArrowLeft, BookMarked, BookOpen, Inbox, LinkIcon, Search, ShieldCheck, Users } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -103,6 +103,39 @@ interface FeedbackSubmission {
   createdAt?: string | null;
 }
 
+interface ResourceSubmission {
+  id: number;
+  contributorName: string;
+  contributorEmail: string;
+  affiliation: string;
+  title: string;
+  description: string;
+  resourceType: string;
+  category: string;
+  audience?: string[] | null;
+  ageGroup: string;
+  url: string;
+  embedUrl?: string | null;
+  sourceLabel?: string | null;
+  duration?: string | null;
+  learningUse: string;
+  safetyNotes: string;
+  thumbnailUrl?: string | null;
+  status: string;
+  reviewerNote?: string | null;
+  submittedAt?: string | null;
+  reviewedAt?: string | null;
+  contributorProfile?: {
+    id: number;
+    displayName: string;
+    affiliation?: string | null;
+    bio?: string | null;
+    expertiseTags?: string[] | null;
+    trustLevel: string;
+    status: string;
+  } | null;
+}
+
 interface AdminUser {
   id: number;
   fullName: string;
@@ -115,6 +148,7 @@ interface AdminUser {
 
 const curriculumStatuses = ["pending_review", "approved", "changes_requested", "rejected", "archived"];
 const collectionStatuses = ["approved", "published", "changes_requested", "rejected", "archived"];
+const resourceStatuses = ["approved", "changes_requested", "rejected", "archived"];
 const feedbackStatuses = ["new", "reviewing", "resolved", "archived"];
 const roles = ["student", "parent", "admin"];
 
@@ -122,6 +156,7 @@ export default function AdminLessons() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedSubmission, setSelectedSubmission] = useState<CurriculumSubmission | null>(null);
   const [selectedCollection, setSelectedCollection] = useState<CurriculumCollection | null>(null);
+  const [selectedResource, setSelectedResource] = useState<ResourceSubmission | null>(null);
   const [reviewNote, setReviewNote] = useState("");
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -134,6 +169,11 @@ export default function AdminLessons() {
   const { data: collections = [], isLoading: collectionsLoading } = useQuery<CurriculumCollection[]>({
     queryKey: ["/api/admin/curriculum-collections"],
     queryFn: () => apiRequest<CurriculumCollection[]>("/api/admin/curriculum-collections"),
+  });
+
+  const { data: resourceSubmissions = [], isLoading: resourcesLoading } = useQuery<ResourceSubmission[]>({
+    queryKey: ["/api/resource-submissions"],
+    queryFn: () => apiRequest<ResourceSubmission[]>("/api/resource-submissions"),
   });
 
   const { data: feedback = [], isLoading: feedbackLoading } = useQuery<FeedbackSubmission[]>({
@@ -188,6 +228,31 @@ export default function AdminLessons() {
     onError: (error) => {
       toast({
         title: "Collection review failed",
+        description: error instanceof Error ? error.message : "Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const resourceReviewMutation = useMutation({
+    mutationFn: ({ id, status, reviewerNote }: { id: number; status: string; reviewerNote?: string }) =>
+      apiRequest<ResourceSubmission>(`/api/resource-submissions/${id}/review`, {
+        method: "PATCH",
+        body: { status, reviewerNote },
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/resource-submissions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/resources"] });
+      setSelectedResource(null);
+      setReviewNote("");
+      toast({
+        title: "Resource review updated",
+        description: "Approved resources are published into the Resource Center.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Resource review failed",
         description: error instanceof Error ? error.message : "Please try again.",
         variant: "destructive",
       });
@@ -252,6 +317,19 @@ export default function AdminLessons() {
       .includes(searchQuery.toLowerCase())
   );
 
+  const filteredResources = resourceSubmissions.filter((resource) =>
+    [
+      resource.title,
+      resource.contributorProfile?.displayName || resource.contributorName,
+      resource.resourceType,
+      resource.category,
+      resource.status,
+    ]
+      .join(" ")
+      .toLowerCase()
+      .includes(searchQuery.toLowerCase())
+  );
+
   const filteredFeedback = feedback.filter((item) =>
     [item.name, item.email, item.audience, item.category, item.status, item.message]
       .join(" ")
@@ -286,6 +364,7 @@ export default function AdminLessons() {
   const counts = {
     pending: submissions.filter((submission) => submission.status === "pending_review").length,
     collections: collections.filter((collection) => collection.status === "pending_review").length,
+    resources: resourceSubmissions.filter((resource) => resource.status === "pending_review").length,
     feedback: feedback.filter((item) => item.status === "new" || item.status === "reviewing").length,
     users: users.length,
   };
@@ -303,7 +382,7 @@ export default function AdminLessons() {
         <div className="w-[150px]" />
       </div>
 
-      <div className="mb-6 grid gap-4 md:grid-cols-4">
+      <div className="mb-6 grid gap-4 md:grid-cols-5">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-sm font-medium">
@@ -326,6 +405,18 @@ export default function AdminLessons() {
           <CardContent>
             <div className="text-3xl font-bold">{counts.collections}</div>
             <p className="text-sm text-muted-foreground">pending collections</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-sm font-medium">
+              <LinkIcon className="h-4 w-4 text-primary" />
+              Resource Queue
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold">{counts.resources}</div>
+            <p className="text-sm text-muted-foreground">pending resources</p>
           </CardContent>
         </Card>
         <Card>
@@ -357,7 +448,7 @@ export default function AdminLessons() {
       <div className="relative mb-6">
         <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
         <Input
-          placeholder="Search submissions, collections, feedback, users..."
+          placeholder="Search submissions, collections, resources, feedback, users..."
           className="pl-8"
           value={searchQuery}
           onChange={(event) => setSearchQuery(event.target.value)}
@@ -365,9 +456,10 @@ export default function AdminLessons() {
       </div>
 
       <Tabs defaultValue="curriculum">
-        <TabsList className="mb-6 grid w-full grid-cols-4">
+        <TabsList className="mb-6 grid w-full grid-cols-5">
           <TabsTrigger value="curriculum">Curriculum</TabsTrigger>
           <TabsTrigger value="collections">Collections</TabsTrigger>
+          <TabsTrigger value="resources">Resources</TabsTrigger>
           <TabsTrigger value="feedback">Feedback</TabsTrigger>
           <TabsTrigger value="users">Users & Roles</TabsTrigger>
         </TabsList>
@@ -473,6 +565,60 @@ export default function AdminLessons() {
                           <Button variant="outline" size="sm" onClick={() => {
                             setSelectedCollection(collection);
                             setReviewNote(collection.reviewerNote || "");
+                          }}>
+                            Manage
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="resources">
+          <Card>
+            <CardHeader>
+              <CardTitle>Resource Review Queue</CardTitle>
+              <CardDescription>Review submitted videos, links, guides, worksheets, and activities before publication.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {resourcesLoading ? (
+                <p className="py-8 text-center text-muted-foreground">Loading resources...</p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Resource</TableHead>
+                      <TableHead>Contributor</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Submitted</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredResources.map((resource) => (
+                      <TableRow key={resource.id}>
+                        <TableCell>
+                          <div className="font-medium">{resource.title}</div>
+                          <div className="text-xs text-muted-foreground">{resource.category} | {resource.ageGroup}</div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="font-medium">{resource.contributorProfile?.displayName || resource.contributorName}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {resource.contributorProfile ? `${resource.contributorProfile.trustLevel} creator` : resource.contributorEmail}
+                          </div>
+                        </TableCell>
+                        <TableCell>{resource.resourceType}</TableCell>
+                        <TableCell>{statusBadge(resource.status)}</TableCell>
+                        <TableCell>{formatDate(resource.submittedAt)}</TableCell>
+                        <TableCell className="text-right">
+                          <Button variant="outline" size="sm" onClick={() => {
+                            setSelectedResource(resource);
+                            setReviewNote(resource.reviewerNote || "");
                           }}>
                             Manage
                           </Button>
@@ -726,6 +872,104 @@ export default function AdminLessons() {
                   disabled={collectionReviewMutation.isPending}
                   onClick={() => collectionReviewMutation.mutate({
                     id: selectedCollection.id,
+                    status,
+                    reviewerNote: reviewNote || undefined,
+                  })}
+                >
+                  {status.replace("_", " ")}
+                </Button>
+              ))}
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {selectedResource && (
+        <Dialog open={Boolean(selectedResource)} onOpenChange={(open) => !open && setSelectedResource(null)}>
+          <DialogContent className="max-h-[90vh] max-w-4xl overflow-y-auto">
+            <DialogHeader>
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge>{selectedResource.resourceType}</Badge>
+                <Badge variant="outline">{selectedResource.category}</Badge>
+                <Badge variant="secondary">{selectedResource.ageGroup}</Badge>
+                {statusBadge(selectedResource.status)}
+              </div>
+              <DialogTitle>{selectedResource.title}</DialogTitle>
+              <DialogDescription>
+                Submitted by {selectedResource.contributorProfile?.displayName || selectedResource.contributorName} ({selectedResource.contributorEmail})
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-5">
+              <div className="rounded-md border bg-slate-50 p-4">
+                <h3 className="mb-2 font-semibold">Contributor Context</h3>
+                {selectedResource.contributorProfile ? (
+                  <div className="space-y-2 text-sm text-muted-foreground">
+                    <div className="flex flex-wrap gap-2">
+                      <Badge variant="secondary">{selectedResource.contributorProfile.trustLevel} creator</Badge>
+                      <Badge variant="outline">{selectedResource.contributorProfile.status}</Badge>
+                    </div>
+                    {selectedResource.contributorProfile.affiliation && (
+                      <p>Affiliation: {selectedResource.contributorProfile.affiliation}</p>
+                    )}
+                    {selectedResource.contributorProfile.expertiseTags?.length ? (
+                      <p>Expertise: {selectedResource.contributorProfile.expertiseTags.join(", ")}</p>
+                    ) : null}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">No contributor profile is linked to this resource.</p>
+                )}
+              </div>
+
+              <div>
+                <h3 className="mb-1 font-semibold">Description</h3>
+                <p className="whitespace-pre-line text-sm text-muted-foreground">{selectedResource.description}</p>
+              </div>
+
+              <div className="rounded-md border p-4">
+                <h3 className="mb-2 font-semibold">Source</h3>
+                <div className="space-y-2 text-sm">
+                  <a className="break-all text-primary underline" href={selectedResource.url} target="_blank" rel="noreferrer">
+                    {selectedResource.url}
+                  </a>
+                  {selectedResource.embedUrl && <p className="break-all text-muted-foreground">Embed: {selectedResource.embedUrl}</p>}
+                  <div className="flex flex-wrap gap-2">
+                    {selectedResource.sourceLabel && <Badge variant="outline">Source: {selectedResource.sourceLabel}</Badge>}
+                    {selectedResource.duration && <Badge variant="outline">{selectedResource.duration}</Badge>}
+                    {selectedResource.audience?.map((audience) => <Badge key={audience} variant="secondary">{audience}</Badge>)}
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <h3 className="mb-1 font-semibold">Learning Use</h3>
+                <p className="whitespace-pre-line text-sm text-muted-foreground">{selectedResource.learningUse}</p>
+              </div>
+
+              <div className="rounded-md border bg-amber-50 p-4">
+                <h3 className="mb-1 font-semibold text-amber-950">Safety Notes</h3>
+                <p className="whitespace-pre-line text-sm text-amber-900">{selectedResource.safetyNotes}</p>
+              </div>
+
+              <div className="space-y-2">
+                <h3 className="font-semibold">Reviewer Note</h3>
+                <Textarea
+                  value={reviewNote}
+                  onChange={(event) => setReviewNote(event.target.value)}
+                  placeholder="Add notes for the contributor or internal review history..."
+                  className="min-h-[120px]"
+                />
+              </div>
+            </div>
+
+            <DialogFooter className="flex flex-wrap gap-2">
+              {resourceStatuses.map((status) => (
+                <Button
+                  key={status}
+                  variant={status === "approved" ? "default" : status === "rejected" ? "destructive" : "outline"}
+                  disabled={resourceReviewMutation.isPending}
+                  onClick={() => resourceReviewMutation.mutate({
+                    id: selectedResource.id,
                     status,
                     reviewerNote: reviewNote || undefined,
                   })}

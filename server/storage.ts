@@ -26,6 +26,7 @@ import {
   parentLessonReviews, type ParentLessonReview, type InsertParentLessonReview,
   contributorProfiles, type ContributorProfile, type InsertContributorProfile,
   curriculumSubmissions, type CurriculumSubmission, type InsertCurriculumSubmission,
+  resourceSubmissions, type ResourceSubmission, type InsertResourceSubmission,
   curriculumCollections, type CurriculumCollection, type InsertCurriculumCollection,
   curriculumCollectionItems, type CurriculumCollectionItem, type InsertCurriculumCollectionItem,
   userCurriculumCollectionProgress, type UserCurriculumCollectionProgress, type InsertUserCurriculumCollectionProgress,
@@ -55,6 +56,11 @@ export interface IStorage {
   getCurriculumSubmission(id: number): Promise<CurriculumSubmission | undefined>;
   createCurriculumSubmission(submission: InsertCurriculumSubmission): Promise<CurriculumSubmission>;
   reviewCurriculumSubmission(id: number, updates: Partial<CurriculumSubmission>): Promise<CurriculumSubmission>;
+  getResourceSubmissions(status?: string): Promise<ResourceSubmission[]>;
+  getResourceSubmissionsForContributor(contributorProfileId: number, contributorEmail: string): Promise<ResourceSubmission[]>;
+  getResourceSubmission(id: number): Promise<ResourceSubmission | undefined>;
+  createResourceSubmission(submission: InsertResourceSubmission): Promise<ResourceSubmission>;
+  reviewResourceSubmission(id: number, updates: Partial<ResourceSubmission>): Promise<ResourceSubmission>;
   getCurriculumCollections(status?: string): Promise<CurriculumCollection[]>;
   getCurriculumCollectionsForContributor(contributorProfileId: number): Promise<CurriculumCollection[]>;
   getCurriculumCollection(id: number): Promise<CurriculumCollection | undefined>;
@@ -341,6 +347,47 @@ export class DatabaseStorage implements IStorage {
     const results = await db.update(curriculumSubmissions)
       .set(updates)
       .where(eq(curriculumSubmissions.id, id))
+      .returning();
+    return results[0];
+  }
+
+  async getResourceSubmissions(status?: string): Promise<ResourceSubmission[]> {
+    if (status) {
+      return await db.select().from(resourceSubmissions)
+        .where(eq(resourceSubmissions.status, status));
+    }
+
+    return await db.select().from(resourceSubmissions);
+  }
+
+  async getResourceSubmissionsForContributor(
+    contributorProfileId: number,
+    contributorEmail: string,
+  ): Promise<ResourceSubmission[]> {
+    const allSubmissions = await this.getResourceSubmissions();
+    const normalizedEmail = contributorEmail.trim().toLowerCase();
+
+    return allSubmissions.filter((submission) =>
+      submission.contributorProfileId === contributorProfileId ||
+      submission.contributorEmail.trim().toLowerCase() === normalizedEmail
+    );
+  }
+
+  async getResourceSubmission(id: number): Promise<ResourceSubmission | undefined> {
+    const results = await db.select().from(resourceSubmissions)
+      .where(eq(resourceSubmissions.id, id));
+    return results[0];
+  }
+
+  async createResourceSubmission(submission: InsertResourceSubmission): Promise<ResourceSubmission> {
+    const results = await db.insert(resourceSubmissions).values(submission).returning();
+    return results[0];
+  }
+
+  async reviewResourceSubmission(id: number, updates: Partial<ResourceSubmission>): Promise<ResourceSubmission> {
+    const results = await db.update(resourceSubmissions)
+      .set(updates)
+      .where(eq(resourceSubmissions.id, id))
       .returning();
     return results[0];
   }

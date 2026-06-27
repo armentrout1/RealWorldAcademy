@@ -14,6 +14,7 @@ const primaryNavItems = [
   { href: "/resource-center", label: "Resources" },
   { href: "/parent-dashboard", label: "Parent Dashboard" },
   { href: "/contribute", label: "Contribute" },
+  { href: "/contribute-resource", label: "Submit Resource" },
   { href: "/curriculum-collections", label: "Build Collections" },
   { href: "/contributor-dashboard", label: "Creator Dashboard" },
   { href: "/contributor-profile", label: "Creator Profile" },
