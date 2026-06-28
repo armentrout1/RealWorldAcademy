@@ -176,6 +176,37 @@ interface OfferingInterest {
     affiliation?: string | null;
     trustLevel: string;
   } | null;
+  session?: {
+    id: number;
+    title: string;
+    startsAt?: string | null;
+  } | null;
+}
+
+interface OfferingSession {
+  id: number;
+  title: string;
+  startsAt?: string | null;
+  endsAt?: string | null;
+  duration?: string | null;
+  capacity?: number | null;
+  reservedSeats: number;
+  meetingUrl?: string | null;
+  registrationNote?: string | null;
+  status: string;
+  submittedAt?: string | null;
+  offering?: {
+    id: number;
+    title: string;
+    subject: string;
+    ageGroup: string;
+  } | null;
+  contributorProfile?: {
+    id: number;
+    displayName: string;
+    affiliation?: string | null;
+    trustLevel: string;
+  } | null;
 }
 
 interface ResourceSubmission {
@@ -231,6 +262,7 @@ const resourceStatuses = ["approved", "changes_requested", "rejected", "archived
 const feedbackStatuses = ["new", "reviewing", "resolved", "archived"];
 const reportStatuses = ["new", "reviewing", "resolved", "archived"];
 const offeringReviewStatuses = ["approved", "changes_requested", "rejected", "archived"];
+const sessionReviewStatuses = ["approved", "changes_requested", "rejected", "cancelled", "archived"];
 const interestStatuses = ["new", "contacted", "waitlisted", "closed", "archived"];
 const roles = ["student", "parent", "admin"];
 const rubricCriteria = [
@@ -290,6 +322,11 @@ export default function AdminLessons() {
   const { data: offeringInterests = [], isLoading: interestsLoading } = useQuery<OfferingInterest[]>({
     queryKey: ["/api/admin/offering-interests"],
     queryFn: () => apiRequest<OfferingInterest[]>("/api/admin/offering-interests"),
+  });
+
+  const { data: offeringSessions = [], isLoading: sessionsLoading } = useQuery<OfferingSession[]>({
+    queryKey: ["/api/admin/offering-sessions"],
+    queryFn: () => apiRequest<OfferingSession[]>("/api/admin/offering-sessions"),
   });
 
   const { data: users = [], isLoading: usersLoading } = useQuery<AdminUser[]>({
@@ -470,6 +507,26 @@ export default function AdminLessons() {
     },
   });
 
+  const sessionReviewMutation = useMutation({
+    mutationFn: ({ id, status }: { id: number; status: string }) =>
+      apiRequest<OfferingSession>(`/api/admin/offering-sessions/${id}/review`, {
+        method: "PATCH",
+        body: { status },
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/offering-sessions"] });
+      toast({ title: "Session reviewed", description: "The session review status has been saved." });
+    },
+    onError: (error) => {
+      toast({
+        title: "Session review failed",
+        description: error instanceof Error ? error.message : "Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+
 
   const roleMutation = useMutation({
     mutationFn: ({ userId, role }: { userId: number; role: string }) =>
@@ -576,6 +633,21 @@ export default function AdminLessons() {
       .includes(searchQuery.toLowerCase())
   );
 
+  const filteredSessions = offeringSessions.filter((session) =>
+    [
+      session.title,
+      session.status,
+      session.meetingUrl,
+      session.registrationNote,
+      session.offering?.title,
+      session.offering?.subject,
+      session.contributorProfile?.displayName,
+    ]
+      .join(" ")
+      .toLowerCase()
+      .includes(searchQuery.toLowerCase())
+  );
+
   const filteredUsers = users.filter((user) =>
     [user.fullName, user.email, user.role, user.ageGroup]
       .join(" ")
@@ -655,6 +727,7 @@ export default function AdminLessons() {
     collections: collections.filter((collection) => collection.status === "pending_review").length,
     resources: resourceSubmissions.filter((resource) => resource.status === "pending_review").length,
     offerings: educatorOfferings.filter((offering) => offering.status === "pending_review").length,
+    sessions: offeringSessions.filter((session) => session.status === "pending_review").length,
     interests: offeringInterests.filter((interest) => ["new", "waitlisted"].includes(interest.status)).length,
     feedback: feedback.filter((item) => item.status === "new" || item.status === "reviewing").length,
     reports: contentReports.filter((item) => item.status === "new" || item.status === "reviewing").length,
@@ -719,8 +792,8 @@ export default function AdminLessons() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold">{counts.offerings}</div>
-            <p className="text-sm text-muted-foreground">{counts.interests} family interests</p>
+            <div className="text-3xl font-bold">{counts.offerings + counts.sessions}</div>
+            <p className="text-sm text-muted-foreground">{counts.sessions} sessions, {counts.interests} interests</p>
           </CardContent>
         </Card>
         <Card>
@@ -1024,6 +1097,86 @@ export default function AdminLessons() {
 
           <Card>
             <CardHeader>
+              <CardTitle>Class Session Review Queue</CardTitle>
+              <CardDescription>Review dates, capacity, and external meeting links before families can request seats.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {sessionsLoading ? (
+                <p className="py-8 text-center text-muted-foreground">Loading class sessions...</p>
+              ) : filteredSessions.length === 0 ? (
+                <div className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
+                  No class sessions match the current search.
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Session</TableHead>
+                      <TableHead>Offering</TableHead>
+                      <TableHead>Educator</TableHead>
+                      <TableHead>Seats</TableHead>
+                      <TableHead>Meeting</TableHead>
+                      <TableHead>Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredSessions.map((session) => (
+                      <TableRow key={session.id}>
+                        <TableCell>
+                          <div className="font-medium">{session.title}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {formatDate(session.startsAt)}{session.duration ? ` | ${session.duration}` : ""}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="font-medium">{session.offering?.title || "Offering unavailable"}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {session.offering ? `${session.offering.subject} | ${session.offering.ageGroup}` : "No offering details"}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="font-medium">{session.contributorProfile?.displayName || "Unknown educator"}</div>
+                          <div className="text-xs text-muted-foreground">{session.contributorProfile?.trustLevel || "No trust level"}</div>
+                        </TableCell>
+                        <TableCell>{session.capacity ? `${session.reservedSeats}/${session.capacity}` : `${session.reservedSeats} requested`}</TableCell>
+                        <TableCell className="max-w-[220px]">
+                          {session.meetingUrl ? (
+                            <a className="break-all text-xs text-primary underline" href={session.meetingUrl} target="_blank" rel="noreferrer">
+                              {session.meetingUrl}
+                            </a>
+                          ) : (
+                            <span className="text-sm text-muted-foreground">No link</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {session.status === "pending_review" ? (
+                            <Select
+                              value={session.status}
+                              onValueChange={(status) => sessionReviewMutation.mutate({ id: session.id, status })}
+                              disabled={sessionReviewMutation.isPending}
+                            >
+                              <SelectTrigger className="w-[170px]">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="pending_review">pending review</SelectItem>
+                                {sessionReviewStatuses.map((status) => (
+                                  <SelectItem key={status} value={status}>{status.replace("_", " ")}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          ) : statusBadge(session.status)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
               <CardTitle>Marketplace Interest Queue</CardTitle>
               <CardDescription>Monitor family requests before enrollment and payments are automated.</CardDescription>
             </CardHeader>
@@ -1063,6 +1216,11 @@ export default function AdminLessons() {
                           <div className="text-xs text-muted-foreground">
                             {interest.offering ? `${interest.offering.subject} | ${interest.offering.ageGroup}` : "No offering details"}
                           </div>
+                          {interest.session && (
+                            <div className="mt-1 text-xs text-muted-foreground">
+                              Session: {interest.session.title} ({formatDate(interest.session.startsAt)})
+                            </div>
+                          )}
                         </TableCell>
                         <TableCell>
                           <div className="font-medium">{interest.contributorProfile?.displayName || "Unknown educator"}</div>

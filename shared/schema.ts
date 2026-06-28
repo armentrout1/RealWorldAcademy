@@ -794,9 +794,47 @@ export const insertEducatorOfferingSchema = createInsertSchema(educatorOfferings
 export type InsertEducatorOffering = z.infer<typeof insertEducatorOfferingSchema>;
 export type EducatorOffering = typeof educatorOfferings.$inferSelect;
 
+export const offeringSessions = pgTable("offering_sessions", {
+  id: serial("id").primaryKey(),
+  educatorOfferingId: integer("educator_offering_id").notNull().references(() => educatorOfferings.id),
+  contributorProfileId: integer("contributor_profile_id").notNull().references(() => contributorProfiles.id),
+  title: text("title").notNull(),
+  startsAt: timestamp("starts_at").notNull(),
+  endsAt: timestamp("ends_at"),
+  duration: text("duration"),
+  capacity: integer("capacity"),
+  reservedSeats: integer("reserved_seats").default(0).notNull(),
+  meetingUrl: text("meeting_url"),
+  locationNote: text("location_note"),
+  registrationNote: text("registration_note"),
+  status: text("status").default("draft").notNull(), // draft, pending_review, approved, changes_requested, cancelled, archived
+  reviewerNote: text("reviewer_note"),
+  internalReviewNote: text("internal_review_note"),
+  submittedAt: timestamp("submitted_at"),
+  reviewedAt: timestamp("reviewed_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const offeringSessionsRelations = relations(offeringSessions, ({ one }) => ({
+  offering: one(educatorOfferings, {
+    fields: [offeringSessions.educatorOfferingId],
+    references: [educatorOfferings.id],
+  }),
+  contributorProfile: one(contributorProfiles, {
+    fields: [offeringSessions.contributorProfileId],
+    references: [contributorProfiles.id],
+  }),
+}));
+
+export const insertOfferingSessionSchema = createInsertSchema(offeringSessions).omit({ id: true });
+export type InsertOfferingSession = z.infer<typeof insertOfferingSessionSchema>;
+export type OfferingSession = typeof offeringSessions.$inferSelect;
+
 export const offeringInterests = pgTable("offering_interests", {
   id: serial("id").primaryKey(),
   educatorOfferingId: integer("educator_offering_id").notNull().references(() => educatorOfferings.id),
+  offeringSessionId: integer("offering_session_id").references(() => offeringSessions.id),
   contributorProfileId: integer("contributor_profile_id").notNull().references(() => contributorProfiles.id),
   requesterUserId: integer("requester_user_id").references(() => users.id),
   requesterName: text("requester_name").notNull(),
@@ -812,6 +850,10 @@ export const offeringInterestsRelations = relations(offeringInterests, ({ one })
   offering: one(educatorOfferings, {
     fields: [offeringInterests.educatorOfferingId],
     references: [educatorOfferings.id],
+  }),
+  session: one(offeringSessions, {
+    fields: [offeringInterests.offeringSessionId],
+    references: [offeringSessions.id],
   }),
   contributorProfile: one(contributorProfiles, {
     fields: [offeringInterests.contributorProfileId],

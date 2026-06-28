@@ -149,7 +149,11 @@ Current build status:
 - `green`: public educator offerings can collect family interest requests.
 - `green`: educator dashboard includes a family interest queue with follow-up statuses.
 - `green`: admin management includes marketplace interest oversight.
-- `yellow`: class sessions, seat reservations, and meeting-link review still need the dedicated scheduling model.
+- `green`: `offering_sessions` schema exists for live classes, tutoring windows, capacity, and external meeting links.
+- `green`: educators can draft or submit sessions for approved offerings.
+- `green`: admins can review session dates, capacity, and meeting links before public discovery.
+- `green`: public educator profiles show approved sessions and let families request a specific seat.
+- `yellow`: true seat reservation counts, calendar integrations, and payment-backed enrollment still need the next scheduling pass.
 
 ### Phase 5: Payments and Platform Fee
 

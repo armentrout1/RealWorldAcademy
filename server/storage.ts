@@ -27,6 +27,7 @@ import {
   parentLessonReviews, type ParentLessonReview, type InsertParentLessonReview,
   contributorProfiles, type ContributorProfile, type InsertContributorProfile,
   educatorOfferings, type EducatorOffering, type InsertEducatorOffering,
+  offeringSessions, type OfferingSession, type InsertOfferingSession,
   offeringInterests, type OfferingInterest, type InsertOfferingInterest,
   curriculumSubmissions, type CurriculumSubmission, type InsertCurriculumSubmission,
   resourceSubmissions, type ResourceSubmission, type InsertResourceSubmission,
@@ -91,6 +92,12 @@ export interface IStorage {
   getEducatorOfferingsForContributor(contributorProfileId: number): Promise<EducatorOffering[]>;
   createEducatorOffering(offering: InsertEducatorOffering): Promise<EducatorOffering>;
   updateEducatorOffering(id: number, updates: Partial<EducatorOffering>): Promise<EducatorOffering>;
+  getOfferingSessions(status?: string): Promise<OfferingSession[]>;
+  getOfferingSession(id: number): Promise<OfferingSession | undefined>;
+  getOfferingSessionsForContributor(contributorProfileId: number): Promise<OfferingSession[]>;
+  getOfferingSessionsForOffering(educatorOfferingId: number): Promise<OfferingSession[]>;
+  createOfferingSession(session: InsertOfferingSession): Promise<OfferingSession>;
+  updateOfferingSession(id: number, updates: Partial<OfferingSession>): Promise<OfferingSession>;
   getOfferingInterests(): Promise<OfferingInterest[]>;
   getOfferingInterestsForContributor(contributorProfileId: number): Promise<OfferingInterest[]>;
   getOfferingInterestsForOffering(educatorOfferingId: number): Promise<OfferingInterest[]>;
@@ -584,6 +591,43 @@ export class DatabaseStorage implements IStorage {
     const results = await db.update(educatorOfferings)
       .set(updates)
       .where(eq(educatorOfferings.id, id))
+      .returning();
+    return results[0];
+  }
+
+  async getOfferingSessions(status?: string): Promise<OfferingSession[]> {
+    if (status) {
+      return await db.select().from(offeringSessions).where(eq(offeringSessions.status, status));
+    }
+
+    return await db.select().from(offeringSessions);
+  }
+
+  async getOfferingSession(id: number): Promise<OfferingSession | undefined> {
+    const results = await db.select().from(offeringSessions)
+      .where(eq(offeringSessions.id, id));
+    return results[0];
+  }
+
+  async getOfferingSessionsForContributor(contributorProfileId: number): Promise<OfferingSession[]> {
+    return await db.select().from(offeringSessions)
+      .where(eq(offeringSessions.contributorProfileId, contributorProfileId));
+  }
+
+  async getOfferingSessionsForOffering(educatorOfferingId: number): Promise<OfferingSession[]> {
+    return await db.select().from(offeringSessions)
+      .where(eq(offeringSessions.educatorOfferingId, educatorOfferingId));
+  }
+
+  async createOfferingSession(session: InsertOfferingSession): Promise<OfferingSession> {
+    const results = await db.insert(offeringSessions).values(session).returning();
+    return results[0];
+  }
+
+  async updateOfferingSession(id: number, updates: Partial<OfferingSession>): Promise<OfferingSession> {
+    const results = await db.update(offeringSessions)
+      .set(updates)
+      .where(eq(offeringSessions.id, id))
       .returning();
     return results[0];
   }

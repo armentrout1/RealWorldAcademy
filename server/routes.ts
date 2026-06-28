@@ -18,7 +18,7 @@ import {
   insertResourceSubmissionSchema,
   insertCurriculumCollectionSchema, insertCurriculumCollectionItemSchema,
   insertFeedbackSubmissionSchema, insertContentReportSchema,
-  insertEducatorOfferingSchema, insertOfferingInterestSchema,
+  insertEducatorOfferingSchema, insertOfferingSessionSchema, insertOfferingInterestSchema,
   insertCredentialDefinitionSchema, insertCredentialRequirementSchema,
   insertContributorProfileSchema,
   type CurriculumCollection,
@@ -1200,15 +1200,191 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  const enrichOfferingInterests = async (interests: Awaited<ReturnType<typeof storage.getOfferingInterests>>) => {
+  const enrichOfferingSessions = async (sessions: Awaited<ReturnType<typeof storage.getOfferingSessions>>) => {
     const offerings = await storage.getEducatorOfferings();
     const profiles = await storage.getAllContributorProfiles();
     const offeringById = new Map(offerings.map((offering) => [offering.id, offering]));
     const profileById = new Map(profiles.map((profile) => [profile.id, profile]));
 
+    return sessions.map((session) => ({
+      ...session,
+      offering: offeringById.get(session.educatorOfferingId) || null,
+      contributorProfile: profileById.get(session.contributorProfileId) || null,
+    }));
+  };
+
+  const buildOfferingSessionPayload = (
+    profileId: number,
+    offeringId: number,
+    body: Record<string, unknown>,
+    status = "draft",
+  ) => {
+    const startsAt = new Date(String(body.startsAt || ""));
+    const endsAt = body.endsAt ? new Date(String(body.endsAt)) : null;
+
+    if (Number.isNaN(startsAt.getTime())) {
+      throw new Error("Valid start date and time are required");
+    }
+
+    if (endsAt && Number.isNaN(endsAt.getTime())) {
+      throw new Error("End date and time must be valid");
+    }
+
+    return insertOfferingSessionSchema.parse({
+      educatorOfferingId: offeringId,
+      contributorProfileId: profileId,
+      title: String(body.title || "").trim(),
+      startsAt,
+      endsAt,
+      duration: body.duration ? String(body.duration).trim() : null,
+      capacity: body.capacity ? Number(body.capacity) : null,
+      reservedSeats: body.reservedSeats ? Number(body.reservedSeats) : 0,
+      meetingUrl: body.meetingUrl ? String(body.meetingUrl).trim() : null,
+      locationNote: body.locationNote ? String(body.locationNote).trim() : null,
+      registrationNote: body.registrationNote ? String(body.registrationNote).trim() : null,
+      status,
+      reviewerNote: null,
+      internalReviewNote: null,
+      submittedAt: status === "pending_review" ? new Date() : null,
+      reviewedAt: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+  };
+
+  app.get("/api/offering-sessions/me", async (req, res) => {
+    try {
+      const sessionUserId = requireSessionUserId(req, res);
+      if (!sessionUserId) return;
+
+      const profile = await storage.getContributorProfileByUserId(sessionUserId);
+      if (!profile) return res.json([]);
+
+      const sessions = await storage.getOfferingSessionsForContributor(profile.id);
+      res.json(await enrichOfferingSessions(sessions));
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch offering sessions" });
+    }
+  });
+
+  app.post("/api/offering-sessions", express.json(), async (req, res) => {
+    try {
+      const sessionUserId = requireSessionUserId(req, res);
+      if (!sessionUserId) return;
+
+      const profile = await storage.getContributorProfileByUserId(sessionUserId);
+      if (!profile) {
+        return res.status(400).json({ message: "Create an educator profile before adding sessions" });
+      }
+
+      const offeringId = Number(req.body.educatorOfferingId);
+      const offering = await storage.getEducatorOffering(offeringId);
+      if (!offering || offering.contributorProfileId !== profile.id) {
+        return res.status(404).json({ message: "Offering not found" });
+      }
+
+      if (offering.status !== "approved") {
+        return res.status(400).json({ message: "Only approved offerings can receive class sessions" });
+      }
+
+      const status = req.body.submitForReview ? "pending_review" : "draft";
+      const sessionData = buildOfferingSessionPayload(profile.id, offering.id, req.body, status);
+      if (!sessionData.title) {
+        return res.status(400).json({ message: "Session title is required" });
+      }
+
+      const session = await storage.createOfferingSession(sessionData);
+      res.status(201).json(session);
+    } catch (error) {
+      res.status(400).json({ message: error instanceof Error ? error.message : "Invalid offering session" });
+    }
+  });
+
+  app.patch("/api/offering-sessions/:id", express.json(), async (req, res) => {
+    try {
+      const sessionUserId = requireSessionUserId(req, res);
+      if (!sessionUserId) return;
+
+      const profile = await storage.getContributorProfileByUserId(sessionUserId);
+      if (!profile) {
+        return res.status(400).json({ message: "Create an educator profile before editing sessions" });
+      }
+
+      const id = Number(req.params.id);
+      const existing = (await storage.getOfferingSessionsForContributor(profile.id)).find((session) => session.id === id);
+      if (!existing) {
+        return res.status(404).json({ message: "Session not found" });
+      }
+
+      if (!["draft", "changes_requested"].includes(existing.status)) {
+        return res.status(400).json({ message: "Only draft or changes requested sessions can be edited" });
+      }
+
+      const offering = await storage.getEducatorOffering(existing.educatorOfferingId);
+      if (!offering || offering.status !== "approved") {
+        return res.status(400).json({ message: "Session offering must still be approved" });
+      }
+
+      const status = req.body.submitForReview ? "pending_review" : existing.status;
+      const sessionData = buildOfferingSessionPayload(profile.id, existing.educatorOfferingId, req.body, status);
+      const session = await storage.updateOfferingSession(id, {
+        ...sessionData,
+        createdAt: existing.createdAt,
+        reservedSeats: existing.reservedSeats,
+        updatedAt: new Date(),
+      });
+      res.json(session);
+    } catch (error) {
+      res.status(400).json({ message: error instanceof Error ? error.message : "Failed to update offering session" });
+    }
+  });
+
+  app.get("/api/admin/offering-sessions", async (req, res) => {
+    try {
+      if (!(await requireAdminUser(req, res))) return;
+
+      const status = typeof req.query.status === "string" ? req.query.status : undefined;
+      const sessions = await storage.getOfferingSessions(status);
+      res.json(await enrichOfferingSessions(sessions));
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch offering sessions" });
+    }
+  });
+
+  app.patch("/api/admin/offering-sessions/:id/review", express.json(), async (req, res) => {
+    try {
+      if (!(await requireAdminUser(req, res))) return;
+
+      const allowedStatuses = new Set(["approved", "changes_requested", "rejected", "archived", "cancelled"]);
+      if (!allowedStatuses.has(req.body.status)) {
+        return res.status(400).json({ message: "Invalid session review status" });
+      }
+
+      const session = await storage.updateOfferingSession(Number(req.params.id), {
+        status: req.body.status,
+        reviewerNote: req.body.reviewerNote ? String(req.body.reviewerNote).trim() : null,
+        internalReviewNote: req.body.internalReviewNote ? String(req.body.internalReviewNote).trim() : null,
+        reviewedAt: new Date(),
+        updatedAt: new Date(),
+      });
+      res.json(session);
+    } catch (error) {
+      res.status(400).json({ message: "Failed to review offering session" });
+    }
+  });
+
+  const enrichOfferingInterests = async (interests: Awaited<ReturnType<typeof storage.getOfferingInterests>>) => {
+    const offerings = await storage.getEducatorOfferings();
+    const sessions = await storage.getOfferingSessions();
+    const profiles = await storage.getAllContributorProfiles();
+    const offeringById = new Map(offerings.map((offering) => [offering.id, offering]));
+    const sessionById = new Map(sessions.map((session) => [session.id, session]));
+    const profileById = new Map(profiles.map((profile) => [profile.id, profile]));
+
     return interests.map((interest) => ({
       ...interest,
       offering: offeringById.get(interest.educatorOfferingId) || null,
+      session: interest.offeringSessionId ? sessionById.get(interest.offeringSessionId) || null : null,
       contributorProfile: profileById.get(interest.contributorProfileId) || null,
     }));
   };
@@ -1227,6 +1403,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Approved offering not found" });
       }
 
+      const offeringSessionId = req.body.offeringSessionId ? Number(req.body.offeringSessionId) : null;
+      const offeringSession = offeringSessionId ? await storage.getOfferingSession(offeringSessionId) : undefined;
+      if (offeringSessionId && (
+        !offeringSession ||
+        offeringSession.educatorOfferingId !== offering.id ||
+        offeringSession.status !== "approved"
+      )) {
+        return res.status(404).json({ message: "Approved session not found" });
+      }
+
       const requester = req.session.userId ? await storage.getUser(req.session.userId) : undefined;
       const requesterName = String(req.body.requesterName || requester?.fullName || "").trim();
       const requesterEmail = String(req.body.requesterEmail || requester?.email || "").trim().toLowerCase();
@@ -1237,6 +1423,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const interestData = insertOfferingInterestSchema.parse({
         educatorOfferingId: offering.id,
+        offeringSessionId,
         contributorProfileId: offering.contributorProfileId,
         requesterUserId: requester?.id || null,
         requesterName,
@@ -1374,10 +1561,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const approvedOfferings = (await storage.getEducatorOfferingsForContributor(profile.id))
         .filter((offering) => offering.status === "approved");
+      const approvedSessions = (await storage.getOfferingSessionsForContributor(profile.id))
+        .filter((session) => session.status === "approved");
+      const sessionsByOffering = new Map<number, typeof approvedSessions>();
+
+      approvedSessions.forEach((session) => {
+        const existing = sessionsByOffering.get(session.educatorOfferingId) || [];
+        sessionsByOffering.set(session.educatorOfferingId, [...existing, session]);
+      });
 
       res.json({
         ...profile,
-        approvedOfferings,
+        approvedOfferings: approvedOfferings.map((offering) => ({
+          ...offering,
+          approvedSessions: sessionsByOffering.get(offering.id) || [],
+        })),
       });
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch educator" });

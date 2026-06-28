@@ -53,6 +53,7 @@ interface EducatorOffering {
 interface OfferingInterest {
   id: number;
   educatorOfferingId: number;
+  offeringSessionId?: number | null;
   requesterName: string;
   requesterEmail: string;
   learnerAgeGroup?: string | null;
@@ -63,6 +64,33 @@ interface OfferingInterest {
     id: number;
     title: string;
     offeringType: string;
+    subject: string;
+    ageGroup: string;
+  } | null;
+  session?: {
+    id: number;
+    title: string;
+    startsAt?: string | null;
+  } | null;
+}
+
+interface OfferingSession {
+  id: number;
+  educatorOfferingId: number;
+  title: string;
+  startsAt?: string | null;
+  endsAt?: string | null;
+  duration?: string | null;
+  capacity?: number | null;
+  reservedSeats: number;
+  meetingUrl?: string | null;
+  locationNote?: string | null;
+  registrationNote?: string | null;
+  status: string;
+  submittedAt?: string | null;
+  offering?: {
+    id: number;
+    title: string;
     subject: string;
     ageGroup: string;
   } | null;
@@ -80,6 +108,18 @@ const emptyOfferingForm = {
   sampleUrl: "",
   parentExpectations: "",
   completionEvidence: "",
+};
+
+const emptySessionForm = {
+  educatorOfferingId: "",
+  title: "",
+  startsAt: "",
+  endsAt: "",
+  duration: "",
+  capacity: "",
+  meetingUrl: "",
+  locationNote: "",
+  registrationNote: "",
 };
 
 const statusBadge = (status: string) => {
@@ -106,6 +146,7 @@ export default function ContributorDashboard() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [offeringForm, setOfferingForm] = React.useState(emptyOfferingForm);
+  const [sessionForm, setSessionForm] = React.useState(emptySessionForm);
 
   const { data: profile, isLoading: profileLoading } = useQuery<ContributorProfileRecord | null>({
     queryKey: ["/api/contributor-profiles/me"],
@@ -128,6 +169,12 @@ export default function ContributorDashboard() {
   const { data: interests = [], isLoading: interestsLoading } = useQuery<OfferingInterest[]>({
     queryKey: ["/api/offering-interests/me"],
     queryFn: () => apiRequest<OfferingInterest[]>("/api/offering-interests/me"),
+    enabled: Boolean(profile?.id),
+  });
+
+  const { data: sessions = [], isLoading: sessionsLoading } = useQuery<OfferingSession[]>({
+    queryKey: ["/api/offering-sessions/me"],
+    queryFn: () => apiRequest<OfferingSession[]>("/api/offering-sessions/me"),
     enabled: Boolean(profile?.id),
   });
 
@@ -177,6 +224,37 @@ export default function ContributorDashboard() {
       });
     },
   });
+
+  const sessionMutation = useMutation({
+    mutationFn: (submitForReview: boolean) => apiRequest<OfferingSession>("/api/offering-sessions", {
+      method: "POST",
+      body: {
+        ...sessionForm,
+        educatorOfferingId: Number(sessionForm.educatorOfferingId),
+        capacity: sessionForm.capacity ? Number(sessionForm.capacity) : null,
+        submitForReview,
+      },
+    }),
+    onSuccess: (_, submitForReview) => {
+      setSessionForm(emptySessionForm);
+      queryClient.invalidateQueries({ queryKey: ["/api/offering-sessions/me"] });
+      toast({
+        title: submitForReview ? "Session submitted" : "Session saved",
+        description: submitForReview
+          ? "Admins can now review the session and external meeting details."
+          : "Your draft session has been saved.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Session not saved",
+        description: error instanceof Error ? error.message : "Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const approvedOfferings = offerings.filter((offering) => offering.status === "approved");
 
   if (!user) {
     return (
@@ -277,6 +355,157 @@ export default function ContributorDashboard() {
           <CardContent>
             <div className="text-3xl font-bold capitalize">{profile?.trustLevel || "new"}</div>
             <p className="text-sm text-muted-foreground">review speed can improve over time</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="mb-6 grid gap-6 lg:grid-cols-[1fr_420px]">
+        <Card>
+          <CardHeader>
+            <CardTitle>Class Sessions</CardTitle>
+            <CardDescription>Schedule live classes, tutoring windows, or coaching sessions for approved offerings.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {sessionsLoading ? (
+              <p className="py-8 text-center text-muted-foreground">Loading sessions...</p>
+            ) : sessions.length === 0 ? (
+              <div className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
+                No sessions yet. Approved offerings can have sessions submitted for admin review.
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Session</TableHead>
+                    <TableHead>Offering</TableHead>
+                    <TableHead>Seats</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Submitted</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {sessions.map((session) => (
+                    <TableRow key={session.id}>
+                      <TableCell>
+                        <div className="font-medium">{session.title}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {formatDate(session.startsAt)}{session.duration ? ` | ${session.duration}` : ""}
+                        </div>
+                      </TableCell>
+                      <TableCell>{session.offering?.title || "Offering removed"}</TableCell>
+                      <TableCell>
+                        {session.capacity ? `${session.reservedSeats}/${session.capacity}` : `${session.reservedSeats} requested`}
+                      </TableCell>
+                      <TableCell>{statusBadge(session.status)}</TableCell>
+                      <TableCell>{formatDate(session.submittedAt)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Create Session</CardTitle>
+            <CardDescription>Meeting links stay hidden from families until admins review the session.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label>Approved Offering</Label>
+              <Select
+                value={sessionForm.educatorOfferingId}
+                onValueChange={(educatorOfferingId) => setSessionForm((current) => ({ ...current, educatorOfferingId }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select offering" />
+                </SelectTrigger>
+                <SelectContent>
+                  {approvedOfferings.map((offering) => (
+                    <SelectItem key={offering.id} value={String(offering.id)}>{offering.title}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="sessionTitle">Session Title</Label>
+              <Input
+                id="sessionTitle"
+                value={sessionForm.title}
+                onChange={(event) => setSessionForm((current) => ({ ...current, title: event.target.value }))}
+                placeholder="Saturday budgeting lab"
+              />
+            </div>
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="sessionStarts">Starts</Label>
+                <Input
+                  id="sessionStarts"
+                  type="datetime-local"
+                  value={sessionForm.startsAt}
+                  onChange={(event) => setSessionForm((current) => ({ ...current, startsAt: event.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="sessionEnds">Ends</Label>
+                <Input
+                  id="sessionEnds"
+                  type="datetime-local"
+                  value={sessionForm.endsAt}
+                  onChange={(event) => setSessionForm((current) => ({ ...current, endsAt: event.target.value }))}
+                />
+              </div>
+            </div>
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="sessionDuration">Duration</Label>
+                <Input
+                  id="sessionDuration"
+                  value={sessionForm.duration}
+                  onChange={(event) => setSessionForm((current) => ({ ...current, duration: event.target.value }))}
+                  placeholder="60 minutes"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="sessionCapacity">Capacity</Label>
+                <Input
+                  id="sessionCapacity"
+                  type="number"
+                  min="1"
+                  value={sessionForm.capacity}
+                  onChange={(event) => setSessionForm((current) => ({ ...current, capacity: event.target.value }))}
+                  placeholder="12"
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="meetingUrl">Meeting URL</Label>
+              <Input
+                id="meetingUrl"
+                value={sessionForm.meetingUrl}
+                onChange={(event) => setSessionForm((current) => ({ ...current, meetingUrl: event.target.value }))}
+                placeholder="Zoom, Meet, or external classroom link"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="registrationNote">Registration Note</Label>
+              <Textarea
+                id="registrationNote"
+                className="min-h-[80px]"
+                value={sessionForm.registrationNote}
+                onChange={(event) => setSessionForm((current) => ({ ...current, registrationNote: event.target.value }))}
+                placeholder="What should families know before requesting a seat?"
+              />
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" onClick={() => sessionMutation.mutate(false)} disabled={sessionMutation.isPending}>
+                Save Draft
+              </Button>
+              <Button onClick={() => sessionMutation.mutate(true)} disabled={sessionMutation.isPending}>
+                Submit Session
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -535,6 +764,11 @@ export default function ContributorDashboard() {
                       <div className="text-xs text-muted-foreground">
                         {interest.offering ? `${interest.offering.subject} | ${interest.offering.ageGroup}` : "No offering details"}
                       </div>
+                      {interest.session && (
+                        <div className="mt-1 text-xs text-muted-foreground">
+                          Session: {interest.session.title} ({formatDate(interest.session.startsAt)})
+                        </div>
+                      )}
                     </TableCell>
                     <TableCell className="max-w-sm text-sm text-muted-foreground">
                       {interest.message || "No message included"}

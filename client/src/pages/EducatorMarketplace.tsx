@@ -27,6 +27,19 @@ interface EducatorOffering {
   parentExpectations?: string | null;
   completionEvidence?: string | null;
   status: string;
+  approvedSessions?: OfferingSession[];
+}
+
+interface OfferingSession {
+  id: number;
+  title: string;
+  startsAt?: string | null;
+  endsAt?: string | null;
+  duration?: string | null;
+  capacity?: number | null;
+  reservedSeats: number;
+  locationNote?: string | null;
+  registrationNote?: string | null;
 }
 
 interface EducatorProfile {
@@ -61,9 +74,21 @@ const formatPrice = (offering: EducatorOffering) => {
   return `$${(offering.priceCents / 100).toFixed(2)}`;
 };
 
+const formatDate = (dateString?: string | null) => {
+  if (!dateString) return "Date TBD";
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(dateString));
+};
+
 function EducatorDetail({ educatorId }: { educatorId: number }) {
   const { toast } = useToast();
   const [selectedOfferingId, setSelectedOfferingId] = React.useState<number | null>(null);
+  const [selectedSessionId, setSelectedSessionId] = React.useState<number | null>(null);
   const [interestForm, setInterestForm] = React.useState({
     requesterName: "",
     requesterEmail: "",
@@ -81,11 +106,13 @@ function EducatorDetail({ educatorId }: { educatorId: number }) {
       method: "POST",
       body: {
         educatorOfferingId,
+        offeringSessionId: selectedSessionId,
         ...interestForm,
       },
     }),
     onSuccess: () => {
       setSelectedOfferingId(null);
+      setSelectedSessionId(null);
       setInterestForm({ requesterName: "", requesterEmail: "", learnerAgeGroup: "", message: "" });
       toast({
         title: "Request sent",
@@ -214,14 +241,20 @@ function EducatorDetail({ educatorId }: { educatorId: number }) {
                             Sample
                           </a>
                         </Button>
-                        <Button onClick={() => setSelectedOfferingId(offering.id)}>
+                        <Button onClick={() => {
+                          setSelectedOfferingId(offering.id);
+                          setSelectedSessionId(null);
+                        }}>
                           <Mail className="mr-2 h-4 w-4" />
                           Request Info
                         </Button>
                       </div>
                     )}
                     {!offering.sampleUrl && (
-                      <Button onClick={() => setSelectedOfferingId(offering.id)}>
+                      <Button onClick={() => {
+                        setSelectedOfferingId(offering.id);
+                        setSelectedSessionId(null);
+                      }}>
                         <Mail className="mr-2 h-4 w-4" />
                         Request Info
                       </Button>
@@ -240,8 +273,54 @@ function EducatorDetail({ educatorId }: { educatorId: number }) {
                       </div>
                     </>
                   )}
+                  {offering.approvedSessions?.length ? (
+                    <>
+                      <Separator className="my-4" />
+                      <div className="space-y-3">
+                        <h4 className="font-medium">Upcoming Sessions</h4>
+                        {offering.approvedSessions.map((session) => (
+                          <div key={session.id} className="rounded-md border bg-slate-50 p-3">
+                            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                              <div>
+                                <div className="font-medium">{session.title}</div>
+                                <div className="text-sm text-muted-foreground">
+                                  {formatDate(session.startsAt)}{session.duration ? ` | ${session.duration}` : ""}
+                                </div>
+                                <div className="mt-1 text-xs text-muted-foreground">
+                                  {session.capacity
+                                    ? `${Math.max(session.capacity - session.reservedSeats, 0)} of ${session.capacity} seats open`
+                                    : "Seat count managed by educator"}
+                                </div>
+                                {session.registrationNote && (
+                                  <p className="mt-2 text-sm text-muted-foreground">{session.registrationNote}</p>
+                                )}
+                              </div>
+                              <Button
+                                variant="outline"
+                                onClick={() => {
+                                  setSelectedOfferingId(offering.id);
+                                  setSelectedSessionId(session.id);
+                                  setInterestForm((current) => ({
+                                    ...current,
+                                    message: current.message || `I am interested in ${session.title}.`,
+                                  }));
+                                }}
+                              >
+                                Request Seat
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  ) : null}
                   {selectedOfferingId === offering.id && (
                     <div className="mt-4 rounded-md border bg-slate-50 p-4">
+                      {selectedSessionId && (
+                        <Badge className="mb-3" variant="secondary">
+                          Requesting a seat for {offering.approvedSessions?.find((session) => session.id === selectedSessionId)?.title || "selected session"}
+                        </Badge>
+                      )}
                       <div className="grid gap-3 md:grid-cols-2">
                         <div className="space-y-2">
                           <Label htmlFor={`requesterName-${offering.id}`}>Your Name</Label>
