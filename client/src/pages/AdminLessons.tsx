@@ -209,6 +209,37 @@ interface OfferingSession {
   } | null;
 }
 
+interface OfferingEnrollment {
+  id: number;
+  requesterName: string;
+  requesterEmail: string;
+  learnerAgeGroup?: string | null;
+  learnerCount: number;
+  message?: string | null;
+  status: string;
+  createdAt?: string | null;
+  reservedAt?: string | null;
+  offering?: {
+    id: number;
+    title: string;
+    subject: string;
+    ageGroup: string;
+  } | null;
+  session?: {
+    id: number;
+    title: string;
+    startsAt?: string | null;
+    capacity?: number | null;
+    reservedSeats: number;
+  } | null;
+  contributorProfile?: {
+    id: number;
+    displayName: string;
+    affiliation?: string | null;
+    trustLevel: string;
+  } | null;
+}
+
 interface ResourceSubmission {
   id: number;
   contributorName: string;
@@ -264,6 +295,7 @@ const reportStatuses = ["new", "reviewing", "resolved", "archived"];
 const offeringReviewStatuses = ["approved", "changes_requested", "rejected", "archived"];
 const sessionReviewStatuses = ["approved", "changes_requested", "rejected", "cancelled", "archived"];
 const interestStatuses = ["new", "contacted", "waitlisted", "closed", "archived"];
+const enrollmentStatuses = ["requested", "reserved", "waitlisted", "cancelled", "completed", "archived"];
 const roles = ["student", "parent", "admin"];
 const rubricCriteria = [
   ["safety", "Safety"],
@@ -327,6 +359,11 @@ export default function AdminLessons() {
   const { data: offeringSessions = [], isLoading: sessionsLoading } = useQuery<OfferingSession[]>({
     queryKey: ["/api/admin/offering-sessions"],
     queryFn: () => apiRequest<OfferingSession[]>("/api/admin/offering-sessions"),
+  });
+
+  const { data: offeringEnrollments = [], isLoading: enrollmentsLoading } = useQuery<OfferingEnrollment[]>({
+    queryKey: ["/api/admin/offering-enrollments"],
+    queryFn: () => apiRequest<OfferingEnrollment[]>("/api/admin/offering-enrollments"),
   });
 
   const { data: users = [], isLoading: usersLoading } = useQuery<AdminUser[]>({
@@ -526,6 +563,27 @@ export default function AdminLessons() {
     },
   });
 
+  const enrollmentMutation = useMutation({
+    mutationFn: ({ id, status }: { id: number; status: string }) =>
+      apiRequest<OfferingEnrollment>(`/api/admin/offering-enrollments/${id}`, {
+        method: "PATCH",
+        body: { status },
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/offering-enrollments"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/offering-sessions"] });
+      toast({ title: "Enrollment updated", description: "The reservation status and seat count have been saved." });
+    },
+    onError: (error) => {
+      toast({
+        title: "Enrollment update failed",
+        description: error instanceof Error ? error.message : "Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+
 
 
   const roleMutation = useMutation({
@@ -648,6 +706,22 @@ export default function AdminLessons() {
       .includes(searchQuery.toLowerCase())
   );
 
+  const filteredEnrollments = offeringEnrollments.filter((enrollment) =>
+    [
+      enrollment.requesterName,
+      enrollment.requesterEmail,
+      enrollment.learnerAgeGroup,
+      enrollment.status,
+      enrollment.message,
+      enrollment.offering?.title,
+      enrollment.session?.title,
+      enrollment.contributorProfile?.displayName,
+    ]
+      .join(" ")
+      .toLowerCase()
+      .includes(searchQuery.toLowerCase())
+  );
+
   const filteredUsers = users.filter((user) =>
     [user.fullName, user.email, user.role, user.ageGroup]
       .join(" ")
@@ -728,6 +802,7 @@ export default function AdminLessons() {
     resources: resourceSubmissions.filter((resource) => resource.status === "pending_review").length,
     offerings: educatorOfferings.filter((offering) => offering.status === "pending_review").length,
     sessions: offeringSessions.filter((session) => session.status === "pending_review").length,
+    enrollments: offeringEnrollments.filter((enrollment) => ["requested", "reserved", "waitlisted"].includes(enrollment.status)).length,
     interests: offeringInterests.filter((interest) => ["new", "waitlisted"].includes(interest.status)).length,
     feedback: feedback.filter((item) => item.status === "new" || item.status === "reviewing").length,
     reports: contentReports.filter((item) => item.status === "new" || item.status === "reviewing").length,
@@ -793,7 +868,7 @@ export default function AdminLessons() {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold">{counts.offerings + counts.sessions}</div>
-            <p className="text-sm text-muted-foreground">{counts.sessions} sessions, {counts.interests} interests</p>
+            <p className="text-sm text-muted-foreground">{counts.sessions} sessions, {counts.enrollments} enrollments</p>
           </CardContent>
         </Card>
         <Card>
@@ -1243,6 +1318,81 @@ export default function AdminLessons() {
                             </SelectTrigger>
                             <SelectContent>
                               {interestStatuses.map((status) => (
+                                <SelectItem key={status} value={status}>{status.replace("_", " ")}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Session Enrollment Queue</CardTitle>
+              <CardDescription>Manage requested, reserved, waitlisted, cancelled, and completed session seats.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {enrollmentsLoading ? (
+                <p className="py-8 text-center text-muted-foreground">Loading enrollments...</p>
+              ) : filteredEnrollments.length === 0 ? (
+                <div className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
+                  No session enrollments match the current search.
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Family</TableHead>
+                      <TableHead>Session</TableHead>
+                      <TableHead>Educator</TableHead>
+                      <TableHead>Learners</TableHead>
+                      <TableHead>Message</TableHead>
+                      <TableHead>Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredEnrollments.map((enrollment) => (
+                      <TableRow key={enrollment.id}>
+                        <TableCell>
+                          <div className="font-medium">{enrollment.requesterName}</div>
+                          <a className="text-xs text-primary underline" href={`mailto:${enrollment.requesterEmail}`}>
+                            {enrollment.requesterEmail}
+                          </a>
+                          {enrollment.learnerAgeGroup && (
+                            <div className="text-xs text-muted-foreground">Learner: {enrollment.learnerAgeGroup}</div>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <div className="font-medium">{enrollment.session?.title || "Session unavailable"}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {formatDate(enrollment.session?.startsAt)}
+                          </div>
+                          <div className="text-xs text-muted-foreground">{enrollment.offering?.title || "Offering unavailable"}</div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="font-medium">{enrollment.contributorProfile?.displayName || "Unknown educator"}</div>
+                          <div className="text-xs text-muted-foreground">{enrollment.contributorProfile?.trustLevel || "No trust level"}</div>
+                        </TableCell>
+                        <TableCell>{enrollment.learnerCount}</TableCell>
+                        <TableCell className="max-w-sm text-sm text-muted-foreground">
+                          {enrollment.message || "No message included"}
+                        </TableCell>
+                        <TableCell>
+                          <Select
+                            value={enrollment.status}
+                            onValueChange={(status) => enrollmentMutation.mutate({ id: enrollment.id, status })}
+                            disabled={enrollmentMutation.isPending}
+                          >
+                            <SelectTrigger className="w-[150px]">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {enrollmentStatuses.map((status) => (
                                 <SelectItem key={status} value={status}>{status.replace("_", " ")}</SelectItem>
                               ))}
                             </SelectContent>

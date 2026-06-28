@@ -93,6 +93,7 @@ function EducatorDetail({ educatorId }: { educatorId: number }) {
     requesterName: "",
     requesterEmail: "",
     learnerAgeGroup: "",
+    learnerCount: "1",
     message: "",
   });
 
@@ -113,7 +114,7 @@ function EducatorDetail({ educatorId }: { educatorId: number }) {
     onSuccess: () => {
       setSelectedOfferingId(null);
       setSelectedSessionId(null);
-      setInterestForm({ requesterName: "", requesterEmail: "", learnerAgeGroup: "", message: "" });
+      setInterestForm({ requesterName: "", requesterEmail: "", learnerAgeGroup: "", learnerCount: "1", message: "" });
       toast({
         title: "Request sent",
         description: "The educator can now follow up from their Real World Academy dashboard.",
@@ -350,6 +351,18 @@ function EducatorDetail({ educatorId }: { educatorId: number }) {
                             placeholder="Example: 10-12, teen, adult"
                           />
                         </div>
+                        {selectedSessionId && (
+                          <div className="space-y-2 md:col-span-2">
+                            <Label htmlFor={`learnerCount-${offering.id}`}>Learners</Label>
+                            <Input
+                              id={`learnerCount-${offering.id}`}
+                              type="number"
+                              min="1"
+                              value={interestForm.learnerCount}
+                              onChange={(event) => setInterestForm((current) => ({ ...current, learnerCount: event.target.value }))}
+                            />
+                          </div>
+                        )}
                         <div className="space-y-2 md:col-span-2">
                           <Label htmlFor={`requestMessage-${offering.id}`}>Message</Label>
                           <Textarea

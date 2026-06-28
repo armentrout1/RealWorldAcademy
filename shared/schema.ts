@@ -831,6 +831,49 @@ export const insertOfferingSessionSchema = createInsertSchema(offeringSessions).
 export type InsertOfferingSession = z.infer<typeof insertOfferingSessionSchema>;
 export type OfferingSession = typeof offeringSessions.$inferSelect;
 
+export const offeringEnrollments = pgTable("offering_enrollments", {
+  id: serial("id").primaryKey(),
+  educatorOfferingId: integer("educator_offering_id").notNull().references(() => educatorOfferings.id),
+  offeringSessionId: integer("offering_session_id").notNull().references(() => offeringSessions.id),
+  contributorProfileId: integer("contributor_profile_id").notNull().references(() => contributorProfiles.id),
+  requesterUserId: integer("requester_user_id").references(() => users.id),
+  requesterName: text("requester_name").notNull(),
+  requesterEmail: text("requester_email").notNull(),
+  learnerAgeGroup: text("learner_age_group"),
+  learnerCount: integer("learner_count").default(1).notNull(),
+  message: text("message"),
+  status: text("status").default("requested").notNull(), // requested, reserved, waitlisted, cancelled, completed, archived
+  sourceInterestId: integer("source_interest_id"),
+  reservedAt: timestamp("reserved_at"),
+  cancelledAt: timestamp("cancelled_at"),
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const offeringEnrollmentsRelations = relations(offeringEnrollments, ({ one }) => ({
+  offering: one(educatorOfferings, {
+    fields: [offeringEnrollments.educatorOfferingId],
+    references: [educatorOfferings.id],
+  }),
+  session: one(offeringSessions, {
+    fields: [offeringEnrollments.offeringSessionId],
+    references: [offeringSessions.id],
+  }),
+  contributorProfile: one(contributorProfiles, {
+    fields: [offeringEnrollments.contributorProfileId],
+    references: [contributorProfiles.id],
+  }),
+  requester: one(users, {
+    fields: [offeringEnrollments.requesterUserId],
+    references: [users.id],
+  }),
+}));
+
+export const insertOfferingEnrollmentSchema = createInsertSchema(offeringEnrollments).omit({ id: true });
+export type InsertOfferingEnrollment = z.infer<typeof insertOfferingEnrollmentSchema>;
+export type OfferingEnrollment = typeof offeringEnrollments.$inferSelect;
+
 export const offeringInterests = pgTable("offering_interests", {
   id: serial("id").primaryKey(),
   educatorOfferingId: integer("educator_offering_id").notNull().references(() => educatorOfferings.id),

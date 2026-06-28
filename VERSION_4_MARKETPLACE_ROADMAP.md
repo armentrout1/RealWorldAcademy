@@ -153,7 +153,10 @@ Current build status:
 - `green`: educators can draft or submit sessions for approved offerings.
 - `green`: admins can review session dates, capacity, and meeting links before public discovery.
 - `green`: public educator profiles show approved sessions and let families request a specific seat.
-- `yellow`: true seat reservation counts, calendar integrations, and payment-backed enrollment still need the next scheduling pass.
+- `green`: `offering_enrollments` schema exists for requested, reserved, waitlisted, cancelled, completed, and archived seat states.
+- `green`: specific session seat requests create enrollment records and can be managed by educators or admins.
+- `green`: moving enrollments into or out of reserved/completed status updates session reserved seat counts.
+- `yellow`: calendar integrations, family-facing enrollment dashboards, and payment-backed enrollment still need future passes.
 
 ### Phase 5: Payments and Platform Fee
 

@@ -18,7 +18,7 @@ import {
   insertResourceSubmissionSchema,
   insertCurriculumCollectionSchema, insertCurriculumCollectionItemSchema,
   insertFeedbackSubmissionSchema, insertContentReportSchema,
-  insertEducatorOfferingSchema, insertOfferingSessionSchema, insertOfferingInterestSchema,
+  insertEducatorOfferingSchema, insertOfferingSessionSchema, insertOfferingEnrollmentSchema, insertOfferingInterestSchema,
   insertCredentialDefinitionSchema, insertCredentialRequirementSchema,
   insertContributorProfileSchema,
   type CurriculumCollection,
@@ -1373,6 +1373,129 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  const enrichOfferingEnrollments = async (
+    enrollments: Awaited<ReturnType<typeof storage.getOfferingEnrollments>>,
+  ) => {
+    const offerings = await storage.getEducatorOfferings();
+    const sessions = await storage.getOfferingSessions();
+    const profiles = await storage.getAllContributorProfiles();
+    const offeringById = new Map(offerings.map((offering) => [offering.id, offering]));
+    const sessionById = new Map(sessions.map((session) => [session.id, session]));
+    const profileById = new Map(profiles.map((profile) => [profile.id, profile]));
+
+    return enrollments.map((enrollment) => ({
+      ...enrollment,
+      offering: offeringById.get(enrollment.educatorOfferingId) || null,
+      session: sessionById.get(enrollment.offeringSessionId) || null,
+      contributorProfile: profileById.get(enrollment.contributorProfileId) || null,
+    }));
+  };
+
+  const enrollmentStatuses = new Set(["requested", "reserved", "waitlisted", "cancelled", "completed", "archived"]);
+  const activeSeatStatuses = new Set(["reserved", "completed"]);
+
+  const updateEnrollmentStatus = async (
+    enrollment: Awaited<ReturnType<typeof storage.getOfferingEnrollments>>[number],
+    status: string,
+  ) => {
+    if (!enrollmentStatuses.has(status)) {
+      throw new Error("Invalid enrollment status");
+    }
+
+    const wasActive = activeSeatStatuses.has(enrollment.status);
+    const willBeActive = activeSeatStatuses.has(status);
+    const learnerCount = enrollment.learnerCount || 1;
+
+    if (!wasActive && willBeActive) {
+      const session = await storage.getOfferingSession(enrollment.offeringSessionId);
+      const openSeats = session?.capacity ? session.capacity - session.reservedSeats : Number.POSITIVE_INFINITY;
+      if (openSeats < learnerCount) {
+        throw new Error("Not enough seats are available");
+      }
+      await storage.adjustOfferingSessionReservedSeats(enrollment.offeringSessionId, learnerCount);
+    }
+
+    if (wasActive && !willBeActive) {
+      await storage.adjustOfferingSessionReservedSeats(enrollment.offeringSessionId, -learnerCount);
+    }
+
+    return await storage.updateOfferingEnrollment(enrollment.id, {
+      status,
+      reservedAt: status === "reserved" && !enrollment.reservedAt ? new Date() : enrollment.reservedAt,
+      cancelledAt: status === "cancelled" && !enrollment.cancelledAt ? new Date() : enrollment.cancelledAt,
+      completedAt: status === "completed" && !enrollment.completedAt ? new Date() : enrollment.completedAt,
+      updatedAt: new Date(),
+    });
+  };
+
+  app.get("/api/offering-enrollments/me", async (req, res) => {
+    try {
+      const sessionUserId = requireSessionUserId(req, res);
+      if (!sessionUserId) return;
+
+      const profile = await storage.getContributorProfileByUserId(sessionUserId);
+      if (!profile) return res.json([]);
+
+      const enrollments = await storage.getOfferingEnrollmentsForContributor(profile.id);
+      res.json(await enrichOfferingEnrollments(enrollments));
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch offering enrollments" });
+    }
+  });
+
+  app.patch("/api/offering-enrollments/:id", express.json(), async (req, res) => {
+    try {
+      const sessionUserId = requireSessionUserId(req, res);
+      if (!sessionUserId) return;
+
+      const profile = await storage.getContributorProfileByUserId(sessionUserId);
+      if (!profile) {
+        return res.status(403).json({ message: "Educator profile required" });
+      }
+
+      const enrollmentId = Number(req.params.id);
+      const existing = (await storage.getOfferingEnrollmentsForContributor(profile.id))
+        .find((enrollment) => enrollment.id === enrollmentId);
+      if (!existing) {
+        return res.status(404).json({ message: "Enrollment not found" });
+      }
+
+      const enrollment = await updateEnrollmentStatus(existing, String(req.body.status || ""));
+      res.json(enrollment);
+    } catch (error) {
+      res.status(400).json({ message: error instanceof Error ? error.message : "Failed to update enrollment" });
+    }
+  });
+
+  app.get("/api/admin/offering-enrollments", async (req, res) => {
+    try {
+      if (!(await requireAdminUser(req, res))) return;
+
+      const status = typeof req.query.status === "string" ? req.query.status : undefined;
+      const enrollments = await storage.getOfferingEnrollments(status);
+      res.json(await enrichOfferingEnrollments(enrollments));
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch offering enrollments" });
+    }
+  });
+
+  app.patch("/api/admin/offering-enrollments/:id", express.json(), async (req, res) => {
+    try {
+      if (!(await requireAdminUser(req, res))) return;
+
+      const enrollmentId = Number(req.params.id);
+      const existing = (await storage.getOfferingEnrollments()).find((enrollment) => enrollment.id === enrollmentId);
+      if (!existing) {
+        return res.status(404).json({ message: "Enrollment not found" });
+      }
+
+      const enrollment = await updateEnrollmentStatus(existing, String(req.body.status || ""));
+      res.json(enrollment);
+    } catch (error) {
+      res.status(400).json({ message: error instanceof Error ? error.message : "Failed to update enrollment" });
+    }
+  });
+
   const enrichOfferingInterests = async (interests: Awaited<ReturnType<typeof storage.getOfferingInterests>>) => {
     const offerings = await storage.getEducatorOfferings();
     const sessions = await storage.getOfferingSessions();
@@ -1416,6 +1539,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const requester = req.session.userId ? await storage.getUser(req.session.userId) : undefined;
       const requesterName = String(req.body.requesterName || requester?.fullName || "").trim();
       const requesterEmail = String(req.body.requesterEmail || requester?.email || "").trim().toLowerCase();
+      const learnerCount = Math.max(1, Number(req.body.learnerCount || 1));
 
       if (!requesterName || !requesterEmail) {
         return res.status(400).json({ message: "Name and email are required" });
@@ -1436,6 +1560,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       const interest = await storage.createOfferingInterest(interestData);
+      if (offeringSession) {
+        const enrollmentData = insertOfferingEnrollmentSchema.parse({
+          educatorOfferingId: offering.id,
+          offeringSessionId: offeringSession.id,
+          contributorProfileId: offering.contributorProfileId,
+          requesterUserId: requester?.id || null,
+          requesterName,
+          requesterEmail,
+          learnerAgeGroup: req.body.learnerAgeGroup ? String(req.body.learnerAgeGroup).trim() : null,
+          learnerCount,
+          message: req.body.message ? String(req.body.message).trim() : null,
+          status: "requested",
+          sourceInterestId: interest.id,
+          reservedAt: null,
+          cancelledAt: null,
+          completedAt: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
+        await storage.createOfferingEnrollment(enrollmentData);
+      }
       res.status(201).json(interest);
     } catch (error) {
       res.status(400).json({ message: error instanceof Error ? error.message : "Invalid offering interest" });

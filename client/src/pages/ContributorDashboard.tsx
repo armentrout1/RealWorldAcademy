@@ -96,6 +96,31 @@ interface OfferingSession {
   } | null;
 }
 
+interface OfferingEnrollment {
+  id: number;
+  requesterName: string;
+  requesterEmail: string;
+  learnerAgeGroup?: string | null;
+  learnerCount: number;
+  message?: string | null;
+  status: string;
+  createdAt?: string | null;
+  reservedAt?: string | null;
+  offering?: {
+    id: number;
+    title: string;
+    subject: string;
+    ageGroup: string;
+  } | null;
+  session?: {
+    id: number;
+    title: string;
+    startsAt?: string | null;
+    capacity?: number | null;
+    reservedSeats: number;
+  } | null;
+}
+
 const emptyOfferingForm = {
   title: "",
   description: "",
@@ -140,6 +165,7 @@ const formatDate = (dateString?: string | null) => {
 };
 
 const interestStatuses = ["new", "contacted", "waitlisted", "closed", "archived"];
+const enrollmentStatuses = ["requested", "reserved", "waitlisted", "cancelled", "completed", "archived"];
 
 export default function ContributorDashboard() {
   const { user } = useAuth();
@@ -175,6 +201,12 @@ export default function ContributorDashboard() {
   const { data: sessions = [], isLoading: sessionsLoading } = useQuery<OfferingSession[]>({
     queryKey: ["/api/offering-sessions/me"],
     queryFn: () => apiRequest<OfferingSession[]>("/api/offering-sessions/me"),
+    enabled: Boolean(profile?.id),
+  });
+
+  const { data: enrollments = [], isLoading: enrollmentsLoading } = useQuery<OfferingEnrollment[]>({
+    queryKey: ["/api/offering-enrollments/me"],
+    queryFn: () => apiRequest<OfferingEnrollment[]>("/api/offering-enrollments/me"),
     enabled: Boolean(profile?.id),
   });
 
@@ -248,6 +280,26 @@ export default function ContributorDashboard() {
     onError: (error) => {
       toast({
         title: "Session not saved",
+        description: error instanceof Error ? error.message : "Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const enrollmentMutation = useMutation({
+    mutationFn: ({ id, status }: { id: number; status: string }) =>
+      apiRequest<OfferingEnrollment>(`/api/offering-enrollments/${id}`, {
+        method: "PATCH",
+        body: { status },
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/offering-enrollments/me"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/offering-sessions/me"] });
+      toast({ title: "Enrollment updated", description: "The reservation status and seat count have been saved." });
+    },
+    onError: (error) => {
+      toast({
+        title: "Enrollment update failed",
         description: error instanceof Error ? error.message : "Please try again.",
         variant: "destructive",
       });
@@ -723,6 +775,79 @@ export default function ContributorDashboard() {
           </CardContent>
         </Card>
       </div>
+
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle>Session Enrollment Queue</CardTitle>
+          <CardDescription>Reserve, waitlist, cancel, or complete family seat requests for scheduled sessions.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {enrollmentsLoading ? (
+            <p className="py-8 text-center text-muted-foreground">Loading enrollments...</p>
+          ) : enrollments.length === 0 ? (
+            <div className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
+              No session enrollment requests yet.
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Family</TableHead>
+                  <TableHead>Session</TableHead>
+                  <TableHead>Learners</TableHead>
+                  <TableHead>Message</TableHead>
+                  <TableHead>Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {enrollments.map((enrollment) => (
+                  <TableRow key={enrollment.id}>
+                    <TableCell>
+                      <div className="font-medium">{enrollment.requesterName}</div>
+                      <a className="text-xs text-primary underline" href={`mailto:${enrollment.requesterEmail}`}>
+                        {enrollment.requesterEmail}
+                      </a>
+                      {enrollment.learnerAgeGroup && (
+                        <div className="text-xs text-muted-foreground">Learner: {enrollment.learnerAgeGroup}</div>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <div className="font-medium">{enrollment.session?.title || "Session removed"}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {formatDate(enrollment.session?.startsAt)}
+                      </div>
+                      <div className="text-xs text-muted-foreground">{enrollment.offering?.title || "Offering unavailable"}</div>
+                    </TableCell>
+                    <TableCell>{enrollment.learnerCount}</TableCell>
+                    <TableCell className="max-w-sm text-sm text-muted-foreground">
+                      {enrollment.message || "No message included"}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-col gap-2">
+                        {statusBadge(enrollment.status)}
+                        <Select
+                          value={enrollment.status}
+                          onValueChange={(status) => enrollmentMutation.mutate({ id: enrollment.id, status })}
+                          disabled={enrollmentMutation.isPending}
+                        >
+                          <SelectTrigger className="w-[150px]">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {enrollmentStatuses.map((status) => (
+                              <SelectItem key={status} value={status}>{status.replace("_", " ")}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
 
       <Card className="mb-6">
         <CardHeader>
