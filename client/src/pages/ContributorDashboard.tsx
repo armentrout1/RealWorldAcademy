@@ -50,6 +50,24 @@ interface EducatorOffering {
   submittedAt?: string | null;
 }
 
+interface OfferingInterest {
+  id: number;
+  educatorOfferingId: number;
+  requesterName: string;
+  requesterEmail: string;
+  learnerAgeGroup?: string | null;
+  message?: string | null;
+  status: string;
+  createdAt?: string | null;
+  offering?: {
+    id: number;
+    title: string;
+    offeringType: string;
+    subject: string;
+    ageGroup: string;
+  } | null;
+}
+
 const emptyOfferingForm = {
   title: "",
   description: "",
@@ -66,8 +84,8 @@ const emptyOfferingForm = {
 
 const statusBadge = (status: string) => {
   const label = status.replace("_", " ");
-  if (status === "approved") return <Badge className="bg-emerald-600">{label}</Badge>;
-  if (status === "pending_review") return <Badge className="bg-amber-500">{label}</Badge>;
+  if (status === "approved" || status === "contacted" || status === "closed") return <Badge className="bg-emerald-600">{label}</Badge>;
+  if (status === "pending_review" || status === "new" || status === "waitlisted") return <Badge className="bg-amber-500">{label}</Badge>;
   if (status === "changes_requested" || status === "rejected") return <Badge variant="destructive">{label}</Badge>;
   return <Badge variant="secondary">{label}</Badge>;
 };
@@ -80,6 +98,8 @@ const formatDate = (dateString?: string | null) => {
     year: "numeric",
   }).format(new Date(dateString));
 };
+
+const interestStatuses = ["new", "contacted", "waitlisted", "closed", "archived"];
 
 export default function ContributorDashboard() {
   const { user } = useAuth();
@@ -105,6 +125,12 @@ export default function ContributorDashboard() {
     enabled: Boolean(profile?.id),
   });
 
+  const { data: interests = [], isLoading: interestsLoading } = useQuery<OfferingInterest[]>({
+    queryKey: ["/api/offering-interests/me"],
+    queryFn: () => apiRequest<OfferingInterest[]>("/api/offering-interests/me"),
+    enabled: Boolean(profile?.id),
+  });
+
   const offeringMutation = useMutation({
     mutationFn: (submitForReview: boolean) => apiRequest<EducatorOffering>("/api/educator-offerings", {
       method: "POST",
@@ -127,6 +153,25 @@ export default function ContributorDashboard() {
     onError: (error) => {
       toast({
         title: "Offering not saved",
+        description: error instanceof Error ? error.message : "Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const interestMutation = useMutation({
+    mutationFn: ({ id, status }: { id: number; status: string }) =>
+      apiRequest<OfferingInterest>(`/api/offering-interests/${id}`, {
+        method: "PATCH",
+        body: { status },
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/offering-interests/me"] });
+      toast({ title: "Interest updated", description: "The family request status has been saved." });
+    },
+    onError: (error) => {
+      toast({
+        title: "Interest update failed",
         description: error instanceof Error ? error.message : "Please try again.",
         variant: "destructive",
       });
@@ -449,6 +494,77 @@ export default function ContributorDashboard() {
           </CardContent>
         </Card>
       </div>
+
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle>Family Interest Queue</CardTitle>
+          <CardDescription>Requests from families browsing your approved educator offerings.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {interestsLoading ? (
+            <p className="py-8 text-center text-muted-foreground">Loading family requests...</p>
+          ) : interests.length === 0 ? (
+            <div className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
+              No family requests yet. Approved offerings will collect interest from public educator profiles.
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Family</TableHead>
+                  <TableHead>Offering</TableHead>
+                  <TableHead>Message</TableHead>
+                  <TableHead>Received</TableHead>
+                  <TableHead>Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {interests.map((interest) => (
+                  <TableRow key={interest.id}>
+                    <TableCell>
+                      <div className="font-medium">{interest.requesterName}</div>
+                      <a className="text-xs text-primary underline" href={`mailto:${interest.requesterEmail}`}>
+                        {interest.requesterEmail}
+                      </a>
+                      {interest.learnerAgeGroup && (
+                        <div className="text-xs text-muted-foreground">Learner: {interest.learnerAgeGroup}</div>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <div className="font-medium">{interest.offering?.title || "Offering removed"}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {interest.offering ? `${interest.offering.subject} | ${interest.offering.ageGroup}` : "No offering details"}
+                      </div>
+                    </TableCell>
+                    <TableCell className="max-w-sm text-sm text-muted-foreground">
+                      {interest.message || "No message included"}
+                    </TableCell>
+                    <TableCell>{formatDate(interest.createdAt)}</TableCell>
+                    <TableCell>
+                      <div className="flex flex-col gap-2">
+                        {statusBadge(interest.status)}
+                        <Select
+                          value={interest.status}
+                          onValueChange={(status) => interestMutation.mutate({ id: interest.id, status })}
+                        >
+                          <SelectTrigger className="w-[150px]">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {interestStatuses.map((status) => (
+                              <SelectItem key={status} value={status}>{status.replace("_", " ")}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

@@ -18,7 +18,7 @@ import {
   insertResourceSubmissionSchema,
   insertCurriculumCollectionSchema, insertCurriculumCollectionItemSchema,
   insertFeedbackSubmissionSchema, insertContentReportSchema,
-  insertEducatorOfferingSchema,
+  insertEducatorOfferingSchema, insertOfferingInterestSchema,
   insertCredentialDefinitionSchema, insertCredentialRequirementSchema,
   insertContributorProfileSchema,
   type CurriculumCollection,
@@ -1197,6 +1197,138 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(offering);
     } catch (error) {
       res.status(400).json({ message: "Failed to review educator offering" });
+    }
+  });
+
+  const enrichOfferingInterests = async (interests: Awaited<ReturnType<typeof storage.getOfferingInterests>>) => {
+    const offerings = await storage.getEducatorOfferings();
+    const profiles = await storage.getAllContributorProfiles();
+    const offeringById = new Map(offerings.map((offering) => [offering.id, offering]));
+    const profileById = new Map(profiles.map((profile) => [profile.id, profile]));
+
+    return interests.map((interest) => ({
+      ...interest,
+      offering: offeringById.get(interest.educatorOfferingId) || null,
+      contributorProfile: profileById.get(interest.contributorProfileId) || null,
+    }));
+  };
+
+  const allowedInterestStatuses = new Set(["new", "contacted", "waitlisted", "closed", "archived"]);
+
+  app.post("/api/offering-interests", express.json(), async (req, res) => {
+    try {
+      const offeringId = Number(req.body.educatorOfferingId);
+      if (!offeringId) {
+        return res.status(400).json({ message: "Offering is required" });
+      }
+
+      const offering = await storage.getEducatorOffering(offeringId);
+      if (!offering || offering.status !== "approved") {
+        return res.status(404).json({ message: "Approved offering not found" });
+      }
+
+      const requester = req.session.userId ? await storage.getUser(req.session.userId) : undefined;
+      const requesterName = String(req.body.requesterName || requester?.fullName || "").trim();
+      const requesterEmail = String(req.body.requesterEmail || requester?.email || "").trim().toLowerCase();
+
+      if (!requesterName || !requesterEmail) {
+        return res.status(400).json({ message: "Name and email are required" });
+      }
+
+      const interestData = insertOfferingInterestSchema.parse({
+        educatorOfferingId: offering.id,
+        contributorProfileId: offering.contributorProfileId,
+        requesterUserId: requester?.id || null,
+        requesterName,
+        requesterEmail,
+        learnerAgeGroup: req.body.learnerAgeGroup ? String(req.body.learnerAgeGroup).trim() : null,
+        message: req.body.message ? String(req.body.message).trim() : null,
+        status: "new",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+
+      const interest = await storage.createOfferingInterest(interestData);
+      res.status(201).json(interest);
+    } catch (error) {
+      res.status(400).json({ message: error instanceof Error ? error.message : "Invalid offering interest" });
+    }
+  });
+
+  app.get("/api/offering-interests/me", async (req, res) => {
+    try {
+      const sessionUserId = requireSessionUserId(req, res);
+      if (!sessionUserId) return;
+
+      const profile = await storage.getContributorProfileByUserId(sessionUserId);
+      if (!profile) return res.json([]);
+
+      const interests = await storage.getOfferingInterestsForContributor(profile.id);
+      res.json(await enrichOfferingInterests(interests));
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch offering interests" });
+    }
+  });
+
+  app.patch("/api/offering-interests/:id", express.json(), async (req, res) => {
+    try {
+      const sessionUserId = requireSessionUserId(req, res);
+      if (!sessionUserId) return;
+
+      const profile = await storage.getContributorProfileByUserId(sessionUserId);
+      if (!profile) {
+        return res.status(403).json({ message: "Educator profile required" });
+      }
+
+      const status = String(req.body.status || "");
+      if (!allowedInterestStatuses.has(status)) {
+        return res.status(400).json({ message: "Invalid interest status" });
+      }
+
+      const interestId = Number(req.params.id);
+      const existing = (await storage.getOfferingInterestsForContributor(profile.id))
+        .find((interest) => interest.id === interestId);
+      if (!existing) {
+        return res.status(404).json({ message: "Interest not found" });
+      }
+
+      const interest = await storage.updateOfferingInterest(interestId, {
+        status,
+        updatedAt: new Date(),
+      });
+      res.json(interest);
+    } catch (error) {
+      res.status(400).json({ message: "Failed to update offering interest" });
+    }
+  });
+
+  app.get("/api/admin/offering-interests", async (req, res) => {
+    try {
+      if (!(await requireAdminUser(req, res))) return;
+
+      const interests = await storage.getOfferingInterests();
+      res.json(await enrichOfferingInterests(interests));
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch offering interests" });
+    }
+  });
+
+  app.patch("/api/admin/offering-interests/:id", express.json(), async (req, res) => {
+    try {
+      if (!(await requireAdminUser(req, res))) return;
+
+      const status = String(req.body.status || "");
+      if (!allowedInterestStatuses.has(status)) {
+        return res.status(400).json({ message: "Invalid interest status" });
+      }
+
+      const interest = await storage.updateOfferingInterest(Number(req.params.id), {
+        status,
+        updatedAt: new Date(),
+      });
+      res.json(interest);
+    } catch (error) {
+      res.status(400).json({ message: "Failed to update offering interest" });
     }
   });
 

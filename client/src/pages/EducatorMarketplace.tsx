@@ -1,13 +1,16 @@
 import React from "react";
 import { Link, useLocation } from "wouter";
-import { ArrowLeft, ExternalLink, GraduationCap, Search, ShieldCheck, Video } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
+import { ArrowLeft, ExternalLink, GraduationCap, Mail, Search, ShieldCheck, Video } from "lucide-react";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
+import { Textarea } from "@/components/ui/textarea";
+import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 
 interface EducatorOffering {
@@ -59,9 +62,43 @@ const formatPrice = (offering: EducatorOffering) => {
 };
 
 function EducatorDetail({ educatorId }: { educatorId: number }) {
+  const { toast } = useToast();
+  const [selectedOfferingId, setSelectedOfferingId] = React.useState<number | null>(null);
+  const [interestForm, setInterestForm] = React.useState({
+    requesterName: "",
+    requesterEmail: "",
+    learnerAgeGroup: "",
+    message: "",
+  });
+
   const { data: educator, isLoading } = useQuery<EducatorProfile>({
     queryKey: [`/api/educators/${educatorId}`],
     queryFn: () => apiRequest<EducatorProfile>(`/api/educators/${educatorId}`),
+  });
+
+  const interestMutation = useMutation({
+    mutationFn: (educatorOfferingId: number) => apiRequest("/api/offering-interests", {
+      method: "POST",
+      body: {
+        educatorOfferingId,
+        ...interestForm,
+      },
+    }),
+    onSuccess: () => {
+      setSelectedOfferingId(null);
+      setInterestForm({ requesterName: "", requesterEmail: "", learnerAgeGroup: "", message: "" });
+      toast({
+        title: "Request sent",
+        description: "The educator can now follow up from their Real World Academy dashboard.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Request not sent",
+        description: error instanceof Error ? error.message : "Please try again.",
+        variant: "destructive",
+      });
+    },
   });
 
   if (isLoading) {
@@ -170,11 +207,23 @@ function EducatorDetail({ educatorId }: { educatorId: number }) {
                       <p className="mt-1 text-sm text-muted-foreground">{offering.description}</p>
                     </div>
                     {offering.sampleUrl && (
-                      <Button variant="outline" asChild>
-                        <a href={offering.sampleUrl} target="_blank" rel="noreferrer">
-                          <ExternalLink className="mr-2 h-4 w-4" />
-                          Sample
-                        </a>
+                      <div className="flex flex-wrap gap-2">
+                        <Button variant="outline" asChild>
+                          <a href={offering.sampleUrl} target="_blank" rel="noreferrer">
+                            <ExternalLink className="mr-2 h-4 w-4" />
+                            Sample
+                          </a>
+                        </Button>
+                        <Button onClick={() => setSelectedOfferingId(offering.id)}>
+                          <Mail className="mr-2 h-4 w-4" />
+                          Request Info
+                        </Button>
+                      </div>
+                    )}
+                    {!offering.sampleUrl && (
+                      <Button onClick={() => setSelectedOfferingId(offering.id)}>
+                        <Mail className="mr-2 h-4 w-4" />
+                        Request Info
                       </Button>
                     )}
                   </div>
@@ -190,6 +239,61 @@ function EducatorDetail({ educatorId }: { educatorId: number }) {
                         )}
                       </div>
                     </>
+                  )}
+                  {selectedOfferingId === offering.id && (
+                    <div className="mt-4 rounded-md border bg-slate-50 p-4">
+                      <div className="grid gap-3 md:grid-cols-2">
+                        <div className="space-y-2">
+                          <Label htmlFor={`requesterName-${offering.id}`}>Your Name</Label>
+                          <Input
+                            id={`requesterName-${offering.id}`}
+                            value={interestForm.requesterName}
+                            onChange={(event) => setInterestForm((current) => ({ ...current, requesterName: event.target.value }))}
+                            placeholder="Parent or learner name"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor={`requesterEmail-${offering.id}`}>Email</Label>
+                          <Input
+                            id={`requesterEmail-${offering.id}`}
+                            type="email"
+                            value={interestForm.requesterEmail}
+                            onChange={(event) => setInterestForm((current) => ({ ...current, requesterEmail: event.target.value }))}
+                            placeholder="you@example.com"
+                          />
+                        </div>
+                        <div className="space-y-2 md:col-span-2">
+                          <Label htmlFor={`learnerAge-${offering.id}`}>Learner Age Group</Label>
+                          <Input
+                            id={`learnerAge-${offering.id}`}
+                            value={interestForm.learnerAgeGroup}
+                            onChange={(event) => setInterestForm((current) => ({ ...current, learnerAgeGroup: event.target.value }))}
+                            placeholder="Example: 10-12, teen, adult"
+                          />
+                        </div>
+                        <div className="space-y-2 md:col-span-2">
+                          <Label htmlFor={`requestMessage-${offering.id}`}>Message</Label>
+                          <Textarea
+                            id={`requestMessage-${offering.id}`}
+                            className="min-h-[90px]"
+                            value={interestForm.message}
+                            onChange={(event) => setInterestForm((current) => ({ ...current, message: event.target.value }))}
+                            placeholder="Share what you are hoping to learn, timing needs, or questions."
+                          />
+                        </div>
+                      </div>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <Button
+                          onClick={() => interestMutation.mutate(offering.id)}
+                          disabled={interestMutation.isPending}
+                        >
+                          Send Request
+                        </Button>
+                        <Button variant="ghost" onClick={() => setSelectedOfferingId(null)}>
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
                   )}
                 </div>
               )) : (
@@ -401,4 +505,3 @@ export default function EducatorMarketplace() {
     </div>
   );
 }
-

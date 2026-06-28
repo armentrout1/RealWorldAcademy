@@ -155,6 +155,29 @@ interface EducatorOffering {
   } | null;
 }
 
+interface OfferingInterest {
+  id: number;
+  requesterName: string;
+  requesterEmail: string;
+  learnerAgeGroup?: string | null;
+  message?: string | null;
+  status: string;
+  createdAt?: string | null;
+  offering?: {
+    id: number;
+    title: string;
+    offeringType: string;
+    subject: string;
+    ageGroup: string;
+  } | null;
+  contributorProfile?: {
+    id: number;
+    displayName: string;
+    affiliation?: string | null;
+    trustLevel: string;
+  } | null;
+}
+
 interface ResourceSubmission {
   id: number;
   contributorName: string;
@@ -208,6 +231,7 @@ const resourceStatuses = ["approved", "changes_requested", "rejected", "archived
 const feedbackStatuses = ["new", "reviewing", "resolved", "archived"];
 const reportStatuses = ["new", "reviewing", "resolved", "archived"];
 const offeringReviewStatuses = ["approved", "changes_requested", "rejected", "archived"];
+const interestStatuses = ["new", "contacted", "waitlisted", "closed", "archived"];
 const roles = ["student", "parent", "admin"];
 const rubricCriteria = [
   ["safety", "Safety"],
@@ -261,6 +285,11 @@ export default function AdminLessons() {
   const { data: educatorOfferings = [], isLoading: offeringsLoading } = useQuery<EducatorOffering[]>({
     queryKey: ["/api/admin/educator-offerings"],
     queryFn: () => apiRequest<EducatorOffering[]>("/api/admin/educator-offerings"),
+  });
+
+  const { data: offeringInterests = [], isLoading: interestsLoading } = useQuery<OfferingInterest[]>({
+    queryKey: ["/api/admin/offering-interests"],
+    queryFn: () => apiRequest<OfferingInterest[]>("/api/admin/offering-interests"),
   });
 
   const { data: users = [], isLoading: usersLoading } = useQuery<AdminUser[]>({
@@ -422,6 +451,26 @@ export default function AdminLessons() {
     },
   });
 
+  const interestMutation = useMutation({
+    mutationFn: ({ id, status }: { id: number; status: string }) =>
+      apiRequest<OfferingInterest>(`/api/admin/offering-interests/${id}`, {
+        method: "PATCH",
+        body: { status },
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/offering-interests"] });
+      toast({ title: "Interest updated", description: "The marketplace interest status has been saved." });
+    },
+    onError: (error) => {
+      toast({
+        title: "Interest update failed",
+        description: error instanceof Error ? error.message : "Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+
   const roleMutation = useMutation({
     mutationFn: ({ userId, role }: { userId: number; role: string }) =>
       apiRequest<AdminUser>(`/api/admin/users/${userId}/role`, {
@@ -511,6 +560,22 @@ export default function AdminLessons() {
       .includes(searchQuery.toLowerCase())
   );
 
+  const filteredInterests = offeringInterests.filter((interest) =>
+    [
+      interest.requesterName,
+      interest.requesterEmail,
+      interest.learnerAgeGroup,
+      interest.message,
+      interest.status,
+      interest.offering?.title,
+      interest.offering?.subject,
+      interest.contributorProfile?.displayName,
+    ]
+      .join(" ")
+      .toLowerCase()
+      .includes(searchQuery.toLowerCase())
+  );
+
   const filteredUsers = users.filter((user) =>
     [user.fullName, user.email, user.role, user.ageGroup]
       .join(" ")
@@ -590,6 +655,7 @@ export default function AdminLessons() {
     collections: collections.filter((collection) => collection.status === "pending_review").length,
     resources: resourceSubmissions.filter((resource) => resource.status === "pending_review").length,
     offerings: educatorOfferings.filter((offering) => offering.status === "pending_review").length,
+    interests: offeringInterests.filter((interest) => ["new", "waitlisted"].includes(interest.status)).length,
     feedback: feedback.filter((item) => item.status === "new" || item.status === "reviewing").length,
     reports: contentReports.filter((item) => item.status === "new" || item.status === "reviewing").length,
     users: users.length,
@@ -654,7 +720,7 @@ export default function AdminLessons() {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold">{counts.offerings}</div>
-            <p className="text-sm text-muted-foreground">pending offerings</p>
+            <p className="text-sm text-muted-foreground">{counts.interests} family interests</p>
           </CardContent>
         </Card>
         <Card>
@@ -884,7 +950,7 @@ export default function AdminLessons() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="offerings">
+        <TabsContent value="offerings" className="space-y-6">
           <Card>
             <CardHeader>
               <CardTitle>Educator Offering Review Queue</CardTitle>
@@ -948,6 +1014,82 @@ export default function AdminLessons() {
                           ) : statusBadge(offering.status)}
                         </TableCell>
                         <TableCell>{formatDate(offering.submittedAt)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Marketplace Interest Queue</CardTitle>
+              <CardDescription>Monitor family requests before enrollment and payments are automated.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {interestsLoading ? (
+                <p className="py-8 text-center text-muted-foreground">Loading offering interests...</p>
+              ) : filteredInterests.length === 0 ? (
+                <div className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
+                  No family interest requests match the current search.
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Family</TableHead>
+                      <TableHead>Offering</TableHead>
+                      <TableHead>Educator</TableHead>
+                      <TableHead>Message</TableHead>
+                      <TableHead>Received</TableHead>
+                      <TableHead>Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredInterests.map((interest) => (
+                      <TableRow key={interest.id}>
+                        <TableCell>
+                          <div className="font-medium">{interest.requesterName}</div>
+                          <a className="text-xs text-primary underline" href={`mailto:${interest.requesterEmail}`}>
+                            {interest.requesterEmail}
+                          </a>
+                          {interest.learnerAgeGroup && (
+                            <div className="text-xs text-muted-foreground">Learner: {interest.learnerAgeGroup}</div>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <div className="font-medium">{interest.offering?.title || "Offering unavailable"}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {interest.offering ? `${interest.offering.subject} | ${interest.offering.ageGroup}` : "No offering details"}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="font-medium">{interest.contributorProfile?.displayName || "Unknown educator"}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {interest.contributorProfile?.trustLevel || "No trust level"}
+                          </div>
+                        </TableCell>
+                        <TableCell className="max-w-sm text-sm text-muted-foreground">
+                          {interest.message || "No message included"}
+                        </TableCell>
+                        <TableCell>{formatDate(interest.createdAt)}</TableCell>
+                        <TableCell>
+                          <Select
+                            value={interest.status}
+                            onValueChange={(status) => interestMutation.mutate({ id: interest.id, status })}
+                            disabled={interestMutation.isPending}
+                          >
+                            <SelectTrigger className="w-[150px]">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {interestStatuses.map((status) => (
+                                <SelectItem key={status} value={status}>{status.replace("_", " ")}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>

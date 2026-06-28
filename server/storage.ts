@@ -27,6 +27,7 @@ import {
   parentLessonReviews, type ParentLessonReview, type InsertParentLessonReview,
   contributorProfiles, type ContributorProfile, type InsertContributorProfile,
   educatorOfferings, type EducatorOffering, type InsertEducatorOffering,
+  offeringInterests, type OfferingInterest, type InsertOfferingInterest,
   curriculumSubmissions, type CurriculumSubmission, type InsertCurriculumSubmission,
   resourceSubmissions, type ResourceSubmission, type InsertResourceSubmission,
   curriculumCollections, type CurriculumCollection, type InsertCurriculumCollection,
@@ -86,9 +87,15 @@ export interface IStorage {
   getContributorProfileByUserId(userId: number): Promise<ContributorProfile | undefined>;
   upsertContributorProfile(profile: InsertContributorProfile): Promise<ContributorProfile>;
   getEducatorOfferings(status?: string): Promise<EducatorOffering[]>;
+  getEducatorOffering(id: number): Promise<EducatorOffering | undefined>;
   getEducatorOfferingsForContributor(contributorProfileId: number): Promise<EducatorOffering[]>;
   createEducatorOffering(offering: InsertEducatorOffering): Promise<EducatorOffering>;
   updateEducatorOffering(id: number, updates: Partial<EducatorOffering>): Promise<EducatorOffering>;
+  getOfferingInterests(): Promise<OfferingInterest[]>;
+  getOfferingInterestsForContributor(contributorProfileId: number): Promise<OfferingInterest[]>;
+  getOfferingInterestsForOffering(educatorOfferingId: number): Promise<OfferingInterest[]>;
+  createOfferingInterest(interest: InsertOfferingInterest): Promise<OfferingInterest>;
+  updateOfferingInterest(id: number, updates: Partial<OfferingInterest>): Promise<OfferingInterest>;
   getFeedbackSubmissions(): Promise<FeedbackSubmission[]>;
   createFeedbackSubmission(submission: InsertFeedbackSubmission): Promise<FeedbackSubmission>;
   updateFeedbackSubmission(id: number, updates: Partial<FeedbackSubmission>): Promise<FeedbackSubmission>;
@@ -557,6 +564,12 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(educatorOfferings);
   }
 
+  async getEducatorOffering(id: number): Promise<EducatorOffering | undefined> {
+    const results = await db.select().from(educatorOfferings)
+      .where(eq(educatorOfferings.id, id));
+    return results[0];
+  }
+
   async getEducatorOfferingsForContributor(contributorProfileId: number): Promise<EducatorOffering[]> {
     return await db.select().from(educatorOfferings)
       .where(eq(educatorOfferings.contributorProfileId, contributorProfileId));
@@ -571,6 +584,33 @@ export class DatabaseStorage implements IStorage {
     const results = await db.update(educatorOfferings)
       .set(updates)
       .where(eq(educatorOfferings.id, id))
+      .returning();
+    return results[0];
+  }
+
+  async getOfferingInterests(): Promise<OfferingInterest[]> {
+    return await db.select().from(offeringInterests);
+  }
+
+  async getOfferingInterestsForContributor(contributorProfileId: number): Promise<OfferingInterest[]> {
+    return await db.select().from(offeringInterests)
+      .where(eq(offeringInterests.contributorProfileId, contributorProfileId));
+  }
+
+  async getOfferingInterestsForOffering(educatorOfferingId: number): Promise<OfferingInterest[]> {
+    return await db.select().from(offeringInterests)
+      .where(eq(offeringInterests.educatorOfferingId, educatorOfferingId));
+  }
+
+  async createOfferingInterest(interest: InsertOfferingInterest): Promise<OfferingInterest> {
+    const results = await db.insert(offeringInterests).values(interest).returning();
+    return results[0];
+  }
+
+  async updateOfferingInterest(id: number, updates: Partial<OfferingInterest>): Promise<OfferingInterest> {
+    const results = await db.update(offeringInterests)
+      .set(updates)
+      .where(eq(offeringInterests.id, id))
       .returning();
     return results[0];
   }

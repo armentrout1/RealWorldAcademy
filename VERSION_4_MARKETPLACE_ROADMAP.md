@@ -122,7 +122,7 @@ Current build status:
 - `green`: `/educators` marketplace browse page exists.
 - `green`: families can search and filter educators by subject, age group, and future offering format.
 - `green`: `/educators/:id` detail pages show approved offerings and trust notes.
-- `yellow`: offering interest/inquiry buttons still need to be built.
+- `green`: families can send interest/inquiry requests from approved offerings before payments are enabled.
 
 ### Phase 4: Scheduling and Enrollment Foundation
 
@@ -142,6 +142,14 @@ Exit criteria:
 - Educators can manage class interest or early enrollments.
 - Families can express interest or reserve a seat.
 - Admins can oversee activity.
+
+Current build status:
+
+- `green`: `offering_interests` schema exists for pre-payment family inquiries.
+- `green`: public educator offerings can collect family interest requests.
+- `green`: educator dashboard includes a family interest queue with follow-up statuses.
+- `green`: admin management includes marketplace interest oversight.
+- `yellow`: class sessions, seat reservations, and meeting-link review still need the dedicated scheduling model.
 
 ### Phase 5: Payments and Platform Fee
 
