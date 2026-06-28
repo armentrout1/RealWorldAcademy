@@ -42,7 +42,7 @@ import {
   issuedCredentials, type IssuedCredential, type InsertIssuedCredential
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, sql, and, inArray } from "drizzle-orm";
+import { eq, sql, and, inArray, or } from "drizzle-orm";
 
 export interface IStorage {
   // User operations
@@ -102,6 +102,7 @@ export interface IStorage {
   adjustOfferingSessionReservedSeats(id: number, delta: number): Promise<OfferingSession>;
   getOfferingEnrollments(status?: string): Promise<OfferingEnrollment[]>;
   getOfferingEnrollmentsForContributor(contributorProfileId: number): Promise<OfferingEnrollment[]>;
+  getOfferingEnrollmentsForRequester(userId: number, email: string): Promise<OfferingEnrollment[]>;
   getOfferingEnrollmentsForSession(offeringSessionId: number): Promise<OfferingEnrollment[]>;
   createOfferingEnrollment(enrollment: InsertOfferingEnrollment): Promise<OfferingEnrollment>;
   updateOfferingEnrollment(id: number, updates: Partial<OfferingEnrollment>): Promise<OfferingEnrollment>;
@@ -661,6 +662,14 @@ export class DatabaseStorage implements IStorage {
   async getOfferingEnrollmentsForContributor(contributorProfileId: number): Promise<OfferingEnrollment[]> {
     return await db.select().from(offeringEnrollments)
       .where(eq(offeringEnrollments.contributorProfileId, contributorProfileId));
+  }
+
+  async getOfferingEnrollmentsForRequester(userId: number, email: string): Promise<OfferingEnrollment[]> {
+    return await db.select().from(offeringEnrollments)
+      .where(or(
+        eq(offeringEnrollments.requesterUserId, userId),
+        eq(offeringEnrollments.requesterEmail, email.trim().toLowerCase()),
+      ));
   }
 
   async getOfferingEnrollmentsForSession(offeringSessionId: number): Promise<OfferingEnrollment[]> {

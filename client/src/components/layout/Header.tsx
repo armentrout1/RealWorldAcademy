@@ -10,6 +10,7 @@ import {
   Home,
   UserCircle,
   BookOpen,
+  CalendarClock,
   BarChart as ChartBarIcon,
   Settings as SettingsIcon
 } from "lucide-react";
@@ -95,6 +96,12 @@ const Header: React.FC = () => {
                     <Link href="/educators" className="flex w-full items-center">
                       <GraduationCapIcon className="mr-2 h-4 w-4" />
                       <span>Educator Marketplace</span>
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem>
+                    <Link href="/my-classes" className="flex w-full items-center">
+                      <CalendarClock className="mr-2 h-4 w-4" />
+                      <span>My Classes</span>
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem>

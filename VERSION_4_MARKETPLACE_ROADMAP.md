@@ -156,7 +156,9 @@ Current build status:
 - `green`: `offering_enrollments` schema exists for requested, reserved, waitlisted, cancelled, completed, and archived seat states.
 - `green`: specific session seat requests create enrollment records and can be managed by educators or admins.
 - `green`: moving enrollments into or out of reserved/completed status updates session reserved seat counts.
-- `yellow`: calendar integrations, family-facing enrollment dashboards, and payment-backed enrollment still need future passes.
+- `green`: families can view requested, reserved, waitlisted, and completed session enrollments from `/my-classes`.
+- `green`: learner dashboard and navigation now link into family class tracking.
+- `yellow`: calendar integrations and payment-backed enrollment still need future passes.
 
 ### Phase 5: Payments and Platform Fee
 

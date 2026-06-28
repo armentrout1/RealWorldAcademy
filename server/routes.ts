@@ -1443,6 +1443,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/my-offering-enrollments", async (req, res) => {
+    try {
+      const sessionUserId = requireSessionUserId(req, res);
+      if (!sessionUserId) return;
+
+      const user = await storage.getUser(sessionUserId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const enrollments = await storage.getOfferingEnrollmentsForRequester(user.id, user.email);
+      res.json(await enrichOfferingEnrollments(enrollments));
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch your class enrollments" });
+    }
+  });
+
   app.patch("/api/offering-enrollments/:id", express.json(), async (req, res) => {
     try {
       const sessionUserId = requireSessionUserId(req, res);

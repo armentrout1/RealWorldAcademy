@@ -12,7 +12,8 @@ import {
   Award,
   Clock,
   Bot,
-  MessageCircle
+  MessageCircle,
+  CalendarClock
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
@@ -58,6 +59,11 @@ interface IssuedCredential {
   status: string;
 }
 
+interface OfferingEnrollment {
+  id: number;
+  status: string;
+}
+
 const Dashboard: React.FC = () => {
   const [quote, setQuote] = useState<string>("");
   const { user, isAuthenticated } = useAuth();
@@ -71,6 +77,12 @@ const Dashboard: React.FC = () => {
   const { data: issuedCredentials = [] } = useQuery<IssuedCredential[]>({
     queryKey: ["/api/users", user?.id, "credentials"],
     queryFn: () => apiRequest<IssuedCredential[]>(`/api/users/${user!.id}/credentials`),
+    enabled: Boolean(user?.id),
+  });
+
+  const { data: classEnrollments = [] } = useQuery<OfferingEnrollment[]>({
+    queryKey: ["/api/my-offering-enrollments"],
+    queryFn: () => apiRequest<OfferingEnrollment[]>("/api/my-offering-enrollments"),
     enabled: Boolean(user?.id),
   });
 
@@ -104,7 +116,7 @@ const Dashboard: React.FC = () => {
       
       {/* User Progress Summary - Only show when logged in */}
       {isAuthenticated && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-10">
           <Card className="shadow-sm">
             <CardHeader className="pb-2">
               <CardTitle className="text-base font-medium flex items-center gap-2">
@@ -158,6 +170,26 @@ const Dashboard: React.FC = () => {
                   <span>Status</span>
                   <span className="font-medium">{issuedCredentials.length > 0 ? "Portfolio ready" : "Keep learning"}</span>
                 </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="shadow-sm">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base font-medium flex items-center gap-2">
+                <CalendarClock className="h-4 w-4 text-primary" />
+                Classes
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span>Marketplace sessions</span>
+                  <span className="font-medium">{classEnrollments.length}</span>
+                </div>
+                <Button asChild variant="outline" size="sm" className="w-full">
+                  <Link href="/my-classes">View Classes</Link>
+                </Button>
               </div>
             </CardContent>
           </Card>
