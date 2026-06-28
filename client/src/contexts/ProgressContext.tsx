@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
 import { z } from 'zod';
+import { useAuth } from '@/contexts/AuthContext';
 
 // Define our progress types and response schemas
 export interface Badge {
@@ -197,20 +198,20 @@ interface ProgressContextType {
 
 const ProgressContext = createContext<ProgressContextType | undefined>(undefined);
 
-// Default user ID for demonstration - in a real app, this would come from authentication
-const CURRENT_USER_ID = 1;
-
 // Provider component
 export const ProgressProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const userId = user?.id;
   const [progress, setProgress] = useState<UserProgress>(initialProgress);
   
   // Fetch badges from API
   const badgesQuery = useQuery<Badge[]>({
-    queryKey: ['/api/users', CURRENT_USER_ID, 'badges'],
+    queryKey: ['/api/users', userId, 'badges'],
     queryFn: async () => {
+      if (!userId) return initialProgress.badges;
       try {
-        const data = await apiRequest<BadgesResponse>(`/api/users/${CURRENT_USER_ID}/badges`);
+        const data = await apiRequest<BadgesResponse>(`/api/users/${userId}/badges`);
         return data || [];
       } catch (error) {
         console.error('Failed to fetch badges:', error);
@@ -218,14 +219,16 @@ export const ProgressProvider: React.FC<{ children: ReactNode }> = ({ children }
       }
     },
     initialData: initialProgress.badges,
+    enabled: Boolean(userId),
   });
 
   // Fetch category progress from API
   const categoryProgressQuery = useQuery<CategoryProgress[]>({
-    queryKey: ['/api/users', CURRENT_USER_ID, 'category-progress'],
+    queryKey: ['/api/users', userId, 'category-progress'],
     queryFn: async () => {
+      if (!userId) return initialProgress.categories;
       try {
-        const data = await apiRequest<CategoryProgressResponse>(`/api/users/${CURRENT_USER_ID}/category-progress`);
+        const data = await apiRequest<CategoryProgressResponse>(`/api/users/${userId}/category-progress`);
         // Calculate percentage for each category if it's not already included
         return data?.map(category => ({
           ...category,
@@ -237,14 +240,16 @@ export const ProgressProvider: React.FC<{ children: ReactNode }> = ({ children }
       }
     },
     initialData: initialProgress.categories,
+    enabled: Boolean(userId),
   });
 
   // Fetch timeline events from API
   const timelineQuery = useQuery<TimelineEvent[]>({
-    queryKey: ['/api/users', CURRENT_USER_ID, 'timeline'],
+    queryKey: ['/api/users', userId, 'timeline'],
     queryFn: async () => {
+      if (!userId) return initialProgress.timeline;
       try {
-        const data = await apiRequest<TimelineEventsResponse>(`/api/users/${CURRENT_USER_ID}/timeline`);
+        const data = await apiRequest<TimelineEventsResponse>(`/api/users/${userId}/timeline`);
         return data || [];
       } catch (error) {
         console.error('Failed to fetch timeline events:', error);
@@ -252,14 +257,16 @@ export const ProgressProvider: React.FC<{ children: ReactNode }> = ({ children }
       }
     },
     initialData: initialProgress.timeline,
+    enabled: Boolean(userId),
   });
 
   // Fetch overall progress from API
   const overallProgressQuery = useQuery<number>({
-    queryKey: ['/api/users', CURRENT_USER_ID, 'progress-summary'],
+    queryKey: ['/api/users', userId, 'progress-summary'],
     queryFn: async () => {
+      if (!userId) return initialProgress.overallProgress;
       try {
-        const data = await apiRequest<ProgressSummaryResponse>(`/api/users/${CURRENT_USER_ID}/progress-summary`);
+        const data = await apiRequest<ProgressSummaryResponse>(`/api/users/${userId}/progress-summary`);
         return data?.overallProgress || 0;
       } catch (error) {
         console.error('Failed to fetch overall progress:', error);
@@ -267,6 +274,7 @@ export const ProgressProvider: React.FC<{ children: ReactNode }> = ({ children }
       }
     },
     initialData: initialProgress.overallProgress,
+    enabled: Boolean(userId),
   });
 
   // Combine all the data into a single progress object
@@ -286,7 +294,7 @@ export const ProgressProvider: React.FC<{ children: ReactNode }> = ({ children }
 
   // Calculate overall progress whenever any category changes and update it
   useEffect(() => {
-    if (categoryProgressQuery.data?.length) {
+    if (userId && categoryProgressQuery.data?.length) {
       const totalCompleted = categoryProgressQuery.data.reduce((sum: number, category: CategoryProgress) => sum + category.completed, 0);
       const totalItems = categoryProgressQuery.data.reduce((sum: number, category: CategoryProgress) => sum + category.total, 0);
       const overallProgress = totalItems > 0 ? Math.round((totalCompleted / totalItems) * 100) : 0;
@@ -296,65 +304,69 @@ export const ProgressProvider: React.FC<{ children: ReactNode }> = ({ children }
         updateOverallProgressMutation.mutate({ overallProgress });
       }
     }
-  }, [categoryProgressQuery.data]);
+  }, [categoryProgressQuery.data, overallProgressQuery.data, userId]);
 
   // Category progress mutation
   const updateCategoryProgressMutation = useMutation({
     mutationFn: async ({ id, completed, total }: { id: number, completed: number, total: number }) => {
+      if (!userId) return null;
       return apiRequest({
-        url: `/api/users/${CURRENT_USER_ID}/category-progress/${id}`,
+        url: `/api/users/${userId}/category-progress/${id}`,
         method: 'PATCH',
         body: { completed, total },
       });
     },
     onSuccess: () => {
       // Invalidate the category progress cache
-      queryClient.invalidateQueries({ queryKey: ['/api/users', CURRENT_USER_ID, 'category-progress'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/users', userId, 'category-progress'] });
     },
   });
 
   // Badge mutation
   const updateBadgeMutation = useMutation({
     mutationFn: async ({ id, unlocked }: { id: number, unlocked: boolean }) => {
+      if (!userId) return null;
       return apiRequest({
-        url: `/api/users/${CURRENT_USER_ID}/badges/${id}`,
+        url: `/api/users/${userId}/badges/${id}`,
         method: 'PATCH',
         body: { unlocked },
       });
     },
     onSuccess: () => {
       // Invalidate the badges cache
-      queryClient.invalidateQueries({ queryKey: ['/api/users', CURRENT_USER_ID, 'badges'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/users', userId, 'badges'] });
     },
   });
 
   // Timeline event mutation
   const addTimelineEventMutation = useMutation({
     mutationFn: async (event: Omit<TimelineEvent, 'id'>) => {
+      if (!userId) return null;
       return apiRequest({
-        url: `/api/users/${CURRENT_USER_ID}/timeline`,
+        url: `/api/users/${userId}/timeline`,
         method: 'POST',
         body: event,
       });
     },
     onSuccess: () => {
       // Invalidate the timeline cache
-      queryClient.invalidateQueries({ queryKey: ['/api/users', CURRENT_USER_ID, 'timeline'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/users', userId, 'timeline'] });
     },
   });
 
   // Overall progress mutation
   const updateOverallProgressMutation = useMutation({
     mutationFn: async ({ overallProgress }: { overallProgress: number }) => {
+      if (!userId) return null;
       return apiRequest({
-        url: `/api/users/${CURRENT_USER_ID}/progress-summary`,
+        url: `/api/users/${userId}/progress-summary`,
         method: 'PATCH',
         body: { overallProgress },
       });
     },
     onSuccess: () => {
       // Invalidate the progress summary cache
-      queryClient.invalidateQueries({ queryKey: ['/api/users', CURRENT_USER_ID, 'progress-summary'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/users', userId, 'progress-summary'] });
     },
   });
 

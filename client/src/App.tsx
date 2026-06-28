@@ -7,7 +7,6 @@ import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { ProgressProvider } from "@/contexts/ProgressContext";
 import { AuthProvider } from "@/contexts/AuthContext";
-import { Buddy } from "@/components/ai/Buddy";
 
 // Import pages
 import Home from "@/pages/Home";
@@ -33,8 +32,20 @@ import Journal from "@/pages/Journal";
 import LessonTemplate from "@/pages/LessonTemplate";
 import NotFound from "@/pages/not-found";
 import ContributeLesson from "@/pages/ContributeLesson";
+import ContributeResource from "@/pages/ContributeResource";
+import CollectionLibrary from "@/pages/CollectionLibrary";
+import CurriculumCollections from "@/pages/CurriculumCollections";
+import ContributorDashboard from "@/pages/ContributorDashboard";
+import ContributorProfile from "@/pages/ContributorProfile";
 import AdminLessons from "@/pages/AdminLessons";
 import LessonLibrary from "@/pages/LessonLibrary";
+import Credentials from "@/pages/Credentials";
+import CredentialVerification from "@/pages/CredentialVerification";
+import Portfolio from "@/pages/Portfolio";
+import LegalInfo from "@/pages/LegalInfo";
+import Feedback from "@/pages/Feedback";
+import EducatorMarketplace from "@/pages/EducatorMarketplace";
+import MyClasses from "@/pages/MyClasses";
 
 // Page transition variants
 const pageVariants = {
@@ -111,6 +122,11 @@ function Router() {
             <Route path="/learn">
               <PageWrapper>
                 <Learn />
+              </PageWrapper>
+            </Route>
+            <Route path="/learn/:subject/:lesson">
+              <PageWrapper>
+                <LessonTemplate />
               </PageWrapper>
             </Route>
             <Route path="/learn/:subject">
@@ -203,6 +219,56 @@ function Router() {
                 <ResourceCenter />
               </PageWrapper>
             </Route>
+            <Route path="/educators">
+              <PageWrapper>
+                <EducatorMarketplace />
+              </PageWrapper>
+            </Route>
+            <Route path="/educators/:id">
+              <PageWrapper>
+                <EducatorMarketplace />
+              </PageWrapper>
+            </Route>
+            <Route path="/my-classes">
+              <PageWrapper>
+                <MyClasses />
+              </PageWrapper>
+            </Route>
+            <Route path="/credentials">
+              <PageWrapper>
+                <Credentials />
+              </PageWrapper>
+            </Route>
+            <Route path="/verify/:shareCode">
+              <PageWrapper>
+                <CredentialVerification />
+              </PageWrapper>
+            </Route>
+            <Route path="/portfolio">
+              <PageWrapper>
+                <Portfolio />
+              </PageWrapper>
+            </Route>
+            <Route path="/privacy">
+              <PageWrapper>
+                <LegalInfo />
+              </PageWrapper>
+            </Route>
+            <Route path="/terms">
+              <PageWrapper>
+                <LegalInfo />
+              </PageWrapper>
+            </Route>
+            <Route path="/safety">
+              <PageWrapper>
+                <LegalInfo />
+              </PageWrapper>
+            </Route>
+            <Route path="/feedback">
+              <PageWrapper>
+                <Feedback />
+              </PageWrapper>
+            </Route>
             <Route path="/community">
               <PageWrapper>
                 <Community />
@@ -223,6 +289,26 @@ function Router() {
                 <ContributeLesson />
               </PageWrapper>
             </Route>
+            <Route path="/contribute-resource">
+              <PageWrapper>
+                <ContributeResource />
+              </PageWrapper>
+            </Route>
+            <Route path="/curriculum-collections">
+              <PageWrapper>
+                <CurriculumCollections />
+              </PageWrapper>
+            </Route>
+            <Route path="/contributor-profile">
+              <PageWrapper>
+                <ContributorProfile />
+              </PageWrapper>
+            </Route>
+            <Route path="/contributor-dashboard">
+              <PageWrapper>
+                <ContributorDashboard />
+              </PageWrapper>
+            </Route>
             <Route path="/admin/lessons">
               <PageWrapper>
                 <AdminLessons />
@@ -231,6 +317,16 @@ function Router() {
             <Route path="/library">
               <PageWrapper>
                 <LessonLibrary />
+              </PageWrapper>
+            </Route>
+            <Route path="/collections">
+              <PageWrapper>
+                <CollectionLibrary />
+              </PageWrapper>
+            </Route>
+            <Route path="/collections/:id">
+              <PageWrapper>
+                <CollectionLibrary />
               </PageWrapper>
             </Route>
             <Route>
@@ -251,7 +347,6 @@ function App() {
       <AuthProvider>
         <ProgressProvider>
           <Router />
-          <Buddy />
           <Toaster />
         </ProgressProvider>
       </AuthProvider>

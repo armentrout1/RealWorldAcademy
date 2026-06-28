@@ -3,6 +3,24 @@ import { Link, useLocation } from "wouter";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Menu, BellIcon } from "lucide-react";
 
+const primaryNavItems = [
+  { href: "/", label: "Home" },
+  { href: "/dashboard", label: "Dashboard" },
+  { href: "/learn", label: "Pathways" },
+  { href: "/library", label: "Lessons" },
+  { href: "/collections", label: "Collections" },
+  { href: "/my-classes", label: "My Classes" },
+  { href: "/credentials", label: "Credentials" },
+  { href: "/portfolio", label: "Portfolio" },
+  { href: "/resource-center", label: "Resources" },
+  { href: "/parent-dashboard", label: "Parent Dashboard" },
+  { href: "/contribute", label: "Contribute" },
+  { href: "/contribute-resource", label: "Submit Resource" },
+  { href: "/curriculum-collections", label: "Build Collections" },
+  { href: "/contributor-dashboard", label: "Creator Dashboard" },
+  { href: "/contributor-profile", label: "Creator Profile" },
+];
+
 const Navigation: React.FC = () => {
   const [location] = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -18,90 +36,14 @@ const Navigation: React.FC = () => {
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-1 overflow-x-auto py-1">
-            <Link href="/" className={`px-4 py-3 font-medium ${isActive('/') 
-              ? 'text-primary border-b-2 border-primary' 
-              : 'text-neutral-600 hover:text-primary border-b-2 border-transparent hover:border-primary'
-            } transition-all duration-200`}>
-              Home
-            </Link>
-            <Link href="/dashboard" className={`px-4 py-3 font-medium ${isActive('/dashboard') 
-              ? 'text-primary border-b-2 border-primary' 
-              : 'text-neutral-600 hover:text-primary border-b-2 border-transparent hover:border-primary'
-            } transition-all duration-200`}>
-              Dashboard
-            </Link>
-            <Link href="/learn" className={`px-4 py-3 font-medium ${isActive('/learn') 
-              ? 'text-primary border-b-2 border-primary' 
-              : 'text-neutral-600 hover:text-primary border-b-2 border-transparent hover:border-primary'
-            } transition-all duration-200`}>
-              Learn
-            </Link>
-            <Link href="/library" className={`px-4 py-3 font-medium ${isActive('/library') 
-              ? 'text-primary border-b-2 border-primary' 
-              : 'text-neutral-600 hover:text-primary border-b-2 border-transparent hover:border-primary'
-            } transition-all duration-200`}>
-              Lesson Library
-            </Link>
-            <Link href="/self-discovery" className={`px-4 py-3 font-medium ${isActive('/self-discovery') 
-              ? 'text-primary border-b-2 border-primary' 
-              : 'text-neutral-600 hover:text-primary border-b-2 border-transparent hover:border-primary'
-            } transition-all duration-200`}>
-              Self Discovery
-            </Link>
-            <Link href="/projects" className={`px-4 py-3 font-medium ${isActive('/projects') 
-              ? 'text-primary border-b-2 border-primary' 
-              : 'text-neutral-600 hover:text-primary border-b-2 border-transparent hover:border-primary'
-            } transition-all duration-200`}>
-              Projects
-            </Link>
-            <Link href="/team-projects" className={`px-4 py-3 font-medium ${isActive('/team-projects') 
-              ? 'text-primary border-b-2 border-primary' 
-              : 'text-neutral-600 hover:text-primary border-b-2 border-transparent hover:border-primary'
-            } transition-all duration-200`}>
-              Team Projects
-            </Link>
-            <Link href="/financial-literacy" className={`px-4 py-3 font-medium ${isActive('/financial-literacy') 
-              ? 'text-primary border-b-2 border-primary' 
-              : 'text-neutral-600 hover:text-primary border-b-2 border-transparent hover:border-primary'
-            } transition-all duration-200`}>
-              Financial Literacy
-            </Link>
-            <Link href="/how-we-learn" className={`px-4 py-3 font-medium ${isActive('/how-we-learn') 
-              ? 'text-primary border-b-2 border-primary' 
-              : 'text-neutral-600 hover:text-primary border-b-2 border-transparent hover:border-primary'
-            } transition-all duration-200`}>
-              How We Learn
-            </Link>
-            <Link href="/plan-your-future" className={`px-4 py-3 font-medium ${isActive('/plan-your-future') 
-              ? 'text-primary border-b-2 border-primary' 
-              : 'text-neutral-600 hover:text-primary border-b-2 border-transparent hover:border-primary'
-            } transition-all duration-200`}>
-              Plan Your Future
-            </Link>
-            <Link href="/resource-center" className={`px-4 py-3 font-medium ${isActive('/resource-center') 
-              ? 'text-primary border-b-2 border-primary' 
-              : 'text-neutral-600 hover:text-primary border-b-2 border-transparent hover:border-primary'
-            } transition-all duration-200`}>
-              Resource Center
-            </Link>
-            <Link href="/community" className={`px-4 py-3 font-medium ${isActive('/community') 
-              ? 'text-primary border-b-2 border-primary' 
-              : 'text-neutral-600 hover:text-primary border-b-2 border-transparent hover:border-primary'
-            } transition-all duration-200`}>
-              Community
-            </Link>
-            <Link href="/journal" className={`px-4 py-3 font-medium ${isActive('/journal') 
-              ? 'text-primary border-b-2 border-primary' 
-              : 'text-neutral-600 hover:text-primary border-b-2 border-transparent hover:border-primary'
-            } transition-all duration-200`}>
-              Journal
-            </Link>
-            <Link href="/about" className={`px-4 py-3 font-medium ${isActive('/about') 
-              ? 'text-primary border-b-2 border-primary' 
-              : 'text-neutral-600 hover:text-primary border-b-2 border-transparent hover:border-primary'
-            } transition-all duration-200`}>
-              About
-            </Link>
+            {primaryNavItems.map((item) => (
+              <Link key={item.href} href={item.href} className={`px-4 py-3 font-medium whitespace-nowrap ${isActive(item.href)
+                ? 'text-primary border-b-2 border-primary'
+                : 'text-neutral-600 hover:text-primary border-b-2 border-transparent hover:border-primary'
+              } transition-all duration-200`}>
+                {item.label}
+              </Link>
+            ))}
           </div>
           <div className="md:hidden">
             <button 
@@ -117,90 +59,14 @@ const Navigation: React.FC = () => {
       {/* Mobile menu */}
       <div className={`md:hidden ${mobileMenuOpen ? '' : 'hidden'} bg-white border-b border-neutral-100 pb-2 shadow-md`}>
         <div className="container mx-auto px-4 py-2 space-y-2">
-          <Link href="/" className={`block px-4 py-2 font-medium rounded-md ${isActive('/') 
-            ? 'text-primary bg-blue-50' 
-            : 'text-neutral-600 hover:text-primary hover:bg-blue-50'
-          } transition-colors duration-200`}>
-            Home
-          </Link>
-          <Link href="/dashboard" className={`block px-4 py-2 font-medium rounded-md ${isActive('/dashboard') 
-            ? 'text-primary bg-blue-50' 
-            : 'text-neutral-600 hover:text-primary hover:bg-blue-50'
-          } transition-colors duration-200`}>
-            Dashboard
-          </Link>
-          <Link href="/learn" className={`block px-4 py-2 font-medium rounded-md ${isActive('/learn') 
-            ? 'text-primary bg-blue-50' 
-            : 'text-neutral-600 hover:text-primary hover:bg-blue-50'
-          } transition-colors duration-200`}>
-            Learn
-          </Link>
-          <Link href="/library" className={`block px-4 py-2 font-medium rounded-md ${isActive('/library') 
-            ? 'text-primary bg-blue-50' 
-            : 'text-neutral-600 hover:text-primary hover:bg-blue-50'
-          } transition-colors duration-200`}>
-            Lesson Library
-          </Link>
-          <Link href="/self-discovery" className={`block px-4 py-2 font-medium rounded-md ${isActive('/self-discovery') 
-            ? 'text-primary bg-blue-50' 
-            : 'text-neutral-600 hover:text-primary hover:bg-blue-50'
-          } transition-colors duration-200`}>
-            Self Discovery
-          </Link>
-          <Link href="/projects" className={`block px-4 py-2 font-medium rounded-md ${isActive('/projects') 
-            ? 'text-primary bg-blue-50' 
-            : 'text-neutral-600 hover:text-primary hover:bg-blue-50'
-          } transition-colors duration-200`}>
-            Projects
-          </Link>
-          <Link href="/team-projects" className={`block px-4 py-2 font-medium rounded-md ${isActive('/team-projects') 
-            ? 'text-primary bg-blue-50' 
-            : 'text-neutral-600 hover:text-primary hover:bg-blue-50'
-          } transition-colors duration-200`}>
-            Team Projects
-          </Link>
-          <Link href="/financial-literacy" className={`block px-4 py-2 font-medium rounded-md ${isActive('/financial-literacy') 
-            ? 'text-primary bg-blue-50' 
-            : 'text-neutral-600 hover:text-primary hover:bg-blue-50'
-          } transition-colors duration-200`}>
-            Financial Literacy
-          </Link>
-          <Link href="/how-we-learn" className={`block px-4 py-2 font-medium rounded-md ${isActive('/how-we-learn') 
-            ? 'text-primary bg-blue-50' 
-            : 'text-neutral-600 hover:text-primary hover:bg-blue-50'
-          } transition-colors duration-200`}>
-            How We Learn
-          </Link>
-          <Link href="/plan-your-future" className={`block px-4 py-2 font-medium rounded-md ${isActive('/plan-your-future') 
-            ? 'text-primary bg-blue-50' 
-            : 'text-neutral-600 hover:text-primary hover:bg-blue-50'
-          } transition-colors duration-200`}>
-            Plan Your Future
-          </Link>
-          <Link href="/resource-center" className={`block px-4 py-2 font-medium rounded-md ${isActive('/resource-center') 
-            ? 'text-primary bg-blue-50' 
-            : 'text-neutral-600 hover:text-primary hover:bg-blue-50'
-          } transition-colors duration-200`}>
-            Resource Center
-          </Link>
-          <Link href="/community" className={`block px-4 py-2 font-medium rounded-md ${isActive('/community') 
-            ? 'text-primary bg-blue-50' 
-            : 'text-neutral-600 hover:text-primary hover:bg-blue-50'
-          } transition-colors duration-200`}>
-            Community
-          </Link>
-          <Link href="/journal" className={`block px-4 py-2 font-medium rounded-md ${isActive('/journal') 
-            ? 'text-primary bg-blue-50' 
-            : 'text-neutral-600 hover:text-primary hover:bg-blue-50'
-          } transition-colors duration-200`}>
-            Journal
-          </Link>
-          <Link href="/about" className={`block px-4 py-2 font-medium rounded-md ${isActive('/about') 
-            ? 'text-primary bg-blue-50' 
-            : 'text-neutral-600 hover:text-primary hover:bg-blue-50'
-          } transition-colors duration-200`}>
-            About
-          </Link>
+          {primaryNavItems.map((item) => (
+            <Link key={item.href} href={item.href} className={`block px-4 py-2 font-medium rounded-md ${isActive(item.href)
+              ? 'text-primary bg-blue-50'
+              : 'text-neutral-600 hover:text-primary hover:bg-blue-50'
+            } transition-colors duration-200`}>
+              {item.label}
+            </Link>
+          ))}
           
           <div className="flex items-center space-x-4 pt-2 border-t border-neutral-200">
             <button className="p-2 rounded-full hover:bg-blue-50 text-neutral-600 hover:text-primary transition-colors duration-200">

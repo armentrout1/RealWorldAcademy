@@ -1,18 +1,231 @@
-import express, { type Express } from "express";
+import express, { type Express, type Request, type Response } from "express";
 import { createServer, type Server } from "http";
+import { randomUUID } from "crypto";
 import { storage } from "./storage";
+import { hashPassword, toSafeUser, verifyPassword } from "./auth";
 import { 
   insertUserSchema, insertCourseSchema, insertCategorySchema, 
   insertTestimonialSchema, insertFeatureSchema,
   insertBadgeSchema, insertCategoryProgressSchema, 
   insertTimelineEventSchema, insertUserProgressSummarySchema,
   insertCareerPathSchema, insertGoalSchema, insertVisionBoardItemSchema,
+  insertSubjectSchema, insertLessonSchema,
+  insertLessonResourceSchema,
   insertResourceSchema, insertDailyChallengeSchema, insertUserChallengeSchema,
   insertBuddyProfileSchema, insertBuddyMessageSchema, insertBuddyEmotionLogSchema,
-  insertBuddyJournalEntrySchema
+  insertBuddyJournalEntrySchema, insertParentChildRelationshipSchema,
+  insertParentLessonReviewSchema, insertCurriculumSubmissionSchema,
+  insertResourceSubmissionSchema,
+  insertCurriculumCollectionSchema, insertCurriculumCollectionItemSchema,
+  insertFeedbackSubmissionSchema, insertContentReportSchema,
+  insertEducatorOfferingSchema, insertOfferingSessionSchema, insertOfferingEnrollmentSchema, insertOfferingInterestSchema,
+  insertOfferingReviewSchema,
+  insertCredentialDefinitionSchema, insertCredentialRequirementSchema,
+  insertContributorProfileSchema,
+  type CurriculumCollection,
+  type CurriculumSubmission,
+  type ResourceSubmission,
+  type User
 } from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  const configuredAdminEmails = new Set(
+    (process.env.ADMIN_EMAILS || process.env.ADMIN_EMAIL || "")
+      .split(",")
+      .map((email) => email.trim().toLowerCase())
+      .filter(Boolean),
+  );
+
+  const isConfiguredAdminEmail = (email: string): boolean => configuredAdminEmails.has(email.trim().toLowerCase());
+
+  const promoteConfiguredAdmin = async (user: User): Promise<User> => {
+    if (user.role === "admin" || !isConfiguredAdminEmail(user.email)) {
+      return user;
+    }
+
+    return await storage.updateUserRole(user.id, "admin");
+  };
+
+  const requireSessionUserId = (req: Request, res: Response): number | undefined => {
+    if (!req.session.userId) {
+      res.status(401).json({ message: "Not authenticated" });
+      return undefined;
+    }
+
+    return req.session.userId;
+  };
+
+  const canAccessUserRecord = async (
+    req: Request,
+    res: Response,
+    targetUserId: number,
+    options: { allowAdmin?: boolean; allowParent?: boolean } = {},
+  ): Promise<boolean> => {
+    const sessionUserId = requireSessionUserId(req, res);
+    if (!sessionUserId) return false;
+
+    if (sessionUserId === targetUserId) return true;
+
+    if (options.allowAdmin !== false) {
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (sessionUser?.role === "admin") return true;
+    }
+
+    if (options.allowParent) {
+      const children = await storage.getChildrenForParent(sessionUserId);
+      if (children.some((child) => child.id === targetUserId)) {
+        return true;
+      }
+    }
+
+    res.status(403).json({ message: "Not authorized for this account" });
+    return false;
+  };
+
+  const requireAdminUser = async (req: Request, res: Response): Promise<boolean> => {
+    const sessionUserId = requireSessionUserId(req, res);
+    if (!sessionUserId) return false;
+
+    const user = await storage.getUser(sessionUserId);
+    if (user?.role === "admin") return true;
+
+    res.status(403).json({ message: "Admin access required" });
+    return false;
+  };
+
+  const withLessonResources = async <T extends { id: number }>(lesson: T) => ({
+    ...lesson,
+    resources: await storage.getLessonResources(lesson.id),
+  });
+
+  app.get("/api/health", (_req, res) => {
+    res.json({
+      ok: true,
+      service: "real-world-academy",
+      version: "2-roadmap",
+      timestamp: new Date().toISOString()
+    });
+  });
+
+  app.get("/api/auth/me", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      let user = await storage.getUser(req.session.userId);
+      if (!user) {
+        req.session.destroy(() => undefined);
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      user = await promoteConfiguredAdmin(user);
+      res.json(toSafeUser(user));
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch current user" });
+    }
+  });
+
+  app.post("/api/auth/signup", express.json(), async (req, res) => {
+    try {
+      const { email, password, firstName, lastName, ageGroup, interests, role } = req.body;
+
+      if (!email || !password || !firstName || !lastName || !ageGroup) {
+        return res.status(400).json({ message: "Email, password, name, and age group are required" });
+      }
+
+      if (String(password).length < 8) {
+        return res.status(400).json({ message: "Password must be at least 8 characters" });
+      }
+
+      const normalizedEmail = String(email).trim().toLowerCase();
+      const existingUser = await storage.getUserByEmail(normalizedEmail);
+      if (existingUser) {
+        return res.status(409).json({ message: "An account with that email already exists" });
+      }
+
+      const hashedPassword = await hashPassword(String(password));
+      const accountRole = isConfiguredAdminEmail(normalizedEmail)
+        ? "admin"
+        : role === "parent" ? "parent" : "student";
+      const newUser = await storage.createUser({
+        username: normalizedEmail,
+        password: hashedPassword,
+        fullName: `${String(firstName).trim()} ${String(lastName).trim()}`,
+        email: normalizedEmail,
+        firstName: String(firstName).trim(),
+        lastName: String(lastName).trim(),
+        role: accountRole,
+        ageGroup: String(ageGroup),
+        interests: Array.isArray(interests) ? interests.map(String) : [],
+        xp: 0,
+        level: 1,
+        levelTitle: "Beginner",
+        streakCount: 0,
+        gamificationEnabled: true,
+        showLeaderboard: false,
+        showLevelUpNotifications: true,
+      });
+
+      req.session.userId = newUser.id;
+      res.status(201).json(toSafeUser(newUser));
+    } catch (error) {
+      res.status(400).json({ message: "Invalid signup data" });
+    }
+  });
+
+  app.post("/api/auth/login", express.json(), async (req, res) => {
+    try {
+      const { email, password } = req.body;
+
+      if (!email || !password) {
+        return res.status(400).json({ message: "Email and password are required" });
+      }
+
+      let user = await storage.getUserByEmail(String(email).trim().toLowerCase());
+      if (!user || !(await verifyPassword(String(password), user.password))) {
+        return res.status(401).json({ message: "Invalid email or password" });
+      }
+
+      user = await promoteConfiguredAdmin(user);
+      req.session.userId = user.id;
+      res.json(toSafeUser(user));
+    } catch (error) {
+      res.status(500).json({ message: "Failed to log in" });
+    }
+  });
+
+  app.post("/api/auth/logout", (req, res) => {
+    req.session.destroy((error) => {
+      if (error) {
+        return res.status(500).json({ message: "Failed to log out" });
+      }
+
+      res.clearCookie("rwa.sid");
+      res.status(204).end();
+    });
+  });
+
+  app.post("/api/admin/bootstrap", async (req, res) => {
+    try {
+      const sessionUserId = requireSessionUserId(req, res);
+      if (!sessionUserId) return;
+
+      const user = await storage.getUser(sessionUserId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      if (!isConfiguredAdminEmail(user.email)) {
+        return res.status(403).json({ message: "This account is not listed in ADMIN_EMAILS" });
+      }
+
+      const promotedUser = await promoteConfiguredAdmin(user);
+      res.json(toSafeUser(promotedUser));
+    } catch (error) {
+      res.status(500).json({ message: "Failed to bootstrap admin account" });
+    }
+  });
+
   // Courses endpoints
   app.get("/api/courses", async (req, res) => {
     try {
@@ -126,10 +339,276 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Subject/pathway endpoints
+  app.get("/api/subjects", async (req, res) => {
+    try {
+      const subjects = await storage.getAllSubjects();
+      res.json(subjects);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch subjects" });
+    }
+  });
+
+  app.get("/api/subjects/featured", async (req, res) => {
+    try {
+      const featuredSubjects = await storage.getFeaturedSubjects();
+      res.json(featuredSubjects);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch featured subjects" });
+    }
+  });
+
+  app.get("/api/subjects/:slug/lessons", async (req, res) => {
+    try {
+      const subject = await storage.getSubjectBySlug(req.params.slug);
+      if (!subject) {
+        return res.status(404).json({ message: "Subject not found" });
+      }
+
+      const lessons = await storage.getLessonsBySubject(subject.id);
+      res.json(lessons);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch subject lessons" });
+    }
+  });
+
+  app.get("/api/subjects/:slug", async (req, res) => {
+    try {
+      const subject = await storage.getSubjectBySlug(req.params.slug);
+      if (!subject) {
+        return res.status(404).json({ message: "Subject not found" });
+      }
+      res.json(subject);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch subject" });
+    }
+  });
+
+  app.post("/api/subjects", express.json(), async (req, res) => {
+    try {
+      const validatedData = insertSubjectSchema.parse(req.body);
+      const newSubject = await storage.createSubject(validatedData);
+      res.status(201).json(newSubject);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid subject data" });
+    }
+  });
+
+  app.get("/api/lessons/:id", async (req, res) => {
+    try {
+      const lesson = await storage.getLesson(Number(req.params.id));
+      if (!lesson) {
+        return res.status(404).json({ message: "Lesson not found" });
+      }
+      res.json(await withLessonResources(lesson));
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch lesson" });
+    }
+  });
+
+  app.get("/api/subjects/:subjectSlug/lessons/:lessonSlug", async (req, res) => {
+    try {
+      const lesson = await storage.getLessonBySlug(req.params.subjectSlug, req.params.lessonSlug);
+      if (!lesson) {
+        return res.status(404).json({ message: "Lesson not found" });
+      }
+      res.json(await withLessonResources(lesson));
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch lesson" });
+    }
+  });
+
+  app.post("/api/lessons", express.json(), async (req, res) => {
+    try {
+      const validatedData = insertLessonSchema.parse(req.body);
+      const newLesson = await storage.createLesson(validatedData);
+      res.status(201).json(newLesson);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid lesson data" });
+    }
+  });
+
+  app.use("/api/users/:userId", async (req, res, next) => {
+    const userId = Number(req.params.userId);
+    if (Number.isNaN(userId)) {
+      return res.status(400).json({ message: "Invalid user id" });
+    }
+
+    const isParentReviewWrite = req.method === "POST" && req.path.includes("/lessons/") && req.path.endsWith("/reviews");
+    const allowParent = req.method === "GET" || isParentReviewWrite;
+
+    if (await canAccessUserRecord(req, res, userId, { allowParent })) {
+      next();
+    }
+  });
+
+  // Lesson progress endpoints
+  app.get("/api/users/:userId/lessons/:lessonId/progress", async (req, res) => {
+    try {
+      const userId = Number(req.params.userId);
+      if (!(await canAccessUserRecord(req, res, userId, { allowParent: true }))) return;
+
+      const lessonId = Number(req.params.lessonId);
+      const user = await storage.getUser(userId);
+      const lesson = await storage.getLesson(lessonId);
+
+      if (!user || !lesson) {
+        return res.status(404).json({ message: "User or lesson not found" });
+      }
+
+      const progress = await storage.getUserLessonProgress(userId, lessonId);
+      res.json(progress || null);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch lesson progress" });
+    }
+  });
+
+  app.patch("/api/users/:userId/lessons/:lessonId/progress", express.json(), async (req, res) => {
+    try {
+      const userId = Number(req.params.userId);
+      if (!(await canAccessUserRecord(req, res, userId))) return;
+
+      const lessonId = Number(req.params.lessonId);
+      const user = await storage.getUser(userId);
+      const lesson = await storage.getLesson(lessonId);
+
+      if (!user || !lesson) {
+        return res.status(404).json({ message: "User or lesson not found" });
+      }
+
+      const existing = await storage.getUserLessonProgress(userId, lessonId);
+      const status = req.body.status || existing?.status || "in_progress";
+      const progress = await storage.updateUserLessonProgress(userId, lessonId, {
+        status,
+        ageGroup: req.body.ageGroup || existing?.ageGroup || user.ageGroup || "13-15",
+        startedAt: existing?.startedAt || new Date(),
+        completedAt: status === "completed" ? (existing?.completedAt || new Date()) : existing?.completedAt,
+        answers: req.body.answers ?? existing?.answers,
+        reflectionResponse: req.body.reflectionResponse ?? existing?.reflectionResponse,
+        notes: req.body.notes ?? existing?.notes,
+        xpEarned: status === "completed" ? (existing?.xpEarned || lesson.xpReward) : existing?.xpEarned,
+        badgeEarned: status === "completed" ? true : existing?.badgeEarned,
+      });
+
+      if (status === "completed") {
+        const subjectLessons = await storage.getLessonsBySubject(lesson.subjectId);
+        const lessonProgress = await storage.getAllUserLessonProgressBySubject(userId, lesson.subjectId);
+        const completedLessonIds = new Set(
+          lessonProgress
+            .filter((item) => item.status === "completed")
+            .map((item) => item.lessonId)
+        );
+        completedLessonIds.add(lessonId);
+
+        await storage.updateUserSubjectProgress(userId, lesson.subjectId, {
+          status: completedLessonIds.size >= subjectLessons.length ? "completed" : "in_progress",
+          currentLessonId: lessonId,
+          startedAt: new Date(),
+          completedAt: completedLessonIds.size >= subjectLessons.length ? new Date() : undefined,
+          percentComplete: subjectLessons.length > 0
+            ? Math.round((completedLessonIds.size / subjectLessons.length) * 100)
+            : 0,
+        });
+
+        await storage.updateUserXP(userId, lesson.xpReward);
+        await storage.createTimelineEvent({
+          userId,
+          title: `Completed lesson: ${lesson.title}`,
+          date: new Date(),
+          completed: true,
+          category: "lesson",
+        });
+      }
+
+      res.json(progress);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid lesson progress data" });
+    }
+  });
+
+  app.get("/api/users/:userId/lesson-progress", async (req, res) => {
+    try {
+      const userId = Number(req.params.userId);
+      if (!(await canAccessUserRecord(req, res, userId, { allowParent: true }))) return;
+
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const progress = await storage.getAllUserLessonProgress(userId);
+      const enrichedProgress = await Promise.all(progress.map(async (item) => ({
+        progress: item,
+        lesson: await storage.getLesson(item.lessonId),
+      })));
+
+      res.json(enrichedProgress);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch lesson progress" });
+    }
+  });
+
+  app.get("/api/users/:childId/lesson-reviews", async (req, res) => {
+    try {
+      const childId = Number(req.params.childId);
+      if (!(await canAccessUserRecord(req, res, childId, { allowParent: true }))) return;
+
+      const child = await storage.getUser(childId);
+      if (!child) {
+        return res.status(404).json({ message: "Child user not found" });
+      }
+
+      const reviews = await storage.getParentLessonReviewsForChild(childId);
+      res.json(reviews);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch lesson reviews" });
+    }
+  });
+
+  app.post("/api/users/:childId/lessons/:lessonId/reviews", express.json(), async (req, res) => {
+    try {
+      const sessionUserId = requireSessionUserId(req, res);
+      if (!sessionUserId) return;
+
+      const childId = Number(req.params.childId);
+      const lessonId = Number(req.params.lessonId);
+      const validatedData = insertParentLessonReviewSchema.parse({
+        ...req.body,
+        parentUserId: sessionUserId,
+        childUserId: childId,
+        lessonId,
+        reviewedAt: new Date(),
+      });
+
+      const [parent, child, lesson] = await Promise.all([
+        storage.getUser(validatedData.parentUserId),
+        storage.getUser(childId),
+        storage.getLesson(lessonId),
+      ]);
+
+      if (!parent || !child || !lesson) {
+        return res.status(404).json({ message: "Parent, child, or lesson not found" });
+      }
+
+      const children = await storage.getChildrenForParent(validatedData.parentUserId);
+      if (!children.some((linkedChild) => linkedChild.id === childId)) {
+        return res.status(403).json({ message: "Parent is not linked to this child" });
+      }
+
+      const review = await storage.createParentLessonReview(validatedData);
+      res.status(201).json(review);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid parent review data" });
+    }
+  });
+
   // User endpoints
   app.post("/api/users", express.json(), async (req, res) => {
     try {
-      const validatedData = insertUserSchema.parse(req.body);
+      const validatedData = insertUserSchema.parse({
+        ...req.body,
+        password: await hashPassword(String(req.body.password)),
+      });
       const existingUser = await storage.getUserByUsername(validatedData.username);
       
       if (existingUser) {
@@ -156,6 +635,2103 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(userWithoutPassword);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch user" });
+    }
+  });
+
+  app.get("/api/users/:parentId/children", async (req, res) => {
+    try {
+      const parentId = Number(req.params.parentId);
+      if (!(await canAccessUserRecord(req, res, parentId))) return;
+
+      const parent = await storage.getUser(parentId);
+      if (!parent) {
+        return res.status(404).json({ message: "Parent user not found" });
+      }
+
+      const children = await storage.getChildrenForParent(parentId);
+      const safeChildren = children.map(({ password, ...child }) => child);
+      res.json(safeChildren);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch child accounts" });
+    }
+  });
+
+  app.get("/api/users/:childId/parents", async (req, res) => {
+    try {
+      const childId = Number(req.params.childId);
+      if (!(await canAccessUserRecord(req, res, childId, { allowParent: true }))) return;
+
+      const child = await storage.getUser(childId);
+      if (!child) {
+        return res.status(404).json({ message: "Child user not found" });
+      }
+
+      const parents = await storage.getParentsForChild(childId);
+      const safeParents = parents.map(({ password, ...parent }) => parent);
+      res.json(safeParents);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch parent accounts" });
+    }
+  });
+
+  app.post("/api/family/relationships", express.json(), async (req, res) => {
+    try {
+      const sessionUserId = requireSessionUserId(req, res);
+      if (!sessionUserId) return;
+
+      const validatedData = insertParentChildRelationshipSchema.parse(req.body);
+      if (validatedData.parentUserId !== sessionUserId) {
+        return res.status(403).json({ message: "Parent account must match the current session" });
+      }
+
+      const parent = await storage.getUser(validatedData.parentUserId);
+      const child = await storage.getUser(validatedData.childUserId);
+      if (!parent || !child) {
+        return res.status(404).json({ message: "Parent or child user not found" });
+      }
+
+      const relationship = await storage.createParentChildRelationship(validatedData);
+      res.status(201).json(relationship);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid parent-child relationship data" });
+    }
+  });
+
+  app.post("/api/family/link-child", express.json(), async (req, res) => {
+    try {
+      const sessionUserId = requireSessionUserId(req, res);
+      if (!sessionUserId) return;
+
+      const childEmail = typeof req.body.childEmail === "string"
+        ? req.body.childEmail.trim().toLowerCase()
+        : "";
+      const relationshipLabel = typeof req.body.relationshipLabel === "string" && req.body.relationshipLabel.trim()
+        ? req.body.relationshipLabel.trim()
+        : "parent";
+
+      if (!childEmail) {
+        return res.status(400).json({ message: "Child account email is required" });
+      }
+
+      const parent = await storage.getUser(sessionUserId);
+      const child = await storage.getUserByEmail(childEmail);
+      if (!parent) {
+        return res.status(404).json({ message: "Parent account not found" });
+      }
+      if (!child) {
+        return res.status(404).json({ message: "No child account found for that email" });
+      }
+      if (child.id === sessionUserId) {
+        return res.status(400).json({ message: "You cannot link your own account as a child" });
+      }
+
+      const linkedChildren = await storage.getChildrenForParent(sessionUserId);
+      const alreadyLinked = linkedChildren.find((linkedChild) => linkedChild.id === child.id);
+      if (!alreadyLinked) {
+        await storage.createParentChildRelationship({
+          parentUserId: sessionUserId,
+          childUserId: child.id,
+          relationshipLabel,
+          status: "active",
+          createdAt: new Date(),
+        });
+      }
+
+      res.status(alreadyLinked ? 200 : 201).json(toSafeUser(child));
+    } catch (error) {
+      res.status(500).json({ message: "Failed to link child account" });
+    }
+  });
+
+  const contributionSubjectAliases: Record<string, string> = {
+    "financial-literacy": "money-basics",
+    finance: "money-basics",
+    technology: "digital-productivity",
+    "digital-skills": "digital-productivity",
+    communication: "communication-relationships",
+    "well-being": "career-exploration",
+    "critical-thinking": "career-exploration",
+    creativity: "career-exploration",
+    citizenship: "digital-productivity",
+  };
+
+  const slugify = (value: string): string => value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80);
+
+  const publishCurriculumSubmission = async (submission: CurriculumSubmission) => {
+    const requestedSubjectSlug = slugify(submission.subject);
+    const subjectSlug = contributionSubjectAliases[requestedSubjectSlug] || requestedSubjectSlug;
+    const subject = await storage.getSubjectBySlug(subjectSlug);
+
+    if (!subject) {
+      throw new Error(`No publishable subject exists for "${submission.subject}"`);
+    }
+
+    const baseSlug = slugify(submission.title) || `submission-${submission.id}`;
+    const slug = `contrib-${submission.id}-${baseSlug}`;
+    const existingLesson = await storage.getLessonBySlug(subject.slug, slug);
+
+    if (existingLesson) {
+      return existingLesson;
+    }
+
+    const existingLessons = await storage.getLessonsBySubject(subject.id);
+    const contributorProfile = submission.contributorProfileId
+      ? await storage.getContributorProfile(submission.contributorProfileId)
+      : undefined;
+    const contributorName = contributorProfile?.displayName || submission.contributorName;
+
+    const lesson = await storage.createLesson(insertLessonSchema.parse({
+      subjectId: subject.id,
+      title: submission.title,
+      subtitle: `Community lesson by ${contributorName}`,
+      slug,
+      order: existingLessons.length + 1,
+      learningObjective: submission.objective,
+      warmUpQuestion: submission.warmUp,
+      lessonExplanation: submission.coreContent,
+      scenarioTitle: "Real-World Scenario",
+      scenarioContent: submission.scenario,
+      activityType: "reflection",
+      activityContent: {
+        instructions: submission.activity,
+        contributor: {
+          id: contributorProfile?.id,
+          name: contributorName,
+          affiliation: contributorProfile?.affiliation || submission.affiliation,
+          trustLevel: contributorProfile?.trustLevel,
+        },
+        sourceSubmissionId: submission.id,
+      },
+      reflectionPrompt: submission.reflection,
+      estimatedMinutes: 30,
+      xpReward: 50,
+      ageGroupContent: {
+        [submission.ageGroup]: {
+          learningObjective: submission.objective,
+          warmUpQuestion: submission.warmUp,
+          lessonExplanation: submission.coreContent,
+          scenarioContent: submission.scenario,
+          activityContent: submission.activity,
+          reflectionPrompt: submission.reflection,
+        },
+      },
+    }));
+
+    if (submission.resourceTitle && submission.resourceUrl) {
+      const resourceType = submission.resourceType || "link";
+      await storage.createLessonResource(insertLessonResourceSchema.parse({
+        lessonId: lesson.id,
+        resourceId: null,
+        resourceType,
+        title: submission.resourceTitle,
+        description: submission.resourceDescription || null,
+        url: submission.resourceUrl,
+        embedUrl: resourceType === "video" ? getYouTubeEmbedUrl(submission.resourceUrl) : null,
+        sourceLabel: submission.resourceSourceLabel || null,
+        duration: submission.resourceDuration || null,
+        safetyNotes: submission.resourceSafetyNotes || null,
+        parentPrompt: submission.resourceParentPrompt || null,
+        studentPrompt: submission.resourceStudentPrompt || null,
+        order: 1,
+      }));
+    }
+
+    return lesson;
+  };
+
+  const attachContributorProfiles = async (submissions: CurriculumSubmission[]) => {
+    const profiles = await storage.getAllContributorProfiles();
+    const profileById = new Map(profiles.map((profile) => [profile.id, profile]));
+
+    return submissions.map((submission) => ({
+      ...submission,
+      contributorProfile: submission.contributorProfileId
+        ? profileById.get(submission.contributorProfileId) || null
+        : profiles.find((profile) =>
+            profile.displayName.toLowerCase() === submission.contributorName.toLowerCase() ||
+            profile.affiliation?.toLowerCase() === submission.affiliation.toLowerCase()
+          ) || null,
+    }));
+  };
+
+  const attachResourceContributorProfiles = async (submissions: ResourceSubmission[]) => {
+    const profiles = await storage.getAllContributorProfiles();
+    const profileById = new Map(profiles.map((profile) => [profile.id, profile]));
+
+    return submissions.map((submission) => ({
+      ...submission,
+      contributorProfile: submission.contributorProfileId
+        ? profileById.get(submission.contributorProfileId) || null
+        : profiles.find((profile) =>
+            profile.displayName.toLowerCase() === submission.contributorName.toLowerCase() ||
+            profile.affiliation?.toLowerCase() === submission.affiliation.toLowerCase()
+          ) || null,
+    }));
+  };
+
+  const attachCollectionDetails = async (collections: CurriculumCollection[]) => {
+    const profiles = await storage.getAllContributorProfiles();
+    const profileById = new Map(profiles.map((profile) => [profile.id, profile]));
+
+    return Promise.all(collections.map(async (collection) => ({
+      ...collection,
+      contributorProfile: profileById.get(collection.contributorProfileId) || null,
+      items: await storage.getCurriculumCollectionItems(collection.id),
+    })));
+  };
+
+  const getYouTubeEmbedUrl = (url: string | null) => {
+    if (!url) return null;
+
+    try {
+      const parsed = new URL(url);
+      const host = parsed.hostname.replace(/^www\./, "");
+      const videoId = host === "youtu.be"
+        ? parsed.pathname.split("/").filter(Boolean)[0]
+        : parsed.searchParams.get("v");
+
+      if (!videoId || !["youtube.com", "m.youtube.com", "youtu.be"].includes(host)) {
+        return null;
+      }
+
+      return `https://www.youtube.com/embed/${videoId}`;
+    } catch {
+      return null;
+    }
+  };
+
+  const publishResourceSubmission = async (submission: ResourceSubmission) => {
+    const isVideo = submission.resourceType === "video";
+
+    return await storage.createResource({
+      title: submission.title,
+      description: `${submission.description}\n\nLearning use: ${submission.learningUse}\n\nSafety notes: ${submission.safetyNotes}`,
+      resourceType: submission.resourceType,
+      category: submission.category,
+      audience: submission.audience || ["student", "parent"],
+      fileUrl: isVideo ? null : submission.url,
+      embedUrl: isVideo ? submission.embedUrl || getYouTubeEmbedUrl(submission.url) || submission.url : null,
+      thumbnailUrl: submission.thumbnailUrl,
+      downloadCount: 0,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      relatedSubjectId: null,
+      featured: false,
+    });
+  };
+
+  const normalizeCollectionItems = (collectionId: number, rawItems: unknown[]) =>
+    rawItems.map((rawItem, index) => {
+      const item = rawItem as Record<string, unknown>;
+      const url = item.url ? String(item.url).trim() : null;
+      const embedUrl = item.embedUrl ? String(item.embedUrl).trim() : getYouTubeEmbedUrl(url);
+
+      return insertCurriculumCollectionItemSchema.parse({
+        collectionId,
+        itemType: String(item.itemType || "link"),
+        title: String(item.title || "").trim(),
+        description: item.description ? String(item.description).trim() : null,
+        url,
+        embedUrl,
+        sourceLabel: item.sourceLabel ? String(item.sourceLabel).trim() : null,
+        duration: item.duration ? String(item.duration).trim() : null,
+        safetyNotes: item.safetyNotes ? String(item.safetyNotes).trim() : null,
+        lessonId: item.lessonId ? Number(item.lessonId) : null,
+        resourceId: item.resourceId ? Number(item.resourceId) : null,
+        order: index + 1,
+        parentPrompt: item.parentPrompt ? String(item.parentPrompt).trim() : null,
+        studentPrompt: item.studentPrompt ? String(item.studentPrompt).trim() : null,
+      });
+    });
+
+  const normalizeStringArray = (value: unknown) =>
+    Array.isArray(value)
+      ? value.map(String).map((item: string) => item.trim()).filter(Boolean)
+      : [];
+
+  app.get("/api/contributor-profiles/me", async (req, res) => {
+    try {
+      const sessionUserId = requireSessionUserId(req, res);
+      if (!sessionUserId) return;
+
+      const profile = await storage.getContributorProfileByUserId(sessionUserId);
+      res.json(profile || null);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch contributor profile" });
+    }
+  });
+
+  app.put("/api/contributor-profiles/me", express.json(), async (req, res) => {
+    try {
+      const sessionUserId = requireSessionUserId(req, res);
+      if (!sessionUserId) return;
+
+      const existingProfile = await storage.getContributorProfileByUserId(sessionUserId);
+      const validatedData = insertContributorProfileSchema.parse({
+        userId: sessionUserId,
+        displayName: String(req.body.displayName || "").trim(),
+        bio: req.body.bio ? String(req.body.bio).trim() : null,
+        affiliation: req.body.affiliation ? String(req.body.affiliation).trim() : null,
+        website: req.body.website ? String(req.body.website).trim() : null,
+        avatarUrl: req.body.avatarUrl ? String(req.body.avatarUrl).trim() : null,
+        expertiseTags: normalizeStringArray(req.body.expertiseTags),
+        teachingStyle: req.body.teachingStyle ? String(req.body.teachingStyle).trim() : null,
+        subjectsTaught: normalizeStringArray(req.body.subjectsTaught),
+        ageGroupsServed: normalizeStringArray(req.body.ageGroupsServed),
+        introVideoUrl: req.body.introVideoUrl ? String(req.body.introVideoUrl).trim() : null,
+        sampleLessonUrls: normalizeStringArray(req.body.sampleLessonUrls),
+        availabilitySummary: req.body.availabilitySummary ? String(req.body.availabilitySummary).trim() : null,
+        timeZone: req.body.timeZone ? String(req.body.timeZone).trim() : null,
+        offeringTypes: normalizeStringArray(req.body.offeringTypes),
+        trustLevel: existingProfile?.trustLevel || "new",
+        status: existingProfile?.status || "active",
+        createdAt: existingProfile?.createdAt || new Date(),
+        updatedAt: new Date(),
+      });
+
+      if (!validatedData.displayName) {
+        return res.status(400).json({ message: "Display name is required" });
+      }
+
+      const profile = await storage.upsertContributorProfile(validatedData);
+      res.json(profile);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid contributor profile" });
+    }
+  });
+
+  app.get("/api/admin/contributor-profiles", async (req, res) => {
+    try {
+      if (!(await requireAdminUser(req, res))) return;
+
+      const profiles = await storage.getAllContributorProfiles();
+      res.json(profiles);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch contributor profiles" });
+    }
+  });
+
+  app.get("/api/contributor-submissions/me", async (req, res) => {
+    try {
+      const sessionUserId = requireSessionUserId(req, res);
+      if (!sessionUserId) return;
+
+      const user = await storage.getUser(sessionUserId);
+      const profile = await storage.getContributorProfileByUserId(sessionUserId);
+      if (!user || !profile) {
+        return res.json([]);
+      }
+
+      const submissions = await storage.getCurriculumSubmissionsForContributor(profile.id, user.email);
+      res.json(await attachContributorProfiles(submissions));
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch contributor submissions" });
+    }
+  });
+
+  app.get("/api/contributor-resource-submissions/me", async (req, res) => {
+    try {
+      const sessionUserId = requireSessionUserId(req, res);
+      if (!sessionUserId) return;
+
+      const user = await storage.getUser(sessionUserId);
+      const profile = await storage.getContributorProfileByUserId(sessionUserId);
+      if (!user || !profile) {
+        return res.json([]);
+      }
+
+      const submissions = await storage.getResourceSubmissionsForContributor(profile.id, user.email);
+      res.json(await attachResourceContributorProfiles(submissions));
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch contributor resource submissions" });
+    }
+  });
+
+  const buildEducatorOfferingPayload = (profileId: number, body: Record<string, unknown>, status = "draft") => {
+    const allowedTypes = new Set(["free_sample", "live_class", "recorded_course", "tutoring", "coaching", "curriculum_bundle"]);
+    const allowedFormats = new Set(["free", "paid_placeholder", "live", "recorded", "one_on_one", "group"]);
+    const offeringType = String(body.offeringType || "free_sample");
+    const format = String(body.format || "free");
+
+    if (!allowedTypes.has(offeringType)) {
+      throw new Error("Invalid offering type");
+    }
+
+    if (!allowedFormats.has(format)) {
+      throw new Error("Invalid offering format");
+    }
+
+    return insertEducatorOfferingSchema.parse({
+      contributorProfileId: profileId,
+      title: String(body.title || "").trim(),
+      description: String(body.description || "").trim(),
+      offeringType,
+      subject: String(body.subject || "").trim(),
+      ageGroup: String(body.ageGroup || "").trim(),
+      format,
+      duration: body.duration ? String(body.duration).trim() : null,
+      priceCents: body.priceCents ? Number(body.priceCents) : null,
+      currency: body.currency ? String(body.currency).trim().toUpperCase() : "USD",
+      sampleUrl: body.sampleUrl ? String(body.sampleUrl).trim() : null,
+      meetingUrl: body.meetingUrl ? String(body.meetingUrl).trim() : null,
+      parentExpectations: body.parentExpectations ? String(body.parentExpectations).trim() : null,
+      completionEvidence: body.completionEvidence ? String(body.completionEvidence).trim() : null,
+      status,
+      reviewerNote: null,
+      internalReviewNote: null,
+      submittedAt: status === "pending_review" ? new Date() : null,
+      reviewedAt: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+  };
+
+  app.get("/api/educator-offerings/me", async (req, res) => {
+    try {
+      const sessionUserId = requireSessionUserId(req, res);
+      if (!sessionUserId) return;
+
+      const profile = await storage.getContributorProfileByUserId(sessionUserId);
+      if (!profile) return res.json([]);
+
+      res.json(await storage.getEducatorOfferingsForContributor(profile.id));
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch educator offerings" });
+    }
+  });
+
+  app.post("/api/educator-offerings", express.json(), async (req, res) => {
+    try {
+      const sessionUserId = requireSessionUserId(req, res);
+      if (!sessionUserId) return;
+
+      const profile = await storage.getContributorProfileByUserId(sessionUserId);
+      if (!profile) {
+        return res.status(400).json({ message: "Create an educator profile before adding offerings" });
+      }
+
+      const status = req.body.submitForReview ? "pending_review" : "draft";
+      const offeringData = buildEducatorOfferingPayload(profile.id, req.body, status);
+
+      if (!offeringData.title || !offeringData.description || !offeringData.subject || !offeringData.ageGroup) {
+        return res.status(400).json({ message: "Title, description, subject, and age group are required" });
+      }
+
+      const offering = await storage.createEducatorOffering(offeringData);
+      res.status(201).json(offering);
+    } catch (error) {
+      res.status(400).json({ message: error instanceof Error ? error.message : "Invalid educator offering" });
+    }
+  });
+
+  app.patch("/api/educator-offerings/:id", express.json(), async (req, res) => {
+    try {
+      const sessionUserId = requireSessionUserId(req, res);
+      if (!sessionUserId) return;
+
+      const profile = await storage.getContributorProfileByUserId(sessionUserId);
+      if (!profile) {
+        return res.status(400).json({ message: "Create an educator profile before editing offerings" });
+      }
+
+      const id = Number(req.params.id);
+      const existing = (await storage.getEducatorOfferingsForContributor(profile.id)).find((offering) => offering.id === id);
+      if (!existing) {
+        return res.status(404).json({ message: "Offering not found" });
+      }
+
+      if (!["draft", "changes_requested"].includes(existing.status)) {
+        return res.status(400).json({ message: "Only draft or changes requested offerings can be edited" });
+      }
+
+      const status = req.body.submitForReview ? "pending_review" : existing.status;
+      const offeringData = buildEducatorOfferingPayload(profile.id, req.body, status);
+      const offering = await storage.updateEducatorOffering(id, {
+        ...offeringData,
+        createdAt: existing.createdAt,
+        updatedAt: new Date(),
+      });
+      res.json(offering);
+    } catch (error) {
+      res.status(400).json({ message: error instanceof Error ? error.message : "Failed to update educator offering" });
+    }
+  });
+
+  app.get("/api/admin/educator-offerings", async (req, res) => {
+    try {
+      if (!(await requireAdminUser(req, res))) return;
+
+      const status = typeof req.query.status === "string" ? req.query.status : undefined;
+      const profiles = await storage.getAllContributorProfiles();
+      const profileById = new Map(profiles.map((profile) => [profile.id, profile]));
+      const offerings = await storage.getEducatorOfferings(status);
+      res.json(offerings.map((offering) => ({
+        ...offering,
+        contributorProfile: profileById.get(offering.contributorProfileId) || null,
+      })));
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch educator offerings" });
+    }
+  });
+
+  app.patch("/api/admin/educator-offerings/:id/review", express.json(), async (req, res) => {
+    try {
+      if (!(await requireAdminUser(req, res))) return;
+
+      const allowedStatuses = new Set(["approved", "changes_requested", "rejected", "archived"]);
+      if (!allowedStatuses.has(req.body.status)) {
+        return res.status(400).json({ message: "Invalid offering review status" });
+      }
+
+      const offering = await storage.updateEducatorOffering(Number(req.params.id), {
+        status: req.body.status,
+        reviewerNote: req.body.reviewerNote ? String(req.body.reviewerNote).trim() : null,
+        internalReviewNote: req.body.internalReviewNote ? String(req.body.internalReviewNote).trim() : null,
+        reviewedAt: new Date(),
+        updatedAt: new Date(),
+      });
+      res.json(offering);
+    } catch (error) {
+      res.status(400).json({ message: "Failed to review educator offering" });
+    }
+  });
+
+  const enrichOfferingSessions = async (sessions: Awaited<ReturnType<typeof storage.getOfferingSessions>>) => {
+    const offerings = await storage.getEducatorOfferings();
+    const profiles = await storage.getAllContributorProfiles();
+    const offeringById = new Map(offerings.map((offering) => [offering.id, offering]));
+    const profileById = new Map(profiles.map((profile) => [profile.id, profile]));
+
+    return sessions.map((session) => ({
+      ...session,
+      offering: offeringById.get(session.educatorOfferingId) || null,
+      contributorProfile: profileById.get(session.contributorProfileId) || null,
+    }));
+  };
+
+  const buildOfferingSessionPayload = (
+    profileId: number,
+    offeringId: number,
+    body: Record<string, unknown>,
+    status = "draft",
+  ) => {
+    const startsAt = new Date(String(body.startsAt || ""));
+    const endsAt = body.endsAt ? new Date(String(body.endsAt)) : null;
+
+    if (Number.isNaN(startsAt.getTime())) {
+      throw new Error("Valid start date and time are required");
+    }
+
+    if (endsAt && Number.isNaN(endsAt.getTime())) {
+      throw new Error("End date and time must be valid");
+    }
+
+    return insertOfferingSessionSchema.parse({
+      educatorOfferingId: offeringId,
+      contributorProfileId: profileId,
+      title: String(body.title || "").trim(),
+      startsAt,
+      endsAt,
+      duration: body.duration ? String(body.duration).trim() : null,
+      capacity: body.capacity ? Number(body.capacity) : null,
+      reservedSeats: body.reservedSeats ? Number(body.reservedSeats) : 0,
+      meetingUrl: body.meetingUrl ? String(body.meetingUrl).trim() : null,
+      locationNote: body.locationNote ? String(body.locationNote).trim() : null,
+      registrationNote: body.registrationNote ? String(body.registrationNote).trim() : null,
+      status,
+      reviewerNote: null,
+      internalReviewNote: null,
+      submittedAt: status === "pending_review" ? new Date() : null,
+      reviewedAt: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+  };
+
+  app.get("/api/offering-sessions/me", async (req, res) => {
+    try {
+      const sessionUserId = requireSessionUserId(req, res);
+      if (!sessionUserId) return;
+
+      const profile = await storage.getContributorProfileByUserId(sessionUserId);
+      if (!profile) return res.json([]);
+
+      const sessions = await storage.getOfferingSessionsForContributor(profile.id);
+      res.json(await enrichOfferingSessions(sessions));
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch offering sessions" });
+    }
+  });
+
+  app.post("/api/offering-sessions", express.json(), async (req, res) => {
+    try {
+      const sessionUserId = requireSessionUserId(req, res);
+      if (!sessionUserId) return;
+
+      const profile = await storage.getContributorProfileByUserId(sessionUserId);
+      if (!profile) {
+        return res.status(400).json({ message: "Create an educator profile before adding sessions" });
+      }
+
+      const offeringId = Number(req.body.educatorOfferingId);
+      const offering = await storage.getEducatorOffering(offeringId);
+      if (!offering || offering.contributorProfileId !== profile.id) {
+        return res.status(404).json({ message: "Offering not found" });
+      }
+
+      if (offering.status !== "approved") {
+        return res.status(400).json({ message: "Only approved offerings can receive class sessions" });
+      }
+
+      const status = req.body.submitForReview ? "pending_review" : "draft";
+      const sessionData = buildOfferingSessionPayload(profile.id, offering.id, req.body, status);
+      if (!sessionData.title) {
+        return res.status(400).json({ message: "Session title is required" });
+      }
+
+      const session = await storage.createOfferingSession(sessionData);
+      res.status(201).json(session);
+    } catch (error) {
+      res.status(400).json({ message: error instanceof Error ? error.message : "Invalid offering session" });
+    }
+  });
+
+  app.patch("/api/offering-sessions/:id", express.json(), async (req, res) => {
+    try {
+      const sessionUserId = requireSessionUserId(req, res);
+      if (!sessionUserId) return;
+
+      const profile = await storage.getContributorProfileByUserId(sessionUserId);
+      if (!profile) {
+        return res.status(400).json({ message: "Create an educator profile before editing sessions" });
+      }
+
+      const id = Number(req.params.id);
+      const existing = (await storage.getOfferingSessionsForContributor(profile.id)).find((session) => session.id === id);
+      if (!existing) {
+        return res.status(404).json({ message: "Session not found" });
+      }
+
+      if (!["draft", "changes_requested"].includes(existing.status)) {
+        return res.status(400).json({ message: "Only draft or changes requested sessions can be edited" });
+      }
+
+      const offering = await storage.getEducatorOffering(existing.educatorOfferingId);
+      if (!offering || offering.status !== "approved") {
+        return res.status(400).json({ message: "Session offering must still be approved" });
+      }
+
+      const status = req.body.submitForReview ? "pending_review" : existing.status;
+      const sessionData = buildOfferingSessionPayload(profile.id, existing.educatorOfferingId, req.body, status);
+      const session = await storage.updateOfferingSession(id, {
+        ...sessionData,
+        createdAt: existing.createdAt,
+        reservedSeats: existing.reservedSeats,
+        updatedAt: new Date(),
+      });
+      res.json(session);
+    } catch (error) {
+      res.status(400).json({ message: error instanceof Error ? error.message : "Failed to update offering session" });
+    }
+  });
+
+  app.get("/api/admin/offering-sessions", async (req, res) => {
+    try {
+      if (!(await requireAdminUser(req, res))) return;
+
+      const status = typeof req.query.status === "string" ? req.query.status : undefined;
+      const sessions = await storage.getOfferingSessions(status);
+      res.json(await enrichOfferingSessions(sessions));
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch offering sessions" });
+    }
+  });
+
+  app.patch("/api/admin/offering-sessions/:id/review", express.json(), async (req, res) => {
+    try {
+      if (!(await requireAdminUser(req, res))) return;
+
+      const allowedStatuses = new Set(["approved", "changes_requested", "rejected", "archived", "cancelled"]);
+      if (!allowedStatuses.has(req.body.status)) {
+        return res.status(400).json({ message: "Invalid session review status" });
+      }
+
+      const session = await storage.updateOfferingSession(Number(req.params.id), {
+        status: req.body.status,
+        reviewerNote: req.body.reviewerNote ? String(req.body.reviewerNote).trim() : null,
+        internalReviewNote: req.body.internalReviewNote ? String(req.body.internalReviewNote).trim() : null,
+        reviewedAt: new Date(),
+        updatedAt: new Date(),
+      });
+      res.json(session);
+    } catch (error) {
+      res.status(400).json({ message: "Failed to review offering session" });
+    }
+  });
+
+  const enrichOfferingEnrollments = async (
+    enrollments: Awaited<ReturnType<typeof storage.getOfferingEnrollments>>,
+  ) => {
+    const offerings = await storage.getEducatorOfferings();
+    const sessions = await storage.getOfferingSessions();
+    const profiles = await storage.getAllContributorProfiles();
+    const offeringById = new Map(offerings.map((offering) => [offering.id, offering]));
+    const sessionById = new Map(sessions.map((session) => [session.id, session]));
+    const profileById = new Map(profiles.map((profile) => [profile.id, profile]));
+
+    return enrollments.map((enrollment) => ({
+      ...enrollment,
+      offering: offeringById.get(enrollment.educatorOfferingId) || null,
+      session: sessionById.get(enrollment.offeringSessionId) || null,
+      contributorProfile: profileById.get(enrollment.contributorProfileId) || null,
+    }));
+  };
+
+  const enrollmentStatuses = new Set(["requested", "reserved", "waitlisted", "cancelled", "completed", "archived"]);
+  const activeSeatStatuses = new Set(["reserved", "completed"]);
+
+  const updateEnrollmentStatus = async (
+    enrollment: Awaited<ReturnType<typeof storage.getOfferingEnrollments>>[number],
+    status: string,
+  ) => {
+    if (!enrollmentStatuses.has(status)) {
+      throw new Error("Invalid enrollment status");
+    }
+
+    const wasActive = activeSeatStatuses.has(enrollment.status);
+    const willBeActive = activeSeatStatuses.has(status);
+    const learnerCount = enrollment.learnerCount || 1;
+
+    if (!wasActive && willBeActive) {
+      const session = await storage.getOfferingSession(enrollment.offeringSessionId);
+      const openSeats = session?.capacity ? session.capacity - session.reservedSeats : Number.POSITIVE_INFINITY;
+      if (openSeats < learnerCount) {
+        throw new Error("Not enough seats are available");
+      }
+      await storage.adjustOfferingSessionReservedSeats(enrollment.offeringSessionId, learnerCount);
+    }
+
+    if (wasActive && !willBeActive) {
+      await storage.adjustOfferingSessionReservedSeats(enrollment.offeringSessionId, -learnerCount);
+    }
+
+    const updatedEnrollment = await storage.updateOfferingEnrollment(enrollment.id, {
+      status,
+      reservedAt: status === "reserved" && !enrollment.reservedAt ? new Date() : enrollment.reservedAt,
+      cancelledAt: status === "cancelled" && !enrollment.cancelledAt ? new Date() : enrollment.cancelledAt,
+      completedAt: status === "completed" && !enrollment.completedAt ? new Date() : enrollment.completedAt,
+      updatedAt: new Date(),
+    });
+
+    if (status === "completed" && !enrollment.completedAt && enrollment.requesterUserId) {
+      const offering = await storage.getEducatorOffering(enrollment.educatorOfferingId);
+      const session = await storage.getOfferingSession(enrollment.offeringSessionId);
+      await storage.createTimelineEvent({
+        userId: enrollment.requesterUserId,
+        title: `Completed class: ${session?.title || offering?.title || "Educator session"}`,
+        date: new Date(),
+        completed: true,
+        category: "class",
+      });
+    }
+
+    return updatedEnrollment;
+  };
+
+  app.get("/api/offering-enrollments/me", async (req, res) => {
+    try {
+      const sessionUserId = requireSessionUserId(req, res);
+      if (!sessionUserId) return;
+
+      const profile = await storage.getContributorProfileByUserId(sessionUserId);
+      if (!profile) return res.json([]);
+
+      const enrollments = await storage.getOfferingEnrollmentsForContributor(profile.id);
+      res.json(await enrichOfferingEnrollments(enrollments));
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch offering enrollments" });
+    }
+  });
+
+  app.get("/api/my-offering-enrollments", async (req, res) => {
+    try {
+      const sessionUserId = requireSessionUserId(req, res);
+      if (!sessionUserId) return;
+
+      const user = await storage.getUser(sessionUserId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const enrollments = await storage.getOfferingEnrollmentsForRequester(user.id, user.email);
+      res.json(await enrichOfferingEnrollments(enrollments));
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch your class enrollments" });
+    }
+  });
+
+  app.post("/api/my-offering-enrollments/:id/reviews", express.json(), async (req, res) => {
+    try {
+      const sessionUserId = requireSessionUserId(req, res);
+      if (!sessionUserId) return;
+
+      const user = await storage.getUser(sessionUserId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const enrollmentId = Number(req.params.id);
+      const enrollment = (await storage.getOfferingEnrollmentsForRequester(user.id, user.email))
+        .find((item) => item.id === enrollmentId);
+      if (!enrollment) {
+        return res.status(404).json({ message: "Enrollment not found" });
+      }
+
+      if (enrollment.status !== "completed") {
+        return res.status(400).json({ message: "Reviews can only be submitted after a completed class" });
+      }
+
+      const existingReview = await storage.getOfferingReviewForEnrollment(enrollment.id);
+      if (existingReview) {
+        return res.status(409).json({ message: "A review already exists for this class" });
+      }
+
+      const rating = Number(req.body.rating);
+      if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
+        return res.status(400).json({ message: "Rating must be between 1 and 5" });
+      }
+
+      const reviewText = String(req.body.reviewText || "").trim();
+      if (reviewText.length < 10) {
+        return res.status(400).json({ message: "Review must be at least 10 characters" });
+      }
+
+      const review = insertOfferingReviewSchema.parse({
+        offeringEnrollmentId: enrollment.id,
+        educatorOfferingId: enrollment.educatorOfferingId,
+        offeringSessionId: enrollment.offeringSessionId,
+        contributorProfileId: enrollment.contributorProfileId,
+        reviewerUserId: user.id,
+        reviewerName: user.fullName || enrollment.requesterName,
+        reviewerEmail: user.email,
+        rating,
+        reviewText,
+        status: "pending_review",
+        adminNote: null,
+        reviewedAt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+
+      res.status(201).json(await storage.createOfferingReview(review));
+    } catch (error) {
+      res.status(400).json({ message: error instanceof Error ? error.message : "Failed to submit review" });
+    }
+  });
+
+  app.post("/api/my-offering-enrollments/:id/checkout", async (req, res) => {
+    try {
+      const sessionUserId = requireSessionUserId(req, res);
+      if (!sessionUserId) return;
+
+      const user = await storage.getUser(sessionUserId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const enrollment = (await storage.getOfferingEnrollmentsForRequester(user.id, user.email))
+        .find((item) => item.id === Number(req.params.id));
+      if (!enrollment) {
+        return res.status(404).json({ message: "Enrollment not found" });
+      }
+
+      const offering = await storage.getEducatorOffering(enrollment.educatorOfferingId);
+      if (!offering?.priceCents) {
+        return res.status(400).json({ message: "This class does not require checkout" });
+      }
+
+      if (!process.env.STRIPE_SECRET_KEY) {
+        return res.status(503).json({
+          message: "Checkout is not configured yet",
+          readiness: {
+            provider: "stripe",
+            requiredEnv: ["STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET"],
+            platformFeePercent: 15,
+          },
+        });
+      }
+
+      return res.status(501).json({ message: "Stripe checkout session creation is ready for provider wiring" });
+    } catch (error) {
+      res.status(400).json({ message: error instanceof Error ? error.message : "Failed to start checkout" });
+    }
+  });
+
+  app.patch("/api/offering-enrollments/:id", express.json(), async (req, res) => {
+    try {
+      const sessionUserId = requireSessionUserId(req, res);
+      if (!sessionUserId) return;
+
+      const profile = await storage.getContributorProfileByUserId(sessionUserId);
+      if (!profile) {
+        return res.status(403).json({ message: "Educator profile required" });
+      }
+
+      const enrollmentId = Number(req.params.id);
+      const existing = (await storage.getOfferingEnrollmentsForContributor(profile.id))
+        .find((enrollment) => enrollment.id === enrollmentId);
+      if (!existing) {
+        return res.status(404).json({ message: "Enrollment not found" });
+      }
+
+      const enrollment = await updateEnrollmentStatus(existing, String(req.body.status || ""));
+      res.json(enrollment);
+    } catch (error) {
+      res.status(400).json({ message: error instanceof Error ? error.message : "Failed to update enrollment" });
+    }
+  });
+
+  app.get("/api/admin/offering-enrollments", async (req, res) => {
+    try {
+      if (!(await requireAdminUser(req, res))) return;
+
+      const status = typeof req.query.status === "string" ? req.query.status : undefined;
+      const enrollments = await storage.getOfferingEnrollments(status);
+      res.json(await enrichOfferingEnrollments(enrollments));
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch offering enrollments" });
+    }
+  });
+
+  app.patch("/api/admin/offering-enrollments/:id", express.json(), async (req, res) => {
+    try {
+      if (!(await requireAdminUser(req, res))) return;
+
+      const enrollmentId = Number(req.params.id);
+      const existing = (await storage.getOfferingEnrollments()).find((enrollment) => enrollment.id === enrollmentId);
+      if (!existing) {
+        return res.status(404).json({ message: "Enrollment not found" });
+      }
+
+      const enrollment = await updateEnrollmentStatus(existing, String(req.body.status || ""));
+      res.json(enrollment);
+    } catch (error) {
+      res.status(400).json({ message: error instanceof Error ? error.message : "Failed to update enrollment" });
+    }
+  });
+
+  const enrichOfferingReviews = async (
+    reviews: Awaited<ReturnType<typeof storage.getOfferingReviews>>,
+  ) => {
+    const offerings = await storage.getEducatorOfferings();
+    const sessions = await storage.getOfferingSessions();
+    const profiles = await storage.getAllContributorProfiles();
+    const offeringById = new Map(offerings.map((offering) => [offering.id, offering]));
+    const sessionById = new Map(sessions.map((session) => [session.id, session]));
+    const profileById = new Map(profiles.map((profile) => [profile.id, profile]));
+
+    return reviews.map((review) => ({
+      ...review,
+      offering: offeringById.get(review.educatorOfferingId) || null,
+      session: sessionById.get(review.offeringSessionId) || null,
+      contributorProfile: profileById.get(review.contributorProfileId) || null,
+    }));
+  };
+
+  app.get("/api/admin/offering-reviews", async (req, res) => {
+    try {
+      if (!(await requireAdminUser(req, res))) return;
+
+      const status = typeof req.query.status === "string" ? req.query.status : undefined;
+      const reviews = await storage.getOfferingReviews(status);
+      res.json(await enrichOfferingReviews(reviews));
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch offering reviews" });
+    }
+  });
+
+  app.patch("/api/admin/offering-reviews/:id", express.json(), async (req, res) => {
+    try {
+      if (!(await requireAdminUser(req, res))) return;
+
+      const allowedStatuses = new Set(["pending_review", "approved", "rejected", "archived"]);
+      if (!allowedStatuses.has(req.body.status)) {
+        return res.status(400).json({ message: "Invalid review status" });
+      }
+
+      const review = await storage.updateOfferingReview(Number(req.params.id), {
+        status: req.body.status,
+        adminNote: req.body.adminNote ? String(req.body.adminNote).trim() : null,
+        reviewedAt: req.body.status === "pending_review" ? null : new Date(),
+        updatedAt: new Date(),
+      });
+      res.json(review);
+    } catch (error) {
+      res.status(400).json({ message: "Failed to update offering review" });
+    }
+  });
+
+  const enrichOfferingInterests = async (interests: Awaited<ReturnType<typeof storage.getOfferingInterests>>) => {
+    const offerings = await storage.getEducatorOfferings();
+    const sessions = await storage.getOfferingSessions();
+    const profiles = await storage.getAllContributorProfiles();
+    const offeringById = new Map(offerings.map((offering) => [offering.id, offering]));
+    const sessionById = new Map(sessions.map((session) => [session.id, session]));
+    const profileById = new Map(profiles.map((profile) => [profile.id, profile]));
+
+    return interests.map((interest) => ({
+      ...interest,
+      offering: offeringById.get(interest.educatorOfferingId) || null,
+      session: interest.offeringSessionId ? sessionById.get(interest.offeringSessionId) || null : null,
+      contributorProfile: profileById.get(interest.contributorProfileId) || null,
+    }));
+  };
+
+  const allowedInterestStatuses = new Set(["new", "contacted", "waitlisted", "closed", "archived"]);
+
+  app.post("/api/offering-interests", express.json(), async (req, res) => {
+    try {
+      const offeringId = Number(req.body.educatorOfferingId);
+      if (!offeringId) {
+        return res.status(400).json({ message: "Offering is required" });
+      }
+
+      const offering = await storage.getEducatorOffering(offeringId);
+      if (!offering || offering.status !== "approved") {
+        return res.status(404).json({ message: "Approved offering not found" });
+      }
+
+      const offeringSessionId = req.body.offeringSessionId ? Number(req.body.offeringSessionId) : null;
+      const offeringSession = offeringSessionId ? await storage.getOfferingSession(offeringSessionId) : undefined;
+      if (offeringSessionId && (
+        !offeringSession ||
+        offeringSession.educatorOfferingId !== offering.id ||
+        offeringSession.status !== "approved"
+      )) {
+        return res.status(404).json({ message: "Approved session not found" });
+      }
+
+      const requester = req.session.userId ? await storage.getUser(req.session.userId) : undefined;
+      const requesterName = String(req.body.requesterName || requester?.fullName || "").trim();
+      const requesterEmail = String(req.body.requesterEmail || requester?.email || "").trim().toLowerCase();
+      const learnerCount = Math.max(1, Number(req.body.learnerCount || 1));
+
+      if (!requesterName || !requesterEmail) {
+        return res.status(400).json({ message: "Name and email are required" });
+      }
+
+      const interestData = insertOfferingInterestSchema.parse({
+        educatorOfferingId: offering.id,
+        offeringSessionId,
+        contributorProfileId: offering.contributorProfileId,
+        requesterUserId: requester?.id || null,
+        requesterName,
+        requesterEmail,
+        learnerAgeGroup: req.body.learnerAgeGroup ? String(req.body.learnerAgeGroup).trim() : null,
+        message: req.body.message ? String(req.body.message).trim() : null,
+        status: "new",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+
+      const interest = await storage.createOfferingInterest(interestData);
+      if (offeringSession) {
+        const enrollmentData = insertOfferingEnrollmentSchema.parse({
+          educatorOfferingId: offering.id,
+          offeringSessionId: offeringSession.id,
+          contributorProfileId: offering.contributorProfileId,
+          requesterUserId: requester?.id || null,
+          requesterName,
+          requesterEmail,
+          learnerAgeGroup: req.body.learnerAgeGroup ? String(req.body.learnerAgeGroup).trim() : null,
+          learnerCount,
+          message: req.body.message ? String(req.body.message).trim() : null,
+          status: "requested",
+          sourceInterestId: interest.id,
+          reservedAt: null,
+          cancelledAt: null,
+          completedAt: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
+        await storage.createOfferingEnrollment(enrollmentData);
+      }
+      res.status(201).json(interest);
+    } catch (error) {
+      res.status(400).json({ message: error instanceof Error ? error.message : "Invalid offering interest" });
+    }
+  });
+
+  app.get("/api/offering-interests/me", async (req, res) => {
+    try {
+      const sessionUserId = requireSessionUserId(req, res);
+      if (!sessionUserId) return;
+
+      const profile = await storage.getContributorProfileByUserId(sessionUserId);
+      if (!profile) return res.json([]);
+
+      const interests = await storage.getOfferingInterestsForContributor(profile.id);
+      res.json(await enrichOfferingInterests(interests));
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch offering interests" });
+    }
+  });
+
+  app.patch("/api/offering-interests/:id", express.json(), async (req, res) => {
+    try {
+      const sessionUserId = requireSessionUserId(req, res);
+      if (!sessionUserId) return;
+
+      const profile = await storage.getContributorProfileByUserId(sessionUserId);
+      if (!profile) {
+        return res.status(403).json({ message: "Educator profile required" });
+      }
+
+      const status = String(req.body.status || "");
+      if (!allowedInterestStatuses.has(status)) {
+        return res.status(400).json({ message: "Invalid interest status" });
+      }
+
+      const interestId = Number(req.params.id);
+      const existing = (await storage.getOfferingInterestsForContributor(profile.id))
+        .find((interest) => interest.id === interestId);
+      if (!existing) {
+        return res.status(404).json({ message: "Interest not found" });
+      }
+
+      const interest = await storage.updateOfferingInterest(interestId, {
+        status,
+        updatedAt: new Date(),
+      });
+      res.json(interest);
+    } catch (error) {
+      res.status(400).json({ message: "Failed to update offering interest" });
+    }
+  });
+
+  app.get("/api/admin/offering-interests", async (req, res) => {
+    try {
+      if (!(await requireAdminUser(req, res))) return;
+
+      const interests = await storage.getOfferingInterests();
+      res.json(await enrichOfferingInterests(interests));
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch offering interests" });
+    }
+  });
+
+  app.patch("/api/admin/offering-interests/:id", express.json(), async (req, res) => {
+    try {
+      if (!(await requireAdminUser(req, res))) return;
+
+      const status = String(req.body.status || "");
+      if (!allowedInterestStatuses.has(status)) {
+        return res.status(400).json({ message: "Invalid interest status" });
+      }
+
+      const interest = await storage.updateOfferingInterest(Number(req.params.id), {
+        status,
+        updatedAt: new Date(),
+      });
+      res.json(interest);
+    } catch (error) {
+      res.status(400).json({ message: "Failed to update offering interest" });
+    }
+  });
+
+  app.get("/api/educators", async (_req, res) => {
+    try {
+      const profiles = (await storage.getAllContributorProfiles())
+        .filter((profile) => profile.status === "active");
+      const approvedOfferings = (await storage.getEducatorOfferings("approved"));
+      const offeringsByProfile = new Map<number, typeof approvedOfferings>();
+
+      approvedOfferings.forEach((offering) => {
+        const existing = offeringsByProfile.get(offering.contributorProfileId) || [];
+        offeringsByProfile.set(offering.contributorProfileId, [...existing, offering]);
+      });
+
+      res.json(profiles
+        .filter((profile) => {
+          const hasEducatorFields = Boolean(
+            profile.teachingStyle ||
+            profile.subjectsTaught?.length ||
+            profile.ageGroupsServed?.length ||
+            profile.offeringTypes?.length ||
+            profile.introVideoUrl ||
+            profile.sampleLessonUrls?.length,
+          );
+          return hasEducatorFields || (offeringsByProfile.get(profile.id)?.length || 0) > 0;
+        })
+        .map((profile) => ({
+          ...profile,
+          approvedOfferings: offeringsByProfile.get(profile.id) || [],
+        })));
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch educators" });
+    }
+  });
+
+  app.get("/api/educators/:id", async (req, res) => {
+    try {
+      const profile = await storage.getContributorProfile(Number(req.params.id));
+      if (!profile || profile.status !== "active") {
+        return res.status(404).json({ message: "Educator not found" });
+      }
+
+      const approvedOfferings = (await storage.getEducatorOfferingsForContributor(profile.id))
+        .filter((offering) => offering.status === "approved");
+      const approvedSessions = (await storage.getOfferingSessionsForContributor(profile.id))
+        .filter((session) => session.status === "approved");
+      const sessionsByOffering = new Map<number, typeof approvedSessions>();
+      const credentials = await storage.getAllCredentialDefinitions();
+      const credentialLinksByOffering = new Map<number, Array<{ id: number; title: string; slug: string; disclaimer: string }>>();
+
+      approvedSessions.forEach((session) => {
+        const existing = sessionsByOffering.get(session.educatorOfferingId) || [];
+        sessionsByOffering.set(session.educatorOfferingId, [...existing, session]);
+      });
+
+      for (const credential of credentials) {
+        const requirements = await storage.getCredentialRequirements(credential.id);
+        requirements
+          .filter((requirement) => requirement.requirementType === "offering_completion" && requirement.targetId)
+          .forEach((requirement) => {
+            const existing = credentialLinksByOffering.get(requirement.targetId!) || [];
+            credentialLinksByOffering.set(requirement.targetId!, [
+              ...existing,
+              {
+                id: credential.id,
+                title: credential.title,
+                slug: credential.slug,
+                disclaimer: credential.disclaimer,
+              },
+            ]);
+          });
+      }
+
+      res.json({
+        ...profile,
+        approvedOfferings: approvedOfferings.map((offering) => ({
+          ...offering,
+          approvedSessions: sessionsByOffering.get(offering.id) || [],
+          eligibleCredentials: credentialLinksByOffering.get(offering.id) || [],
+        })),
+      });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch educator" });
+    }
+  });
+
+  app.post("/api/resource-submissions", express.json(), async (req, res) => {
+    try {
+      const sessionUserId = requireSessionUserId(req, res);
+      if (!sessionUserId) return;
+
+      const user = await storage.getUser(sessionUserId);
+      const contributorProfile = await storage.getContributorProfileByUserId(sessionUserId);
+      if (!user || !contributorProfile) {
+        return res.status(403).json({ message: "Create a contributor profile before submitting resources" });
+      }
+
+      const url = String(req.body.url || "").trim();
+      const isVideo = req.body.resourceType === "video";
+      const validatedData = insertResourceSubmissionSchema.parse({
+        contributorProfileId: contributorProfile.id,
+        contributorName: contributorProfile.displayName,
+        contributorEmail: user.email,
+        affiliation: contributorProfile.affiliation || "Independent contributor",
+        title: String(req.body.title || "").trim(),
+        description: String(req.body.description || "").trim(),
+        resourceType: String(req.body.resourceType || "link"),
+        category: String(req.body.category || "").trim(),
+        audience: Array.isArray(req.body.audience)
+          ? req.body.audience.map(String).filter(Boolean)
+          : ["student", "parent"],
+        ageGroup: String(req.body.ageGroup || "").trim(),
+        url,
+        embedUrl: req.body.embedUrl ? String(req.body.embedUrl).trim() : isVideo ? getYouTubeEmbedUrl(url) : null,
+        sourceLabel: req.body.sourceLabel ? String(req.body.sourceLabel).trim() : null,
+        duration: req.body.duration ? String(req.body.duration).trim() : null,
+        learningUse: String(req.body.learningUse || "").trim(),
+        safetyNotes: String(req.body.safetyNotes || "").trim(),
+        thumbnailUrl: req.body.thumbnailUrl ? String(req.body.thumbnailUrl).trim() : null,
+        status: "pending_review",
+        reviewerNote: null,
+        publishedResourceId: null,
+        submittedAt: new Date(),
+        reviewedAt: null,
+      });
+
+      if (!validatedData.title || !validatedData.description || !validatedData.category || !validatedData.ageGroup || !validatedData.url) {
+        return res.status(400).json({ message: "Title, description, category, age group, and URL are required" });
+      }
+
+      const submission = await storage.createResourceSubmission(validatedData);
+      res.status(201).json(submission);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid resource submission data" });
+    }
+  });
+
+  app.get("/api/resource-submissions", async (req, res) => {
+    try {
+      if (!(await requireAdminUser(req, res))) return;
+
+      const status = typeof req.query.status === "string" ? req.query.status : undefined;
+      const submissions = await storage.getResourceSubmissions(status);
+      res.json(await attachResourceContributorProfiles(submissions));
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch resource submissions" });
+    }
+  });
+
+  app.patch("/api/resource-submissions/:id/review", express.json(), async (req, res) => {
+    try {
+      if (!(await requireAdminUser(req, res))) return;
+
+      const id = Number(req.params.id);
+      const existing = await storage.getResourceSubmission(id);
+      if (!existing) {
+        return res.status(404).json({ message: "Resource submission not found" });
+      }
+
+      const allowedStatuses = new Set(["approved", "changes_requested", "rejected", "archived"]);
+      if (!allowedStatuses.has(req.body.status)) {
+        return res.status(400).json({ message: "Invalid review status" });
+      }
+
+      const publishedResource = req.body.status === "approved"
+        ? await publishResourceSubmission(existing)
+        : undefined;
+
+      const updated = await storage.reviewResourceSubmission(id, {
+        status: req.body.status,
+        reviewerNote: req.body.reviewerNote,
+        internalReviewNote: req.body.internalReviewNote,
+        reviewRubric: req.body.reviewRubric,
+        publishedResourceId: publishedResource?.id || existing.publishedResourceId,
+        reviewedAt: new Date(),
+      });
+
+      const [enriched] = await attachResourceContributorProfiles([updated]);
+      res.json({ ...enriched, publishedResource });
+    } catch (error) {
+      res.status(400).json({ message: "Failed to review resource submission" });
+    }
+  });
+
+  app.get("/api/curriculum-collections", async (_req, res) => {
+    try {
+      const collections = await storage.getCurriculumCollections();
+      const publicCollections = collections.filter((collection) =>
+        collection.status === "approved" || collection.status === "published"
+      );
+      res.json(await attachCollectionDetails(publicCollections));
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch curriculum collections" });
+    }
+  });
+
+  app.get("/api/curriculum-collections/me", async (req, res) => {
+    try {
+      const sessionUserId = requireSessionUserId(req, res);
+      if (!sessionUserId) return;
+
+      const profile = await storage.getContributorProfileByUserId(sessionUserId);
+      if (!profile) {
+        return res.json([]);
+      }
+
+      const collections = await storage.getCurriculumCollectionsForContributor(profile.id);
+      res.json(await attachCollectionDetails(collections));
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch contributor collections" });
+    }
+  });
+
+  app.get("/api/curriculum-collections/:id", async (req, res) => {
+    try {
+      const collection = await storage.getCurriculumCollection(Number(req.params.id));
+      if (!collection || !["approved", "published"].includes(collection.status)) {
+        return res.status(404).json({ message: "Curriculum collection not found" });
+      }
+
+      const [enriched] = await attachCollectionDetails([collection]);
+      res.json(enriched);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch curriculum collection" });
+    }
+  });
+
+  app.get("/api/curriculum-collections/:id/progress", async (req, res) => {
+    try {
+      const sessionUserId = requireSessionUserId(req, res);
+      if (!sessionUserId) return;
+
+      const collection = await storage.getCurriculumCollection(Number(req.params.id));
+      if (!collection || !["approved", "published"].includes(collection.status)) {
+        return res.status(404).json({ message: "Curriculum collection not found" });
+      }
+
+      const progress = await storage.getUserCurriculumCollectionProgress(sessionUserId, collection.id);
+      res.json(progress || null);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch collection progress" });
+    }
+  });
+
+  app.post("/api/curriculum-collections/:id/start", async (req, res) => {
+    try {
+      const sessionUserId = requireSessionUserId(req, res);
+      if (!sessionUserId) return;
+
+      const collection = await storage.getCurriculumCollection(Number(req.params.id));
+      if (!collection || !["approved", "published"].includes(collection.status)) {
+        return res.status(404).json({ message: "Curriculum collection not found" });
+      }
+
+      const items = await storage.getCurriculumCollectionItems(collection.id);
+      const existing = await storage.getUserCurriculumCollectionProgress(sessionUserId, collection.id);
+      const progress = await storage.upsertUserCurriculumCollectionProgress(sessionUserId, collection.id, {
+        status: existing?.status === "completed" ? "completed" : "in_progress",
+        currentItemId: existing?.currentItemId || items[0]?.id,
+        completedItemIds: existing?.completedItemIds || [],
+        percentComplete: existing?.percentComplete || 0,
+        startedAt: existing?.startedAt || new Date(),
+      });
+
+      res.status(existing ? 200 : 201).json(progress);
+    } catch (error) {
+      res.status(400).json({ message: "Failed to start curriculum collection" });
+    }
+  });
+
+  app.patch("/api/curriculum-collections/:id/progress", express.json(), async (req, res) => {
+    try {
+      const sessionUserId = requireSessionUserId(req, res);
+      if (!sessionUserId) return;
+
+      const collection = await storage.getCurriculumCollection(Number(req.params.id));
+      if (!collection || !["approved", "published"].includes(collection.status)) {
+        return res.status(404).json({ message: "Curriculum collection not found" });
+      }
+
+      const items = await storage.getCurriculumCollectionItems(collection.id);
+      const itemId = Number(req.body.itemId);
+      if (!items.some((item) => item.id === itemId)) {
+        return res.status(400).json({ message: "Collection item not found" });
+      }
+
+      const existing = await storage.getUserCurriculumCollectionProgress(sessionUserId, collection.id);
+      const completedItemIds = Array.from(new Set([...(existing?.completedItemIds || []), itemId]));
+      const nextItem = items.find((item) => !completedItemIds.includes(item.id));
+      const percentComplete = items.length > 0
+        ? Math.round((completedItemIds.length / items.length) * 100)
+        : 100;
+      const isComplete = items.length > 0 && completedItemIds.length >= items.length;
+
+      const progress = await storage.upsertUserCurriculumCollectionProgress(sessionUserId, collection.id, {
+        status: isComplete ? "completed" : "in_progress",
+        currentItemId: nextItem?.id || itemId,
+        completedItemIds,
+        percentComplete,
+        startedAt: existing?.startedAt || new Date(),
+        completedAt: isComplete ? existing?.completedAt || new Date() : undefined,
+      });
+
+      res.json(progress);
+    } catch (error) {
+      res.status(400).json({ message: "Failed to update collection progress" });
+    }
+  });
+
+  app.post("/api/curriculum-collections", express.json(), async (req, res) => {
+    try {
+      const sessionUserId = requireSessionUserId(req, res);
+      if (!sessionUserId) return;
+
+      const profile = await storage.getContributorProfileByUserId(sessionUserId);
+      if (!profile) {
+        return res.status(403).json({ message: "Create a contributor profile before building collections" });
+      }
+
+      const now = new Date();
+      const collection = insertCurriculumCollectionSchema.parse({
+        contributorProfileId: profile.id,
+        title: String(req.body.title || "").trim(),
+        description: String(req.body.description || "").trim(),
+        subject: String(req.body.subject || "").trim(),
+        ageGroup: String(req.body.ageGroup || "").trim(),
+        estimatedWeeks: Number(req.body.estimatedWeeks || 1),
+        learningGoals: Array.isArray(req.body.learningGoals)
+          ? req.body.learningGoals.map(String).map((goal: string) => goal.trim()).filter(Boolean)
+          : [],
+        parentNotes: req.body.parentNotes ? String(req.body.parentNotes).trim() : null,
+        finalProject: req.body.finalProject ? String(req.body.finalProject).trim() : null,
+        status: "draft",
+        reviewerNote: null,
+        submittedAt: null,
+        reviewedAt: null,
+        createdAt: now,
+        updatedAt: now,
+      });
+
+      const rawItems = Array.isArray(req.body.items) ? req.body.items : [];
+      if (!collection.title || !collection.description || !collection.subject || !collection.ageGroup) {
+        return res.status(400).json({ message: "Title, description, subject, and age group are required" });
+      }
+
+      const created = await storage.createCurriculumCollection(collection);
+      const items = await storage.replaceCurriculumCollectionItems(
+        created.id,
+        normalizeCollectionItems(created.id, rawItems).filter((item) => item.title),
+      );
+
+      const [enriched] = await attachCollectionDetails([{ ...created, items } as CurriculumCollection]);
+      res.status(201).json(enriched);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid curriculum collection data" });
+    }
+  });
+
+  app.put("/api/curriculum-collections/:id", express.json(), async (req, res) => {
+    try {
+      const sessionUserId = requireSessionUserId(req, res);
+      if (!sessionUserId) return;
+
+      const id = Number(req.params.id);
+      const existing = await storage.getCurriculumCollection(id);
+      const profile = await storage.getContributorProfileByUserId(sessionUserId);
+      const user = await storage.getUser(sessionUserId);
+      const isOwner = existing && profile && existing.contributorProfileId === profile.id;
+      const isAdmin = user?.role === "admin";
+
+      if (!existing) {
+        return res.status(404).json({ message: "Curriculum collection not found" });
+      }
+
+      if (!isOwner && !isAdmin) {
+        return res.status(403).json({ message: "You can only edit your own collections" });
+      }
+
+      if (!isAdmin && !["draft", "changes_requested"].includes(existing.status)) {
+        return res.status(400).json({ message: "Submitted collections cannot be edited until review returns them" });
+      }
+
+      const updates = insertCurriculumCollectionSchema.partial().parse({
+        title: String(req.body.title || "").trim(),
+        description: String(req.body.description || "").trim(),
+        subject: String(req.body.subject || "").trim(),
+        ageGroup: String(req.body.ageGroup || "").trim(),
+        estimatedWeeks: Number(req.body.estimatedWeeks || existing.estimatedWeeks || 1),
+        learningGoals: Array.isArray(req.body.learningGoals)
+          ? req.body.learningGoals.map(String).map((goal: string) => goal.trim()).filter(Boolean)
+          : [],
+        parentNotes: req.body.parentNotes ? String(req.body.parentNotes).trim() : null,
+        finalProject: req.body.finalProject ? String(req.body.finalProject).trim() : null,
+        status: isAdmin ? req.body.status || existing.status : "draft",
+      });
+
+      const rawItems = Array.isArray(req.body.items) ? req.body.items : [];
+      const updated = await storage.updateCurriculumCollection(id, updates);
+      await storage.replaceCurriculumCollectionItems(
+        id,
+        normalizeCollectionItems(id, rawItems).filter((item) => item.title),
+      );
+
+      const [enriched] = await attachCollectionDetails([updated]);
+      res.json(enriched);
+    } catch (error) {
+      res.status(400).json({ message: "Failed to update curriculum collection" });
+    }
+  });
+
+  app.patch("/api/curriculum-collections/:id/submit", async (req, res) => {
+    try {
+      const sessionUserId = requireSessionUserId(req, res);
+      if (!sessionUserId) return;
+
+      const id = Number(req.params.id);
+      const existing = await storage.getCurriculumCollection(id);
+      const profile = await storage.getContributorProfileByUserId(sessionUserId);
+
+      if (!existing) {
+        return res.status(404).json({ message: "Curriculum collection not found" });
+      }
+
+      if (!profile || existing.contributorProfileId !== profile.id) {
+        return res.status(403).json({ message: "You can only submit your own collections" });
+      }
+
+      const items = await storage.getCurriculumCollectionItems(id);
+      if (items.length === 0) {
+        return res.status(400).json({ message: "Add at least one collection item before submitting" });
+      }
+
+      const updated = await storage.updateCurriculumCollection(id, {
+        status: "pending_review",
+        submittedAt: new Date(),
+        reviewerNote: null,
+      });
+      const [enriched] = await attachCollectionDetails([updated]);
+      res.json(enriched);
+    } catch (error) {
+      res.status(400).json({ message: "Failed to submit curriculum collection" });
+    }
+  });
+
+  app.get("/api/admin/curriculum-collections", async (req, res) => {
+    try {
+      if (!(await requireAdminUser(req, res))) return;
+
+      const status = typeof req.query.status === "string" ? req.query.status : undefined;
+      const collections = await storage.getCurriculumCollections(status);
+      res.json(await attachCollectionDetails(collections));
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch curriculum collections" });
+    }
+  });
+
+  app.patch("/api/admin/curriculum-collections/:id/review", express.json(), async (req, res) => {
+    try {
+      if (!(await requireAdminUser(req, res))) return;
+
+      const id = Number(req.params.id);
+      const existing = await storage.getCurriculumCollection(id);
+      if (!existing) {
+        return res.status(404).json({ message: "Curriculum collection not found" });
+      }
+
+      const allowedStatuses = new Set(["approved", "published", "changes_requested", "rejected", "archived"]);
+      if (!allowedStatuses.has(req.body.status)) {
+        return res.status(400).json({ message: "Invalid review status" });
+      }
+
+      const updated = await storage.updateCurriculumCollection(id, {
+        status: req.body.status,
+        reviewerNote: req.body.reviewerNote,
+        internalReviewNote: req.body.internalReviewNote,
+        reviewRubric: req.body.reviewRubric,
+        reviewedAt: new Date(),
+      });
+      const [enriched] = await attachCollectionDetails([updated]);
+      res.json(enriched);
+    } catch (error) {
+      res.status(400).json({ message: "Failed to review curriculum collection" });
+    }
+  });
+
+  // Curriculum contribution and review endpoints
+  app.get("/api/curriculum-submissions", async (req, res) => {
+    try {
+      if (!(await requireAdminUser(req, res))) return;
+
+      const status = typeof req.query.status === "string" ? req.query.status : undefined;
+      const submissions = await storage.getCurriculumSubmissions(status);
+      res.json(await attachContributorProfiles(submissions));
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch curriculum submissions" });
+    }
+  });
+
+  app.get("/api/curriculum-submissions/:id", async (req, res) => {
+    try {
+      if (!(await requireAdminUser(req, res))) return;
+
+      const submission = await storage.getCurriculumSubmission(Number(req.params.id));
+      if (!submission) {
+        return res.status(404).json({ message: "Curriculum submission not found" });
+      }
+
+      const enriched = await attachContributorProfiles([submission]);
+      res.json(enriched[0]);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch curriculum submission" });
+    }
+  });
+
+  app.post("/api/curriculum-submissions", express.json(), async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      const contributorProfile = sessionUserId
+        ? await storage.getContributorProfileByUserId(sessionUserId)
+        : undefined;
+      const validatedData = insertCurriculumSubmissionSchema.parse({
+        ...req.body,
+        contributorProfileId: contributorProfile?.id,
+        contributorName: contributorProfile?.displayName || req.body.contributorName,
+        contributorEmail: req.body.contributorEmail,
+        affiliation: contributorProfile?.affiliation || req.body.affiliation,
+        status: "pending_review",
+        submittedAt: new Date(),
+      });
+      const submission = await storage.createCurriculumSubmission(validatedData);
+      res.status(201).json(submission);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid curriculum submission data" });
+    }
+  });
+
+  app.patch("/api/curriculum-submissions/:id/review", express.json(), async (req, res) => {
+    try {
+      if (!(await requireAdminUser(req, res))) return;
+
+      const id = Number(req.params.id);
+      const existing = await storage.getCurriculumSubmission(id);
+      if (!existing) {
+        return res.status(404).json({ message: "Curriculum submission not found" });
+      }
+
+      const allowedStatuses = new Set(["approved", "changes_requested", "rejected", "archived"]);
+      if (!allowedStatuses.has(req.body.status)) {
+        return res.status(400).json({ message: "Invalid review status" });
+      }
+
+      const publishedLesson = req.body.status === "approved"
+        ? await publishCurriculumSubmission(existing)
+        : undefined;
+
+      const updated = await storage.reviewCurriculumSubmission(id, {
+        status: req.body.status,
+        reviewerNote: req.body.reviewerNote,
+        internalReviewNote: req.body.internalReviewNote,
+        reviewRubric: req.body.reviewRubric,
+        reviewedAt: new Date(),
+      });
+
+      res.json({ ...updated, publishedLesson });
+    } catch (error) {
+      res.status(400).json({
+        message: error instanceof Error ? error.message : "Failed to review curriculum submission",
+      });
+    }
+  });
+
+  app.post("/api/feedback", express.json(), async (req, res) => {
+    try {
+      const validatedData = insertFeedbackSubmissionSchema.parse({
+        ...req.body,
+        status: "new",
+        createdAt: new Date(),
+      });
+      const feedback = await storage.createFeedbackSubmission(validatedData);
+      res.status(201).json(feedback);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid feedback submission" });
+    }
+  });
+
+  app.get("/api/feedback", async (req, res) => {
+    try {
+      if (!(await requireAdminUser(req, res))) return;
+
+      const feedback = await storage.getFeedbackSubmissions();
+      res.json(feedback);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch feedback" });
+    }
+  });
+
+  app.patch("/api/feedback/:id", express.json(), async (req, res) => {
+    try {
+      if (!(await requireAdminUser(req, res))) return;
+
+      const allowedStatuses = new Set(["new", "reviewing", "resolved", "archived"]);
+      if (!allowedStatuses.has(req.body.status)) {
+        return res.status(400).json({ message: "Invalid feedback status" });
+      }
+
+      const feedback = await storage.updateFeedbackSubmission(Number(req.params.id), {
+        status: req.body.status,
+      });
+      res.json(feedback);
+    } catch (error) {
+      res.status(400).json({ message: "Failed to update feedback" });
+    }
+  });
+
+  app.post("/api/content-reports", express.json(), async (req, res) => {
+    try {
+      const reporter = req.session?.userId ? await storage.getUser(req.session.userId) : undefined;
+      const allowedContentTypes = new Set(["lesson", "resource", "collection"]);
+      const allowedCategories = new Set(["inaccurate", "unsafe", "age_mismatch", "broken_link", "copyright", "other"]);
+
+      if (!allowedContentTypes.has(req.body.contentType)) {
+        return res.status(400).json({ message: "Invalid content type" });
+      }
+
+      if (!allowedCategories.has(req.body.category)) {
+        return res.status(400).json({ message: "Invalid report category" });
+      }
+
+      const validatedData = insertContentReportSchema.parse({
+        ...req.body,
+        reporterUserId: reporter?.id,
+        reporterName: req.body.reporterName || reporter?.fullName || reporter?.username || null,
+        reporterEmail: req.body.reporterEmail || reporter?.email || null,
+        status: "new",
+        createdAt: new Date(),
+      });
+
+      const report = await storage.createContentReport(validatedData);
+      res.status(201).json(report);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid content report" });
+    }
+  });
+
+  app.get("/api/content-reports", async (req, res) => {
+    try {
+      if (!(await requireAdminUser(req, res))) return;
+
+      const status = typeof req.query.status === "string" ? req.query.status : undefined;
+      const reports = await storage.getContentReports(status);
+      res.json(reports);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch content reports" });
+    }
+  });
+
+  app.patch("/api/content-reports/:id", express.json(), async (req, res) => {
+    try {
+      if (!(await requireAdminUser(req, res))) return;
+
+      const allowedStatuses = new Set(["new", "reviewing", "resolved", "archived"]);
+      if (req.body.status && !allowedStatuses.has(req.body.status)) {
+        return res.status(400).json({ message: "Invalid report status" });
+      }
+
+      const status = req.body.status;
+      const report = await storage.updateContentReport(Number(req.params.id), {
+        status,
+        adminNote: req.body.adminNote,
+        actionTaken: req.body.actionTaken,
+        resolvedAt: status === "resolved" || status === "archived" ? new Date() : undefined,
+      });
+      res.json(report);
+    } catch (error) {
+      res.status(400).json({ message: "Failed to update content report" });
+    }
+  });
+
+  app.get("/api/admin/users", async (req, res) => {
+    try {
+      if (!(await requireAdminUser(req, res))) return;
+
+      const users = await storage.getAllUsers();
+      const safeUsers = users.map(({ password, ...user }) => user);
+      res.json(safeUsers);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch users" });
+    }
+  });
+
+  app.patch("/api/admin/users/:userId/role", express.json(), async (req, res) => {
+    try {
+      if (!(await requireAdminUser(req, res))) return;
+
+      const allowedRoles = new Set(["student", "parent", "admin"]);
+      if (!allowedRoles.has(req.body.role)) {
+        return res.status(400).json({ message: "Invalid user role" });
+      }
+
+      const user = await storage.updateUserRole(Number(req.params.userId), req.body.role);
+      const { password, ...safeUser } = user;
+      res.json(safeUser);
+    } catch (error) {
+      res.status(400).json({ message: "Failed to update user role" });
+    }
+  });
+
+  // Credential endpoints
+  app.get("/api/credentials", async (_req, res) => {
+    try {
+      const credentials = await storage.getAllCredentialDefinitions();
+      res.json(credentials);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch credentials" });
+    }
+  });
+
+  app.get("/api/credentials/:slug", async (req, res) => {
+    try {
+      const credential = await storage.getCredentialDefinitionBySlug(req.params.slug);
+      if (!credential) {
+        return res.status(404).json({ message: "Credential not found" });
+      }
+
+      const requirements = await storage.getCredentialRequirements(credential.id);
+      res.json({ ...credential, requirements });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch credential" });
+    }
+  });
+
+  app.get("/api/credential-verifications/:shareCode", async (req, res) => {
+    try {
+      const shareCode = req.params.shareCode.trim();
+      const issuedCredential = await storage.getIssuedCredentialByShareCode(shareCode);
+      if (!issuedCredential) {
+        return res.status(404).json({ message: "Credential verification not found" });
+      }
+
+      const credential = await storage.getCredentialDefinition(issuedCredential.credentialId);
+      const learner = await storage.getUser(issuedCredential.userId);
+      if (!credential || !learner) {
+        return res.status(404).json({ message: "Credential verification record is incomplete" });
+      }
+
+      res.json({
+        shareCode: issuedCredential.shareCode,
+        status: issuedCredential.status,
+        issuedAt: issuedCredential.issuedAt,
+        reviewNote: issuedCredential.reviewNote,
+        learner: {
+          fullName: learner.fullName,
+        },
+        credential: {
+          title: credential.title,
+          description: credential.description,
+          criteriaSummary: credential.criteriaSummary,
+          disclaimer: credential.disclaimer,
+        },
+      });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to verify credential" });
+    }
+  });
+
+  app.post("/api/credentials", express.json(), async (req, res) => {
+    try {
+      if (!(await requireAdminUser(req, res))) return;
+
+      const validatedData = insertCredentialDefinitionSchema.parse(req.body);
+      const credential = await storage.createCredentialDefinition(validatedData);
+      res.status(201).json(credential);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid credential data" });
+    }
+  });
+
+  app.post("/api/credentials/:credentialId/requirements", express.json(), async (req, res) => {
+    try {
+      if (!(await requireAdminUser(req, res))) return;
+
+      const credentialId = Number(req.params.credentialId);
+      const credential = await storage.getCredentialDefinition(credentialId);
+      if (!credential) {
+        return res.status(404).json({ message: "Credential not found" });
+      }
+
+      const validatedData = insertCredentialRequirementSchema.parse({
+        ...req.body,
+        credentialId,
+      });
+      const requirement = await storage.createCredentialRequirement(validatedData);
+      res.status(201).json(requirement);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid credential requirement data" });
+    }
+  });
+
+  app.get("/api/admin/credential-requirements", async (req, res) => {
+    try {
+      if (!(await requireAdminUser(req, res))) return;
+
+      const credentials = await storage.getAllCredentialDefinitions();
+      const offerings = await storage.getEducatorOfferings("approved");
+      const offeringById = new Map(offerings.map((offering) => [offering.id, offering]));
+
+      const requirementRows = await Promise.all(credentials.map(async (credential) => ({
+        ...credential,
+        requirements: (await storage.getCredentialRequirements(credential.id)).map((requirement) => ({
+          ...requirement,
+          offering: requirement.requirementType === "offering_completion" && requirement.targetId
+            ? offeringById.get(requirement.targetId) || null
+            : null,
+        })),
+      })));
+
+      res.json({ credentials: requirementRows, approvedOfferings: offerings });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch credential requirements" });
+    }
+  });
+
+  app.get("/api/users/:userId/credentials", async (req, res) => {
+    try {
+      const userId = Number(req.params.userId);
+      if (!(await canAccessUserRecord(req, res, userId, { allowParent: true }))) return;
+
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const credentials = await storage.getIssuedCredentialsForUser(userId);
+      res.json(credentials);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch issued credentials" });
+    }
+  });
+
+  app.post("/api/users/:userId/credentials/:credentialId/issue", async (req, res) => {
+    try {
+      const userId = Number(req.params.userId);
+      if (!(await canAccessUserRecord(req, res, userId))) return;
+
+      const credentialId = Number(req.params.credentialId);
+      const user = await storage.getUser(userId);
+      const credential = await storage.getCredentialDefinition(credentialId);
+
+      if (!user || !credential) {
+        return res.status(404).json({ message: "User or credential not found" });
+      }
+
+      const requirements = await storage.getCredentialRequirements(credentialId);
+      const lessonRequirements = requirements.filter((requirement) => requirement.requirementType === "lesson" && requirement.targetId);
+      const offeringRequirements = requirements.filter((requirement) => requirement.requirementType === "offering_completion" && requirement.targetId);
+
+      for (const requirement of lessonRequirements) {
+        const progress = await storage.getUserLessonProgress(userId, requirement.targetId!);
+        if (progress?.status !== "completed") {
+          return res.status(409).json({ message: "Credential requirements are not complete" });
+        }
+      }
+
+      if (offeringRequirements.length > 0) {
+        const enrollments = await storage.getOfferingEnrollmentsForRequester(user.id, user.email);
+        const completedOfferingIds = new Set(
+          enrollments
+            .filter((enrollment) => enrollment.status === "completed")
+            .map((enrollment) => enrollment.educatorOfferingId),
+        );
+
+        for (const requirement of offeringRequirements) {
+          if (!completedOfferingIds.has(requirement.targetId!)) {
+            return res.status(409).json({ message: "Credential class requirements are not complete" });
+          }
+        }
+      }
+
+      const issuedCredential = await storage.issueCredential({
+        credentialId,
+        userId,
+        status: "issued",
+        issuedAt: new Date(),
+        reviewNote: "Issued automatically after required lesson and class completion.",
+        shareCode: randomUUID(),
+      });
+
+      res.status(201).json(issuedCredential);
+    } catch (error) {
+      res.status(400).json({ message: "Failed to issue credential" });
     }
   });
 
@@ -927,7 +3503,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "User not found" });
       }
       
-      const { content, isFromBuddy } = req.body;
+      const { content, isFromBuddy, role } = req.body;
       
       // Validate that message content exists
       if (!content) {
@@ -937,8 +3513,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Create message
       const validatedData = insertBuddyMessageSchema.parse({
         userId,
+        role: role ? String(role) : Boolean(isFromBuddy) ? "buddy" : "user",
         content: String(content),
-        isFromBuddy: Boolean(isFromBuddy),
         sentAt: new Date()
       });
       

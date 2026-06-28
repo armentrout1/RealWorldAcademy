@@ -1,480 +1,2277 @@
 import React, { useState } from "react";
 import { Link } from "wouter";
-import { ArrowLeft, BookOpen, CheckCircle, Clock, MessageSquare, Search, ThumbsDown, ThumbsUp } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ArrowLeft, BookMarked, BookOpen, Flag, GraduationCap, Inbox, LinkIcon, Search, ShieldCheck, Users } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 
-// Mock lesson data for review
-const mockPendingLessons = [
-  {
-    id: 1,
-    title: "Building a Personal Budget",
-    subject: "Financial Literacy",
-    ageGroup: "13-15",
-    contributorName: "Alex Johnson",
-    affiliation: "High School Economics Teacher",
-    submittedDate: "2025-04-05T14:30:00Z",
-    status: "pending"
-  },
-  {
-    id: 2,
-    title: "Digital Communication Ethics",
-    subject: "Communication",
-    ageGroup: "16-18",
-    contributorName: "Maria Rodriguez",
-    affiliation: "Digital Media Specialist",
-    submittedDate: "2025-04-04T09:15:00Z",
-    status: "pending"
-  },
-  {
-    id: 3,
-    title: "Coding Basics: Your First Webpage",
-    subject: "Technology",
-    ageGroup: "9-12",
-    contributorName: "David Chen",
-    affiliation: "Computer Science Teacher",
-    submittedDate: "2025-04-03T16:45:00Z",
-    status: "pending"
-  }
-];
+interface CurriculumSubmission {
+  id: number;
+  contributorName: string;
+  contributorEmail: string;
+  affiliation: string;
+  title: string;
+  subject: string;
+  ageGroup: string;
+  objective: string;
+  warmUp: string;
+  coreContent: string;
+  scenario: string;
+  activity: string;
+  reflection: string;
+  badge?: string | null;
+  resourceTitle?: string | null;
+  resourceType?: string | null;
+  resourceUrl?: string | null;
+  resourceDescription?: string | null;
+  resourceSourceLabel?: string | null;
+  resourceDuration?: string | null;
+  resourceSafetyNotes?: string | null;
+  resourceParentPrompt?: string | null;
+  resourceStudentPrompt?: string | null;
+  status: string;
+  reviewerNote?: string | null;
+  internalReviewNote?: string | null;
+  reviewRubric?: ReviewRubric | null;
+  submittedAt?: string | null;
+  reviewedAt?: string | null;
+  publishedLesson?: {
+    id: number;
+    title: string;
+    slug: string;
+  };
+  contributorProfile?: {
+    id: number;
+    displayName: string;
+    affiliation?: string | null;
+    bio?: string | null;
+    expertiseTags?: string[] | null;
+    trustLevel: string;
+    status: string;
+  } | null;
+}
 
-const mockApprovedLessons = [
-  {
-    id: 4,
-    title: "Managing Social Media Stress",
-    subject: "Well-Being",
-    ageGroup: "13-15",
-    contributorName: "Sarah Williams",
-    affiliation: "School Counselor",
-    submittedDate: "2025-04-01T11:20:00Z",
-    approvedDate: "2025-04-02T14:10:00Z",
-    status: "approved"
-  },
-  {
-    id: 5,
-    title: "Creative Problem Solving",
-    subject: "Critical Thinking",
-    ageGroup: "9-12",
-    contributorName: "James Lee",
-    affiliation: "STEM Program Coordinator",
-    submittedDate: "2025-03-29T10:05:00Z",
-    approvedDate: "2025-03-30T16:30:00Z",
-    status: "approved"
-  }
-];
+interface CurriculumCollectionItem {
+  id: number;
+  itemType: string;
+  title: string;
+  description?: string | null;
+  url?: string | null;
+  embedUrl?: string | null;
+  sourceLabel?: string | null;
+  duration?: string | null;
+  safetyNotes?: string | null;
+  order: number;
+  parentPrompt?: string | null;
+  studentPrompt?: string | null;
+}
 
-// Full mock lesson for viewing
-const mockFullLesson = {
-  id: 1,
-  title: "Building a Personal Budget",
-  subject: "Financial Literacy",
-  ageGroup: "13-15",
-  contributorName: "Alex Johnson",
-  contributorEmail: "alex.johnson@school.edu",
-  affiliation: "High School Economics Teacher",
-  submittedDate: "2025-04-05T14:30:00Z",
-  status: "pending",
-  objective: "By the end of this lesson, students will be able to create a basic personal budget, identify income sources and spending categories, and understand the importance of saving for future goals.",
-  warmUp: "Think about the last three things you spent money on. Were they needs or wants? How do you decide what to spend your money on?",
-  coreContent: "A personal budget is a financial plan that allocates income towards expenses, savings, and debt repayment. Creating a budget helps you take control of your finances, avoid overspending, and save for future goals.\n\nKey components of a budget include:\n\n1. Income: Money coming in from allowance, jobs, gifts, etc.\n2. Fixed Expenses: Regular costs that don't change (subscriptions, regular purchases)\n3. Variable Expenses: Costs that change month to month (entertainment, eating out)\n4. Savings: Money set aside for future goals\n\nThe 50/30/20 rule is a simple budgeting framework:\n- 50% for needs\n- 30% for wants\n- 20% for savings and debt repayment",
-  scenario: "Maya is a 14-year-old who receives $80 per month from allowance and helping neighbors with yard work. She wants to save for a $240 tablet, but also needs to pay for her $10 monthly music subscription and wants to have money for going out with friends.\n\nHow can Maya create a budget that allows her to save for her tablet while still having money for her needs and some wants?",
-  activity: "Create Your First Budget\n\n1. List all sources of income (allowance, jobs, gifts)\n2. Identify your regular expenses and categorize as needs or wants\n3. Set a savings goal (what are you saving for?)\n4. Create a budget sheet with these categories:\n   - Monthly Income\n   - Needs (___% of income)\n   - Wants (___% of income)\n   - Savings (___% of income)\n5. Track your spending for one month to see how well you stick to your budget",
-  reflection: "How did creating a budget change how you think about money? What was the most challenging part of making a budget? How might budgeting skills help you in the future?",
-  badge: "Budget Master"
-};
+interface CurriculumCollection {
+  id: number;
+  title: string;
+  description: string;
+  subject: string;
+  ageGroup: string;
+  estimatedWeeks: number;
+  learningGoals?: string[] | null;
+  parentNotes?: string | null;
+  finalProject?: string | null;
+  status: string;
+  reviewerNote?: string | null;
+  internalReviewNote?: string | null;
+  reviewRubric?: ReviewRubric | null;
+  submittedAt?: string | null;
+  reviewedAt?: string | null;
+  contributorProfile?: {
+    id: number;
+    displayName: string;
+    affiliation?: string | null;
+    bio?: string | null;
+    expertiseTags?: string[] | null;
+    trustLevel: string;
+    status: string;
+  } | null;
+  items?: CurriculumCollectionItem[];
+}
+
+interface FeedbackSubmission {
+  id: number;
+  name: string;
+  email: string;
+  audience: string;
+  category: string;
+  message: string;
+  status: string;
+  createdAt?: string | null;
+}
+
+interface ContentReport {
+  id: number;
+  reporterName?: string | null;
+  reporterEmail?: string | null;
+  contentType: string;
+  contentId: number;
+  contentTitle: string;
+  category: string;
+  message: string;
+  status: string;
+  adminNote?: string | null;
+  actionTaken?: string | null;
+  createdAt?: string | null;
+  resolvedAt?: string | null;
+}
+
+interface EducatorOffering {
+  id: number;
+  title: string;
+  description: string;
+  offeringType: string;
+  subject: string;
+  ageGroup: string;
+  format: string;
+  duration?: string | null;
+  priceCents?: number | null;
+  status: string;
+  reviewerNote?: string | null;
+  submittedAt?: string | null;
+  contributorProfile?: {
+    id: number;
+    displayName: string;
+    affiliation?: string | null;
+    trustLevel: string;
+    subjectsTaught?: string[] | null;
+    ageGroupsServed?: string[] | null;
+  } | null;
+}
+
+interface OfferingInterest {
+  id: number;
+  requesterName: string;
+  requesterEmail: string;
+  learnerAgeGroup?: string | null;
+  message?: string | null;
+  status: string;
+  createdAt?: string | null;
+  offering?: {
+    id: number;
+    title: string;
+    offeringType: string;
+    subject: string;
+    ageGroup: string;
+  } | null;
+  contributorProfile?: {
+    id: number;
+    displayName: string;
+    affiliation?: string | null;
+    trustLevel: string;
+  } | null;
+  session?: {
+    id: number;
+    title: string;
+    startsAt?: string | null;
+  } | null;
+}
+
+interface OfferingSession {
+  id: number;
+  title: string;
+  startsAt?: string | null;
+  endsAt?: string | null;
+  duration?: string | null;
+  capacity?: number | null;
+  reservedSeats: number;
+  meetingUrl?: string | null;
+  registrationNote?: string | null;
+  status: string;
+  submittedAt?: string | null;
+  offering?: {
+    id: number;
+    title: string;
+    subject: string;
+    ageGroup: string;
+  } | null;
+  contributorProfile?: {
+    id: number;
+    displayName: string;
+    affiliation?: string | null;
+    trustLevel: string;
+  } | null;
+}
+
+interface OfferingEnrollment {
+  id: number;
+  requesterName: string;
+  requesterEmail: string;
+  learnerAgeGroup?: string | null;
+  learnerCount: number;
+  message?: string | null;
+  status: string;
+  createdAt?: string | null;
+  reservedAt?: string | null;
+  offering?: {
+    id: number;
+    title: string;
+    subject: string;
+    ageGroup: string;
+  } | null;
+  session?: {
+    id: number;
+    title: string;
+    startsAt?: string | null;
+    capacity?: number | null;
+    reservedSeats: number;
+  } | null;
+  contributorProfile?: {
+    id: number;
+    displayName: string;
+    affiliation?: string | null;
+    trustLevel: string;
+  } | null;
+}
+
+interface OfferingReview {
+  id: number;
+  offeringEnrollmentId: number;
+  rating: number;
+  reviewText: string;
+  reviewerName: string;
+  reviewerEmail: string;
+  status: string;
+  adminNote?: string | null;
+  createdAt?: string | null;
+  offering?: {
+    id: number;
+    title: string;
+    subject: string;
+    ageGroup: string;
+  } | null;
+  session?: {
+    id: number;
+    title: string;
+    startsAt?: string | null;
+  } | null;
+  contributorProfile?: {
+    id: number;
+    displayName: string;
+    affiliation?: string | null;
+    trustLevel: string;
+  } | null;
+}
+
+interface CredentialDefinition {
+  id: number;
+  title: string;
+  slug: string;
+  description: string;
+  criteriaSummary?: string | null;
+  requirements?: CredentialRequirement[];
+}
+
+interface CredentialRequirement {
+  id: number;
+  credentialId: number;
+  requirementType: string;
+  targetId?: number | null;
+  title: string;
+  description?: string | null;
+  required: boolean;
+  order: number;
+  offering?: EducatorOffering | null;
+}
+
+interface CredentialRequirementOverview {
+  credentials: CredentialDefinition[];
+  approvedOfferings: EducatorOffering[];
+}
+
+interface ResourceSubmission {
+  id: number;
+  contributorName: string;
+  contributorEmail: string;
+  affiliation: string;
+  title: string;
+  description: string;
+  resourceType: string;
+  category: string;
+  audience?: string[] | null;
+  ageGroup: string;
+  url: string;
+  embedUrl?: string | null;
+  sourceLabel?: string | null;
+  duration?: string | null;
+  learningUse: string;
+  safetyNotes: string;
+  thumbnailUrl?: string | null;
+  status: string;
+  reviewerNote?: string | null;
+  internalReviewNote?: string | null;
+  reviewRubric?: ReviewRubric | null;
+  submittedAt?: string | null;
+  reviewedAt?: string | null;
+  contributorProfile?: {
+    id: number;
+    displayName: string;
+    affiliation?: string | null;
+    bio?: string | null;
+    expertiseTags?: string[] | null;
+    trustLevel: string;
+    status: string;
+  } | null;
+}
+
+interface AdminUser {
+  id: number;
+  fullName: string;
+  email: string;
+  firstName?: string | null;
+  lastName?: string | null;
+  role: "student" | "parent" | "admin";
+  ageGroup?: string | null;
+}
+
+type ReviewRubric = Record<string, string>;
+
+const curriculumStatuses = ["pending_review", "approved", "changes_requested", "rejected", "archived"];
+const collectionStatuses = ["approved", "published", "changes_requested", "rejected", "archived"];
+const resourceStatuses = ["approved", "changes_requested", "rejected", "archived"];
+const feedbackStatuses = ["new", "reviewing", "resolved", "archived"];
+const reportStatuses = ["new", "reviewing", "resolved", "archived"];
+const offeringReviewStatuses = ["approved", "changes_requested", "rejected", "archived"];
+const sessionReviewStatuses = ["approved", "changes_requested", "rejected", "cancelled", "archived"];
+const interestStatuses = ["new", "contacted", "waitlisted", "closed", "archived"];
+const enrollmentStatuses = ["requested", "reserved", "waitlisted", "cancelled", "completed", "archived"];
+const offeringReviewModerationStatuses = ["pending_review", "approved", "rejected", "archived"];
+const roles = ["student", "parent", "admin"];
+const rubricCriteria = [
+  ["safety", "Safety"],
+  ["ageFit", "Age Fit"],
+  ["sourceTrust", "Source Trust"],
+  ["originality", "Originality"],
+  ["usefulness", "Learning Usefulness"],
+  ["clarity", "Clarity"],
+  ["credentialFit", "Credential Fit"],
+] as const;
+const rubricRatings = ["pass", "needs_changes", "concern"];
+
+const emptyRubric = (): ReviewRubric => Object.fromEntries(rubricCriteria.map(([key]) => [key, "pass"]));
 
 export default function AdminLessons() {
-  const [activeTab, setActiveTab] = useState("pending");
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedLesson, setSelectedLesson] = useState<any>(null);
-  const [viewMode, setViewMode] = useState<"preview" | "feedback">("preview");
-  const [feedbackText, setFeedbackText] = useState("");
-  const [filterSubject, setFilterSubject] = useState("");
+  const [selectedSubmission, setSelectedSubmission] = useState<CurriculumSubmission | null>(null);
+  const [selectedCollection, setSelectedCollection] = useState<CurriculumCollection | null>(null);
+  const [selectedResource, setSelectedResource] = useState<ResourceSubmission | null>(null);
+  const [reviewNote, setReviewNote] = useState("");
+  const [internalReviewNote, setInternalReviewNote] = useState("");
+  const [reviewRubric, setReviewRubric] = useState<ReviewRubric>(emptyRubric());
+  const [credentialRequirementForm, setCredentialRequirementForm] = useState({
+    credentialId: "",
+    offeringId: "",
+    title: "",
+    description: "",
+    order: "1",
+  });
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
-  // Filter lessons based on search query and subject filter
-  const filterLessons = (lessons: any[]) => {
-    return lessons.filter(lesson => {
-      const matchesSearch = 
-        lesson.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        lesson.contributorName.toLowerCase().includes(searchQuery.toLowerCase());
-      
-      const matchesSubject = filterSubject ? lesson.subject === filterSubject : true;
-      
-      return matchesSearch && matchesSubject;
-    });
-  };
+  const { data: submissions = [], isLoading: submissionsLoading } = useQuery<CurriculumSubmission[]>({
+    queryKey: ["/api/curriculum-submissions"],
+    queryFn: () => apiRequest<CurriculumSubmission[]>("/api/curriculum-submissions"),
+  });
 
-  const pendingLessons = filterLessons(mockPendingLessons);
-  const approvedLessons = filterLessons(mockApprovedLessons);
+  const { data: collections = [], isLoading: collectionsLoading } = useQuery<CurriculumCollection[]>({
+    queryKey: ["/api/admin/curriculum-collections"],
+    queryFn: () => apiRequest<CurriculumCollection[]>("/api/admin/curriculum-collections"),
+  });
 
-  // View lesson details
-  const handleViewLesson = (lesson: any) => {
-    setSelectedLesson(mockFullLesson); // In a real app, we'd fetch the full lesson data
-    setViewMode("preview");
-  };
+  const { data: resourceSubmissions = [], isLoading: resourcesLoading } = useQuery<ResourceSubmission[]>({
+    queryKey: ["/api/resource-submissions"],
+    queryFn: () => apiRequest<ResourceSubmission[]>("/api/resource-submissions"),
+  });
 
-  // Approve lesson
-  const handleApproveLesson = () => {
-    toast({
-      title: "Lesson Approved!",
-      description: `"${selectedLesson.title}" has been approved and added to the curriculum.`,
-    });
-    setSelectedLesson(null);
-  };
+  const { data: feedback = [], isLoading: feedbackLoading } = useQuery<FeedbackSubmission[]>({
+    queryKey: ["/api/feedback"],
+    queryFn: () => apiRequest<FeedbackSubmission[]>("/api/feedback"),
+  });
 
-  // Send feedback
-  const handleSendFeedback = () => {
-    if (!feedbackText.trim()) {
+  const { data: contentReports = [], isLoading: reportsLoading } = useQuery<ContentReport[]>({
+    queryKey: ["/api/content-reports"],
+    queryFn: () => apiRequest<ContentReport[]>("/api/content-reports"),
+  });
+
+  const { data: educatorOfferings = [], isLoading: offeringsLoading } = useQuery<EducatorOffering[]>({
+    queryKey: ["/api/admin/educator-offerings"],
+    queryFn: () => apiRequest<EducatorOffering[]>("/api/admin/educator-offerings"),
+  });
+
+  const { data: offeringInterests = [], isLoading: interestsLoading } = useQuery<OfferingInterest[]>({
+    queryKey: ["/api/admin/offering-interests"],
+    queryFn: () => apiRequest<OfferingInterest[]>("/api/admin/offering-interests"),
+  });
+
+  const { data: offeringSessions = [], isLoading: sessionsLoading } = useQuery<OfferingSession[]>({
+    queryKey: ["/api/admin/offering-sessions"],
+    queryFn: () => apiRequest<OfferingSession[]>("/api/admin/offering-sessions"),
+  });
+
+  const { data: offeringEnrollments = [], isLoading: enrollmentsLoading } = useQuery<OfferingEnrollment[]>({
+    queryKey: ["/api/admin/offering-enrollments"],
+    queryFn: () => apiRequest<OfferingEnrollment[]>("/api/admin/offering-enrollments"),
+  });
+
+  const { data: offeringReviews = [], isLoading: offeringReviewsLoading } = useQuery<OfferingReview[]>({
+    queryKey: ["/api/admin/offering-reviews"],
+    queryFn: () => apiRequest<OfferingReview[]>("/api/admin/offering-reviews"),
+  });
+
+  const { data: credentialRequirementOverview } = useQuery<CredentialRequirementOverview>({
+    queryKey: ["/api/admin/credential-requirements"],
+    queryFn: () => apiRequest<CredentialRequirementOverview>("/api/admin/credential-requirements"),
+  });
+
+  const { data: users = [], isLoading: usersLoading } = useQuery<AdminUser[]>({
+    queryKey: ["/api/admin/users"],
+    queryFn: () => apiRequest<AdminUser[]>("/api/admin/users"),
+  });
+
+  const reviewMutation = useMutation({
+    mutationFn: ({
+      id,
+      status,
+      reviewerNote,
+      internalReviewNote,
+      reviewRubric,
+    }: { id: number; status: string; reviewerNote?: string; internalReviewNote?: string; reviewRubric?: ReviewRubric }) =>
+      apiRequest<CurriculumSubmission>(`/api/curriculum-submissions/${id}/review`, {
+        method: "PATCH",
+        body: { status, reviewerNote, internalReviewNote, reviewRubric },
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/curriculum-submissions"] });
+      setSelectedSubmission(null);
+      setReviewNote("");
+      setInternalReviewNote("");
+      setReviewRubric(emptyRubric());
       toast({
-        title: "Error",
-        description: "Please enter feedback before sending.",
+        title: "Review updated",
+        description: "Approved submissions are now published into the lesson library.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Review failed",
+        description: error instanceof Error ? error.message : "Please try again.",
         variant: "destructive",
       });
-      return;
-    }
+    },
+  });
 
-    toast({
-      title: "Feedback Sent",
-      description: `Feedback for "${selectedLesson.title}" has been sent to the contributor.`,
-    });
-    setSelectedLesson(null);
-    setFeedbackText("");
+  const collectionReviewMutation = useMutation({
+    mutationFn: ({
+      id,
+      status,
+      reviewerNote,
+      internalReviewNote,
+      reviewRubric,
+    }: { id: number; status: string; reviewerNote?: string; internalReviewNote?: string; reviewRubric?: ReviewRubric }) =>
+      apiRequest<CurriculumCollection>(`/api/admin/curriculum-collections/${id}/review`, {
+        method: "PATCH",
+        body: { status, reviewerNote, internalReviewNote, reviewRubric },
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/curriculum-collections"] });
+      setSelectedCollection(null);
+      setReviewNote("");
+      setInternalReviewNote("");
+      setReviewRubric(emptyRubric());
+      toast({
+        title: "Collection review updated",
+        description: "Approved collections are now available to public collection surfaces.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Collection review failed",
+        description: error instanceof Error ? error.message : "Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const resourceReviewMutation = useMutation({
+    mutationFn: ({
+      id,
+      status,
+      reviewerNote,
+      internalReviewNote,
+      reviewRubric,
+    }: { id: number; status: string; reviewerNote?: string; internalReviewNote?: string; reviewRubric?: ReviewRubric }) =>
+      apiRequest<ResourceSubmission>(`/api/resource-submissions/${id}/review`, {
+        method: "PATCH",
+        body: { status, reviewerNote, internalReviewNote, reviewRubric },
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/resource-submissions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/resources"] });
+      setSelectedResource(null);
+      setReviewNote("");
+      setInternalReviewNote("");
+      setReviewRubric(emptyRubric());
+      toast({
+        title: "Resource review updated",
+        description: "Approved resources are published into the Resource Center.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Resource review failed",
+        description: error instanceof Error ? error.message : "Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const feedbackMutation = useMutation({
+    mutationFn: ({ id, status }: { id: number; status: string }) =>
+      apiRequest<FeedbackSubmission>(`/api/feedback/${id}`, {
+        method: "PATCH",
+        body: { status },
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/feedback"] });
+      toast({ title: "Feedback updated", description: "The feedback queue status has been saved." });
+    },
+    onError: (error) => {
+      toast({
+        title: "Feedback update failed",
+        description: error instanceof Error ? error.message : "Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const reportMutation = useMutation({
+    mutationFn: ({ id, status }: { id: number; status: string }) =>
+      apiRequest<ContentReport>(`/api/content-reports/${id}`, {
+        method: "PATCH",
+        body: { status },
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/content-reports"] });
+      toast({ title: "Report updated", description: "The content report status has been saved." });
+    },
+    onError: (error) => {
+      toast({
+        title: "Report update failed",
+        description: error instanceof Error ? error.message : "Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const offeringReviewMutation = useMutation({
+    mutationFn: ({ id, status }: { id: number; status: string }) =>
+      apiRequest<EducatorOffering>(`/api/admin/educator-offerings/${id}/review`, {
+        method: "PATCH",
+        body: { status },
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/educator-offerings"] });
+      toast({ title: "Offering reviewed", description: "The educator offering review status has been saved." });
+    },
+    onError: (error) => {
+      toast({
+        title: "Offering review failed",
+        description: error instanceof Error ? error.message : "Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const interestMutation = useMutation({
+    mutationFn: ({ id, status }: { id: number; status: string }) =>
+      apiRequest<OfferingInterest>(`/api/admin/offering-interests/${id}`, {
+        method: "PATCH",
+        body: { status },
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/offering-interests"] });
+      toast({ title: "Interest updated", description: "The marketplace interest status has been saved." });
+    },
+    onError: (error) => {
+      toast({
+        title: "Interest update failed",
+        description: error instanceof Error ? error.message : "Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const sessionReviewMutation = useMutation({
+    mutationFn: ({ id, status }: { id: number; status: string }) =>
+      apiRequest<OfferingSession>(`/api/admin/offering-sessions/${id}/review`, {
+        method: "PATCH",
+        body: { status },
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/offering-sessions"] });
+      toast({ title: "Session reviewed", description: "The session review status has been saved." });
+    },
+    onError: (error) => {
+      toast({
+        title: "Session review failed",
+        description: error instanceof Error ? error.message : "Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const enrollmentMutation = useMutation({
+    mutationFn: ({ id, status }: { id: number; status: string }) =>
+      apiRequest<OfferingEnrollment>(`/api/admin/offering-enrollments/${id}`, {
+        method: "PATCH",
+        body: { status },
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/offering-enrollments"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/offering-sessions"] });
+      toast({ title: "Enrollment updated", description: "The reservation status and seat count have been saved." });
+    },
+    onError: (error) => {
+      toast({
+        title: "Enrollment update failed",
+        description: error instanceof Error ? error.message : "Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const offeringReviewModerationMutation = useMutation({
+    mutationFn: ({ id, status }: { id: number; status: string }) =>
+      apiRequest<OfferingReview>(`/api/admin/offering-reviews/${id}`, {
+        method: "PATCH",
+        body: { status },
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/offering-reviews"] });
+      toast({ title: "Class review updated", description: "The family review moderation status has been saved." });
+    },
+    onError: (error) => {
+      toast({
+        title: "Class review update failed",
+        description: error instanceof Error ? error.message : "Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const credentialRequirementMutation = useMutation({
+    mutationFn: () => {
+      const offering = credentialRequirementOverview?.approvedOfferings.find((item) => String(item.id) === credentialRequirementForm.offeringId);
+      return apiRequest(`/api/credentials/${credentialRequirementForm.credentialId}/requirements`, {
+        method: "POST",
+        body: {
+          requirementType: "offering_completion",
+          targetId: Number(credentialRequirementForm.offeringId),
+          title: credentialRequirementForm.title || `Complete ${offering?.title || "approved class"}`,
+          description: credentialRequirementForm.description || offering?.description || null,
+          required: true,
+          order: Number(credentialRequirementForm.order || 1),
+        },
+      });
+    },
+    onSuccess: () => {
+      setCredentialRequirementForm({ credentialId: "", offeringId: "", title: "", description: "", order: "1" });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/credential-requirements"] });
+      toast({ title: "Credential requirement added", description: "That approved class now counts toward the selected credential." });
+    },
+    onError: (error) => {
+      toast({
+        title: "Requirement not added",
+        description: error instanceof Error ? error.message : "Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+
+  const roleMutation = useMutation({
+    mutationFn: ({ userId, role }: { userId: number; role: string }) =>
+      apiRequest<AdminUser>(`/api/admin/users/${userId}/role`, {
+        method: "PATCH",
+        body: { role },
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      toast({ title: "Role updated", description: "The user's role has been saved." });
+    },
+    onError: (error) => {
+      toast({
+        title: "Role update failed",
+        description: error instanceof Error ? error.message : "Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const filteredSubmissions = submissions.filter((submission) =>
+    [submission.title, submission.contributorName, submission.subject, submission.status]
+      .join(" ")
+      .toLowerCase()
+      .includes(searchQuery.toLowerCase())
+  );
+
+  const filteredCollections = collections.filter((collection) =>
+    [
+      collection.title,
+      collection.contributorProfile?.displayName,
+      collection.subject,
+      collection.ageGroup,
+      collection.status,
+    ]
+      .join(" ")
+      .toLowerCase()
+      .includes(searchQuery.toLowerCase())
+  );
+
+  const filteredResources = resourceSubmissions.filter((resource) =>
+    [
+      resource.title,
+      resource.contributorProfile?.displayName || resource.contributorName,
+      resource.resourceType,
+      resource.category,
+      resource.status,
+    ]
+      .join(" ")
+      .toLowerCase()
+      .includes(searchQuery.toLowerCase())
+  );
+
+  const filteredFeedback = feedback.filter((item) =>
+    [item.name, item.email, item.audience, item.category, item.status, item.message]
+      .join(" ")
+      .toLowerCase()
+      .includes(searchQuery.toLowerCase())
+  );
+
+  const filteredReports = contentReports.filter((report) =>
+    [
+      report.reporterName,
+      report.reporterEmail,
+      report.contentType,
+      report.contentTitle,
+      report.category,
+      report.status,
+      report.message,
+    ]
+      .join(" ")
+      .toLowerCase()
+      .includes(searchQuery.toLowerCase())
+  );
+
+  const filteredOfferings = educatorOfferings.filter((offering) =>
+    [
+      offering.title,
+      offering.contributorProfile?.displayName,
+      offering.offeringType,
+      offering.subject,
+      offering.ageGroup,
+      offering.status,
+      offering.description,
+    ]
+      .join(" ")
+      .toLowerCase()
+      .includes(searchQuery.toLowerCase())
+  );
+
+  const filteredInterests = offeringInterests.filter((interest) =>
+    [
+      interest.requesterName,
+      interest.requesterEmail,
+      interest.learnerAgeGroup,
+      interest.message,
+      interest.status,
+      interest.offering?.title,
+      interest.offering?.subject,
+      interest.contributorProfile?.displayName,
+    ]
+      .join(" ")
+      .toLowerCase()
+      .includes(searchQuery.toLowerCase())
+  );
+
+  const filteredSessions = offeringSessions.filter((session) =>
+    [
+      session.title,
+      session.status,
+      session.meetingUrl,
+      session.registrationNote,
+      session.offering?.title,
+      session.offering?.subject,
+      session.contributorProfile?.displayName,
+    ]
+      .join(" ")
+      .toLowerCase()
+      .includes(searchQuery.toLowerCase())
+  );
+
+  const filteredEnrollments = offeringEnrollments.filter((enrollment) =>
+    [
+      enrollment.requesterName,
+      enrollment.requesterEmail,
+      enrollment.learnerAgeGroup,
+      enrollment.status,
+      enrollment.message,
+      enrollment.offering?.title,
+      enrollment.session?.title,
+      enrollment.contributorProfile?.displayName,
+    ]
+      .join(" ")
+      .toLowerCase()
+      .includes(searchQuery.toLowerCase())
+  );
+
+  const filteredOfferingReviews = offeringReviews.filter((review) =>
+    [
+      review.reviewerName,
+      review.reviewerEmail,
+      review.reviewText,
+      review.status,
+      review.offering?.title,
+      review.session?.title,
+      review.contributorProfile?.displayName,
+    ]
+      .join(" ")
+      .toLowerCase()
+      .includes(searchQuery.toLowerCase())
+  );
+
+  const filteredUsers = users.filter((user) =>
+    [user.fullName, user.email, user.role, user.ageGroup]
+      .join(" ")
+      .toLowerCase()
+      .includes(searchQuery.toLowerCase())
+  );
+
+  const hydrateReviewState = (item: {
+    reviewerNote?: string | null;
+    internalReviewNote?: string | null;
+    reviewRubric?: ReviewRubric | null;
+  }) => {
+    setReviewNote(item.reviewerNote || "");
+    setInternalReviewNote(item.internalReviewNote || "");
+    setReviewRubric({ ...emptyRubric(), ...(item.reviewRubric || {}) });
   };
 
-  // Format date for display
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return new Intl.DateTimeFormat('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric'
-    }).format(date);
+  const formatDate = (dateString?: string | null) => {
+    if (!dateString) return "Not recorded";
+    return new Intl.DateTimeFormat("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    }).format(new Date(dateString));
+  };
+
+  const statusBadge = (status: string) => {
+    const normalized = status.replace("_", " ");
+    if (status === "approved" || status === "resolved") return <Badge className="bg-emerald-600">{normalized}</Badge>;
+    if (status === "pending_review" || status === "new" || status === "reviewing") return <Badge className="bg-amber-500">{normalized}</Badge>;
+    if (status === "rejected" || status === "changes_requested") return <Badge variant="destructive">{normalized}</Badge>;
+    return <Badge variant="secondary">{normalized}</Badge>;
+  };
+
+  const renderReviewControls = () => (
+    <div className="space-y-4 rounded-md border bg-slate-50 p-4">
+      <div>
+        <h3 className="font-semibold">Structured Review Rubric</h3>
+        <p className="text-sm text-muted-foreground">
+          Use this as the internal quality gate before publishing community-created content.
+        </p>
+      </div>
+      <div className="grid gap-3 md:grid-cols-2">
+        {rubricCriteria.map(([key, label]) => (
+          <div key={key} className="space-y-1">
+            <div className="text-sm font-medium">{label}</div>
+            <Select
+              value={reviewRubric[key] || "pass"}
+              onValueChange={(value) => setReviewRubric((current) => ({ ...current, [key]: value }))}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {rubricRatings.map((rating) => (
+                  <SelectItem key={rating} value={rating}>{rating.replace("_", " ")}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        ))}
+      </div>
+      <div className="space-y-2">
+        <h3 className="font-semibold">Internal Admin Note</h3>
+        <Textarea
+          value={internalReviewNote}
+          onChange={(event) => setInternalReviewNote(event.target.value)}
+          placeholder="Internal-only notes about safety, quality, source trust, or future follow-up..."
+          className="min-h-[90px]"
+        />
+      </div>
+    </div>
+  );
+
+  const counts = {
+    pending: submissions.filter((submission) => submission.status === "pending_review").length,
+    collections: collections.filter((collection) => collection.status === "pending_review").length,
+    resources: resourceSubmissions.filter((resource) => resource.status === "pending_review").length,
+    offerings: educatorOfferings.filter((offering) => offering.status === "pending_review").length,
+    sessions: offeringSessions.filter((session) => session.status === "pending_review").length,
+    enrollments: offeringEnrollments.filter((enrollment) => ["requested", "reserved", "waitlisted"].includes(enrollment.status)).length,
+    reviews: offeringReviews.filter((review) => review.status === "pending_review").length,
+    interests: offeringInterests.filter((interest) => ["new", "waitlisted"].includes(interest.status)).length,
+    feedback: feedback.filter((item) => item.status === "new" || item.status === "reviewing").length,
+    reports: contentReports.filter((item) => item.status === "new" || item.status === "reviewing").length,
+    users: users.length,
   };
 
   return (
     <div className="container py-8">
-      <div className="flex items-center justify-between mb-6">
-        <Link href="/dashboard">
-          <Button variant="ghost" className="gap-1">
+      <div className="mb-6 flex items-center justify-between">
+        <Button variant="ghost" className="gap-1" asChild>
+          <Link href="/dashboard">
             <ArrowLeft className="h-4 w-4" />
             Back to Dashboard
-          </Button>
-        </Link>
-        
-        <h1 className="text-2xl font-bold">Lesson Review Dashboard</h1>
-        
-        <div className="w-[150px]"></div> {/* Empty div for flex alignment */}
+          </Link>
+        </Button>
+        <h1 className="text-2xl font-bold">Admin Management</h1>
+        <div className="w-[150px]" />
       </div>
-      
-      <div className="flex flex-col md:flex-row gap-6 mb-6">
-        <div className="relative flex-1">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search lessons..."
-            className="pl-8"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-        </div>
-        
-        <Select 
-          value={filterSubject}
-          onValueChange={setFilterSubject}
-        >
-          <SelectTrigger className="w-[200px]">
-            <SelectValue placeholder="Filter by subject" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="">All Subjects</SelectItem>
-            <SelectItem value="Financial Literacy">Financial Literacy</SelectItem>
-            <SelectItem value="Communication">Communication</SelectItem>
-            <SelectItem value="Technology">Technology</SelectItem>
-            <SelectItem value="Well-Being">Well-Being</SelectItem>
-            <SelectItem value="Critical Thinking">Critical Thinking</SelectItem>
-          </SelectContent>
-        </Select>
+
+      <div className="mb-6 grid gap-4 md:grid-cols-3 xl:grid-cols-7">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-sm font-medium">
+              <BookOpen className="h-4 w-4 text-primary" />
+              Curriculum Queue
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold">{counts.pending}</div>
+            <p className="text-sm text-muted-foreground">pending submissions</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-sm font-medium">
+              <BookMarked className="h-4 w-4 text-primary" />
+              Collection Queue
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold">{counts.collections}</div>
+            <p className="text-sm text-muted-foreground">pending collections</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-sm font-medium">
+              <LinkIcon className="h-4 w-4 text-primary" />
+              Resource Queue
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold">{counts.resources}</div>
+            <p className="text-sm text-muted-foreground">pending resources</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-sm font-medium">
+              <GraduationCap className="h-4 w-4 text-primary" />
+              Offering Queue
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold">{counts.offerings + counts.sessions + counts.reviews}</div>
+            <p className="text-sm text-muted-foreground">{counts.sessions} sessions, {counts.enrollments} enrollments, {counts.reviews} reviews</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-sm font-medium">
+              <Inbox className="h-4 w-4 text-primary" />
+              Feedback Queue
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold">{counts.feedback}</div>
+            <p className="text-sm text-muted-foreground">open messages</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-sm font-medium">
+              <Flag className="h-4 w-4 text-primary" />
+              Reports
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold">{counts.reports}</div>
+            <p className="text-sm text-muted-foreground">open concerns</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-sm font-medium">
+              <Users className="h-4 w-4 text-primary" />
+              Users
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold">{counts.users}</div>
+            <p className="text-sm text-muted-foreground">accounts</p>
+          </CardContent>
+        </Card>
       </div>
-      
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-2 mb-6">
-          <TabsTrigger value="pending" className="relative">
-            Pending Review
-            <Badge className="ml-2 bg-orange-500 hover:bg-orange-500">{pendingLessons.length}</Badge>
-          </TabsTrigger>
-          <TabsTrigger value="approved">
-            Approved Lessons
-            <Badge className="ml-2 bg-green-500 hover:bg-green-500">{approvedLessons.length}</Badge>
-          </TabsTrigger>
+
+      <div className="relative mb-6">
+        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+        <Input
+          placeholder="Search submissions, collections, resources, offerings, reports, feedback, users..."
+          className="pl-8"
+          value={searchQuery}
+          onChange={(event) => setSearchQuery(event.target.value)}
+        />
+      </div>
+
+      <Tabs defaultValue="curriculum">
+        <TabsList className="mb-6 grid w-full grid-cols-7">
+          <TabsTrigger value="curriculum">Curriculum</TabsTrigger>
+          <TabsTrigger value="collections">Collections</TabsTrigger>
+          <TabsTrigger value="resources">Resources</TabsTrigger>
+          <TabsTrigger value="offerings">Offerings</TabsTrigger>
+          <TabsTrigger value="reports">Reports</TabsTrigger>
+          <TabsTrigger value="feedback">Feedback</TabsTrigger>
+          <TabsTrigger value="users">Users & Roles</TabsTrigger>
         </TabsList>
-        
-        <TabsContent value="pending" className="space-y-4">
-          {pendingLessons.length === 0 ? (
-            <Card>
-              <CardContent className="pt-6 text-center">
-                <p className="text-muted-foreground">No pending lessons found.</p>
-              </CardContent>
-            </Card>
-          ) : (
-            <Card>
-              <CardHeader>
-                <CardTitle>Lessons Awaiting Review</CardTitle>
-                <CardDescription>
-                  Review and approve contributor submissions or provide feedback for improvement.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
+
+        <TabsContent value="curriculum">
+          <Card>
+            <CardHeader>
+              <CardTitle>Curriculum Review Queue</CardTitle>
+              <CardDescription>Approve, reject, archive, or request changes for contributor submissions.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {submissionsLoading ? (
+                <p className="py-8 text-center text-muted-foreground">Loading submissions...</p>
+              ) : (
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Lesson Title</TableHead>
-                      <TableHead>Subject</TableHead>
-                      <TableHead>Age Group</TableHead>
+                      <TableHead>Title</TableHead>
                       <TableHead>Contributor</TableHead>
+                      <TableHead>Subject</TableHead>
+                      <TableHead>Status</TableHead>
                       <TableHead>Submitted</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {pendingLessons.map(lesson => (
-                      <TableRow key={lesson.id}>
-                        <TableCell className="font-medium">{lesson.title}</TableCell>
-                        <TableCell>{lesson.subject}</TableCell>
-                        <TableCell>{lesson.ageGroup}</TableCell>
-                        <TableCell>{lesson.contributorName}</TableCell>
-                        <TableCell>{formatDate(lesson.submittedDate)}</TableCell>
+                    {filteredSubmissions.map((submission) => (
+                      <TableRow key={submission.id}>
+                        <TableCell className="font-medium">{submission.title}</TableCell>
+                        <TableCell>
+                          <div className="font-medium">{submission.contributorProfile?.displayName || submission.contributorName}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {submission.contributorProfile
+                              ? `${submission.contributorProfile.trustLevel} creator`
+                              : submission.contributorEmail}
+                          </div>
+                        </TableCell>
+                        <TableCell>{submission.subject}</TableCell>
+                        <TableCell>{statusBadge(submission.status)}</TableCell>
+                        <TableCell>{formatDate(submission.submittedAt)}</TableCell>
                         <TableCell className="text-right">
-                          <Button variant="outline" size="sm" onClick={() => handleViewLesson(lesson)}>
-                            Review
+                          <Button variant="outline" size="sm" onClick={() => {
+                            setSelectedSubmission(submission);
+                            hydrateReviewState(submission);
+                          }}>
+                            Manage
                           </Button>
                         </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
                 </Table>
-              </CardContent>
-            </Card>
-          )}
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
-        
-        <TabsContent value="approved" className="space-y-4">
-          {approvedLessons.length === 0 ? (
-            <Card>
-              <CardContent className="pt-6 text-center">
-                <p className="text-muted-foreground">No approved lessons found.</p>
-              </CardContent>
-            </Card>
-          ) : (
-            <Card>
-              <CardHeader>
-                <CardTitle>Approved Lessons</CardTitle>
-                <CardDescription>
-                  These lessons have been reviewed and approved for the curriculum.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
+
+        <TabsContent value="collections">
+          <Card>
+            <CardHeader>
+              <CardTitle>Collection Review Queue</CardTitle>
+              <CardDescription>Review multi-step curriculum paths before families can browse them.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {collectionsLoading ? (
+                <p className="py-8 text-center text-muted-foreground">Loading collections...</p>
+              ) : (
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Lesson Title</TableHead>
-                      <TableHead>Subject</TableHead>
-                      <TableHead>Age Group</TableHead>
+                      <TableHead>Collection</TableHead>
                       <TableHead>Contributor</TableHead>
-                      <TableHead>Approved Date</TableHead>
+                      <TableHead>Subject</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Submitted</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {approvedLessons.map(lesson => (
-                      <TableRow key={lesson.id}>
-                        <TableCell className="font-medium">{lesson.title}</TableCell>
-                        <TableCell>{lesson.subject}</TableCell>
-                        <TableCell>{lesson.ageGroup}</TableCell>
-                        <TableCell>{lesson.contributorName}</TableCell>
-                        <TableCell>{formatDate(lesson.approvedDate || '')}</TableCell>
+                    {filteredCollections.map((collection) => (
+                      <TableRow key={collection.id}>
+                        <TableCell>
+                          <div className="font-medium">{collection.title}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {collection.estimatedWeeks} weeks | {collection.items?.length || 0} items
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="font-medium">{collection.contributorProfile?.displayName || "Unknown creator"}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {collection.contributorProfile
+                              ? `${collection.contributorProfile.trustLevel} creator`
+                              : "No linked profile"}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div>{collection.subject}</div>
+                          <div className="text-xs text-muted-foreground">{collection.ageGroup}</div>
+                        </TableCell>
+                        <TableCell>{statusBadge(collection.status)}</TableCell>
+                        <TableCell>{formatDate(collection.submittedAt)}</TableCell>
                         <TableCell className="text-right">
-                          <Button variant="outline" size="sm" onClick={() => handleViewLesson(lesson)}>
-                            View
+                          <Button variant="outline" size="sm" onClick={() => {
+                            setSelectedCollection(collection);
+                            hydrateReviewState(collection);
+                          }}>
+                            Manage
                           </Button>
                         </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
                 </Table>
-              </CardContent>
-            </Card>
-          )}
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="resources">
+          <Card>
+            <CardHeader>
+              <CardTitle>Resource Review Queue</CardTitle>
+              <CardDescription>Review submitted videos, links, guides, worksheets, and activities before publication.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {resourcesLoading ? (
+                <p className="py-8 text-center text-muted-foreground">Loading resources...</p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Resource</TableHead>
+                      <TableHead>Contributor</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Submitted</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredResources.map((resource) => (
+                      <TableRow key={resource.id}>
+                        <TableCell>
+                          <div className="font-medium">{resource.title}</div>
+                          <div className="text-xs text-muted-foreground">{resource.category} | {resource.ageGroup}</div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="font-medium">{resource.contributorProfile?.displayName || resource.contributorName}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {resource.contributorProfile ? `${resource.contributorProfile.trustLevel} creator` : resource.contributorEmail}
+                          </div>
+                        </TableCell>
+                        <TableCell>{resource.resourceType}</TableCell>
+                        <TableCell>{statusBadge(resource.status)}</TableCell>
+                        <TableCell>{formatDate(resource.submittedAt)}</TableCell>
+                        <TableCell className="text-right">
+                          <Button variant="outline" size="sm" onClick={() => {
+                            setSelectedResource(resource);
+                            hydrateReviewState(resource);
+                          }}>
+                            Manage
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="offerings" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Credential Class Requirements</CardTitle>
+              <CardDescription>Connect approved classes to credentials so completed enrollments can unlock real evidence of learning.</CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-6 lg:grid-cols-[420px_1fr]">
+              <div className="space-y-4 rounded-md border p-4">
+                <div className="space-y-2">
+                  <div className="text-sm font-medium">Credential</div>
+                  <Select
+                    value={credentialRequirementForm.credentialId}
+                    onValueChange={(credentialId) => setCredentialRequirementForm((current) => ({ ...current, credentialId }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select credential" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(credentialRequirementOverview?.credentials || []).map((credential) => (
+                        <SelectItem key={credential.id} value={String(credential.id)}>{credential.title}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <div className="text-sm font-medium">Approved Offering</div>
+                  <Select
+                    value={credentialRequirementForm.offeringId}
+                    onValueChange={(offeringId) => {
+                      const offering = credentialRequirementOverview?.approvedOfferings.find((item) => String(item.id) === offeringId);
+                      setCredentialRequirementForm((current) => ({
+                        ...current,
+                        offeringId,
+                        title: current.title || (offering ? `Complete ${offering.title}` : ""),
+                      }));
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select offering" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(credentialRequirementOverview?.approvedOfferings || []).map((offering) => (
+                        <SelectItem key={offering.id} value={String(offering.id)}>{offering.title}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <div className="text-sm font-medium">Requirement Title</div>
+                  <Input
+                    value={credentialRequirementForm.title}
+                    onChange={(event) => setCredentialRequirementForm((current) => ({ ...current, title: event.target.value }))}
+                    placeholder="Complete the budgeting workshop"
+                  />
+                </div>
+                <div className="grid gap-3 md:grid-cols-[1fr_96px]">
+                  <Textarea
+                    className="min-h-[90px]"
+                    value={credentialRequirementForm.description}
+                    onChange={(event) => setCredentialRequirementForm((current) => ({ ...current, description: event.target.value }))}
+                    placeholder="Why this class supports the credential"
+                  />
+                  <Input
+                    type="number"
+                    min="1"
+                    value={credentialRequirementForm.order}
+                    onChange={(event) => setCredentialRequirementForm((current) => ({ ...current, order: event.target.value }))}
+                    aria-label="Requirement order"
+                  />
+                </div>
+                <Button
+                  className="w-full"
+                  onClick={() => credentialRequirementMutation.mutate()}
+                  disabled={
+                    credentialRequirementMutation.isPending ||
+                    !credentialRequirementForm.credentialId ||
+                    !credentialRequirementForm.offeringId
+                  }
+                >
+                  Add Class Requirement
+                </Button>
+              </div>
+
+              <div className="space-y-3">
+                {(credentialRequirementOverview?.credentials || []).map((credential) => {
+                  const offeringRequirements = (credential.requirements || [])
+                    .filter((requirement) => requirement.requirementType === "offering_completion");
+
+                  return (
+                    <div key={credential.id} className="rounded-md border p-4">
+                      <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                        <div>
+                          <div className="font-semibold">{credential.title}</div>
+                          <div className="text-xs text-muted-foreground">{credential.slug}</div>
+                        </div>
+                        <Badge variant="secondary">{offeringRequirements.length} class requirement{offeringRequirements.length === 1 ? "" : "s"}</Badge>
+                      </div>
+                      <div className="mt-3 space-y-2">
+                        {offeringRequirements.length === 0 ? (
+                          <p className="text-sm text-muted-foreground">No approved classes linked yet.</p>
+                        ) : offeringRequirements.map((requirement) => (
+                          <div key={requirement.id} className="rounded-md bg-slate-50 p-3 text-sm">
+                            <div className="font-medium">{requirement.title}</div>
+                            <div className="text-muted-foreground">
+                              {requirement.offering?.title || `Offering #${requirement.targetId}`} | order {requirement.order}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Educator Offering Review Queue</CardTitle>
+              <CardDescription>Review free samples, classes, tutoring, coaching, and bundles before marketplace discovery.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {offeringsLoading ? (
+                <p className="py-8 text-center text-muted-foreground">Loading educator offerings...</p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Offering</TableHead>
+                      <TableHead>Educator</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Price</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Submitted</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredOfferings.map((offering) => (
+                      <TableRow key={offering.id}>
+                        <TableCell>
+                          <div className="font-medium">{offering.title}</div>
+                          <div className="text-xs text-muted-foreground">{offering.subject} | {offering.ageGroup}</div>
+                          <p className="mt-1 line-clamp-2 max-w-md text-xs text-muted-foreground">{offering.description}</p>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            Credential target: offering_completion #{offering.id}
+                          </p>
+                        </TableCell>
+                        <TableCell>
+                          <div className="font-medium">{offering.contributorProfile?.displayName || "Unknown educator"}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {offering.contributorProfile
+                              ? `${offering.contributorProfile.trustLevel} educator`
+                              : "No linked profile"}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div>{offering.offeringType.replace("_", " ")}</div>
+                          <div className="text-xs text-muted-foreground">{offering.format.replace("_", " ")}</div>
+                        </TableCell>
+                        <TableCell>
+                          {offering.priceCents ? `$${(offering.priceCents / 100).toFixed(2)}` : "Free/TBD"}
+                        </TableCell>
+                        <TableCell>
+                          {offering.status === "pending_review" ? (
+                            <Select
+                              value={offering.status}
+                              onValueChange={(status) => offeringReviewMutation.mutate({ id: offering.id, status })}
+                              disabled={offeringReviewMutation.isPending}
+                            >
+                              <SelectTrigger className="w-[170px]">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="pending_review">pending review</SelectItem>
+                                {offeringReviewStatuses.map((status) => (
+                                  <SelectItem key={status} value={status}>{status.replace("_", " ")}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          ) : statusBadge(offering.status)}
+                        </TableCell>
+                        <TableCell>{formatDate(offering.submittedAt)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Class Session Review Queue</CardTitle>
+              <CardDescription>Review dates, capacity, and external meeting links before families can request seats.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {sessionsLoading ? (
+                <p className="py-8 text-center text-muted-foreground">Loading class sessions...</p>
+              ) : filteredSessions.length === 0 ? (
+                <div className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
+                  No class sessions match the current search.
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Session</TableHead>
+                      <TableHead>Offering</TableHead>
+                      <TableHead>Educator</TableHead>
+                      <TableHead>Seats</TableHead>
+                      <TableHead>Meeting</TableHead>
+                      <TableHead>Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredSessions.map((session) => (
+                      <TableRow key={session.id}>
+                        <TableCell>
+                          <div className="font-medium">{session.title}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {formatDate(session.startsAt)}{session.duration ? ` | ${session.duration}` : ""}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="font-medium">{session.offering?.title || "Offering unavailable"}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {session.offering ? `${session.offering.subject} | ${session.offering.ageGroup}` : "No offering details"}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="font-medium">{session.contributorProfile?.displayName || "Unknown educator"}</div>
+                          <div className="text-xs text-muted-foreground">{session.contributorProfile?.trustLevel || "No trust level"}</div>
+                        </TableCell>
+                        <TableCell>{session.capacity ? `${session.reservedSeats}/${session.capacity}` : `${session.reservedSeats} requested`}</TableCell>
+                        <TableCell className="max-w-[220px]">
+                          {session.meetingUrl ? (
+                            <a className="break-all text-xs text-primary underline" href={session.meetingUrl} target="_blank" rel="noreferrer">
+                              {session.meetingUrl}
+                            </a>
+                          ) : (
+                            <span className="text-sm text-muted-foreground">No link</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {session.status === "pending_review" ? (
+                            <Select
+                              value={session.status}
+                              onValueChange={(status) => sessionReviewMutation.mutate({ id: session.id, status })}
+                              disabled={sessionReviewMutation.isPending}
+                            >
+                              <SelectTrigger className="w-[170px]">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="pending_review">pending review</SelectItem>
+                                {sessionReviewStatuses.map((status) => (
+                                  <SelectItem key={status} value={status}>{status.replace("_", " ")}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          ) : statusBadge(session.status)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Marketplace Interest Queue</CardTitle>
+              <CardDescription>Monitor family requests before enrollment and payments are automated.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {interestsLoading ? (
+                <p className="py-8 text-center text-muted-foreground">Loading offering interests...</p>
+              ) : filteredInterests.length === 0 ? (
+                <div className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
+                  No family interest requests match the current search.
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Family</TableHead>
+                      <TableHead>Offering</TableHead>
+                      <TableHead>Educator</TableHead>
+                      <TableHead>Message</TableHead>
+                      <TableHead>Received</TableHead>
+                      <TableHead>Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredInterests.map((interest) => (
+                      <TableRow key={interest.id}>
+                        <TableCell>
+                          <div className="font-medium">{interest.requesterName}</div>
+                          <a className="text-xs text-primary underline" href={`mailto:${interest.requesterEmail}`}>
+                            {interest.requesterEmail}
+                          </a>
+                          {interest.learnerAgeGroup && (
+                            <div className="text-xs text-muted-foreground">Learner: {interest.learnerAgeGroup}</div>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <div className="font-medium">{interest.offering?.title || "Offering unavailable"}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {interest.offering ? `${interest.offering.subject} | ${interest.offering.ageGroup}` : "No offering details"}
+                          </div>
+                          {interest.session && (
+                            <div className="mt-1 text-xs text-muted-foreground">
+                              Session: {interest.session.title} ({formatDate(interest.session.startsAt)})
+                            </div>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <div className="font-medium">{interest.contributorProfile?.displayName || "Unknown educator"}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {interest.contributorProfile?.trustLevel || "No trust level"}
+                          </div>
+                        </TableCell>
+                        <TableCell className="max-w-sm text-sm text-muted-foreground">
+                          {interest.message || "No message included"}
+                        </TableCell>
+                        <TableCell>{formatDate(interest.createdAt)}</TableCell>
+                        <TableCell>
+                          <Select
+                            value={interest.status}
+                            onValueChange={(status) => interestMutation.mutate({ id: interest.id, status })}
+                            disabled={interestMutation.isPending}
+                          >
+                            <SelectTrigger className="w-[150px]">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {interestStatuses.map((status) => (
+                                <SelectItem key={status} value={status}>{status.replace("_", " ")}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Session Enrollment Queue</CardTitle>
+              <CardDescription>Manage requested, reserved, waitlisted, cancelled, and completed session seats.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {enrollmentsLoading ? (
+                <p className="py-8 text-center text-muted-foreground">Loading enrollments...</p>
+              ) : filteredEnrollments.length === 0 ? (
+                <div className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
+                  No session enrollments match the current search.
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Family</TableHead>
+                      <TableHead>Session</TableHead>
+                      <TableHead>Educator</TableHead>
+                      <TableHead>Learners</TableHead>
+                      <TableHead>Message</TableHead>
+                      <TableHead>Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredEnrollments.map((enrollment) => (
+                      <TableRow key={enrollment.id}>
+                        <TableCell>
+                          <div className="font-medium">{enrollment.requesterName}</div>
+                          <a className="text-xs text-primary underline" href={`mailto:${enrollment.requesterEmail}`}>
+                            {enrollment.requesterEmail}
+                          </a>
+                          {enrollment.learnerAgeGroup && (
+                            <div className="text-xs text-muted-foreground">Learner: {enrollment.learnerAgeGroup}</div>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <div className="font-medium">{enrollment.session?.title || "Session unavailable"}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {formatDate(enrollment.session?.startsAt)}
+                          </div>
+                          <div className="text-xs text-muted-foreground">{enrollment.offering?.title || "Offering unavailable"}</div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="font-medium">{enrollment.contributorProfile?.displayName || "Unknown educator"}</div>
+                          <div className="text-xs text-muted-foreground">{enrollment.contributorProfile?.trustLevel || "No trust level"}</div>
+                        </TableCell>
+                        <TableCell>{enrollment.learnerCount}</TableCell>
+                        <TableCell className="max-w-sm text-sm text-muted-foreground">
+                          {enrollment.message || "No message included"}
+                        </TableCell>
+                        <TableCell>
+                          <Select
+                            value={enrollment.status}
+                            onValueChange={(status) => enrollmentMutation.mutate({ id: enrollment.id, status })}
+                            disabled={enrollmentMutation.isPending}
+                          >
+                            <SelectTrigger className="w-[150px]">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {enrollmentStatuses.map((status) => (
+                                <SelectItem key={status} value={status}>{status.replace("_", " ")}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Family Review Moderation</CardTitle>
+              <CardDescription>Approve class reviews only after checking tone, accuracy, privacy, and fit for public educator trust.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {offeringReviewsLoading ? (
+                <p className="py-8 text-center text-muted-foreground">Loading class reviews...</p>
+              ) : filteredOfferingReviews.length === 0 ? (
+                <div className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
+                  No class reviews match the current search.
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Review</TableHead>
+                      <TableHead>Class</TableHead>
+                      <TableHead>Educator</TableHead>
+                      <TableHead>Reviewer</TableHead>
+                      <TableHead>Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredOfferingReviews.map((review) => (
+                      <TableRow key={review.id}>
+                        <TableCell className="max-w-md">
+                          <div className="font-medium">{review.rating}/5 stars</div>
+                          <p className="mt-1 text-sm text-muted-foreground">{review.reviewText}</p>
+                          <div className="mt-1 text-xs text-muted-foreground">Received {formatDate(review.createdAt)}</div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="font-medium">{review.session?.title || review.offering?.title || "Class unavailable"}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {review.offering ? `${review.offering.subject} | ${review.offering.ageGroup}` : "No offering details"}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="font-medium">{review.contributorProfile?.displayName || "Unknown educator"}</div>
+                          <div className="text-xs text-muted-foreground">{review.contributorProfile?.trustLevel || "No trust level"}</div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="font-medium">{review.reviewerName}</div>
+                          <a className="text-xs text-primary underline" href={`mailto:${review.reviewerEmail}`}>
+                            {review.reviewerEmail}
+                          </a>
+                        </TableCell>
+                        <TableCell>
+                          <Select
+                            value={review.status}
+                            onValueChange={(status) => offeringReviewModerationMutation.mutate({ id: review.id, status })}
+                            disabled={offeringReviewModerationMutation.isPending}
+                          >
+                            <SelectTrigger className="w-[160px]">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {offeringReviewModerationStatuses.map((status) => (
+                                <SelectItem key={status} value={status}>{status.replace("_", " ")}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="reports">
+          <Card>
+            <CardHeader>
+              <CardTitle>Content Reports</CardTitle>
+              <CardDescription>Review family concerns about accuracy, safety, age fit, broken links, and source rights.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {reportsLoading ? (
+                <p className="py-8 text-center text-muted-foreground">Loading reports...</p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Content</TableHead>
+                      <TableHead>Concern</TableHead>
+                      <TableHead>Message</TableHead>
+                      <TableHead>Reporter</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Received</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredReports.map((report) => (
+                      <TableRow key={report.id}>
+                        <TableCell>
+                          <div className="font-medium">{report.contentTitle}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {report.contentType} #{report.contentId}
+                          </div>
+                        </TableCell>
+                        <TableCell>{report.category.replace("_", " ")}</TableCell>
+                        <TableCell className="max-w-md">
+                          <p className="line-clamp-3 text-sm">{report.message}</p>
+                          {report.actionTaken && (
+                            <p className="mt-1 text-xs text-muted-foreground">Action: {report.actionTaken}</p>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <div className="font-medium">{report.reporterName || "Anonymous"}</div>
+                          <div className="text-xs text-muted-foreground">{report.reporterEmail || "No email"}</div>
+                        </TableCell>
+                        <TableCell>
+                          <Select
+                            value={report.status}
+                            onValueChange={(status) => reportMutation.mutate({ id: report.id, status })}
+                            disabled={reportMutation.isPending}
+                          >
+                            <SelectTrigger className="w-[150px]">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {reportStatuses.map((status) => (
+                                <SelectItem key={status} value={status}>{status}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </TableCell>
+                        <TableCell>{formatDate(report.createdAt)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="feedback">
+          <Card>
+            <CardHeader>
+              <CardTitle>Feedback Queue</CardTitle>
+              <CardDescription>Track public beta feedback, bug reports, safety concerns, and feature ideas.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {feedbackLoading ? (
+                <p className="py-8 text-center text-muted-foreground">Loading feedback...</p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>From</TableHead>
+                      <TableHead>Category</TableHead>
+                      <TableHead>Message</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Received</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredFeedback.map((item) => (
+                      <TableRow key={item.id}>
+                        <TableCell>
+                          <div className="font-medium">{item.name}</div>
+                          <div className="text-xs text-muted-foreground">{item.email}</div>
+                          <div className="text-xs text-muted-foreground">{item.audience}</div>
+                        </TableCell>
+                        <TableCell>{item.category}</TableCell>
+                        <TableCell className="max-w-md">
+                          <p className="line-clamp-3 text-sm">{item.message}</p>
+                        </TableCell>
+                        <TableCell>
+                          <Select
+                            value={item.status}
+                            onValueChange={(status) => feedbackMutation.mutate({ id: item.id, status })}
+                            disabled={feedbackMutation.isPending}
+                          >
+                            <SelectTrigger className="w-[150px]">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {feedbackStatuses.map((status) => (
+                                <SelectItem key={status} value={status}>{status}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </TableCell>
+                        <TableCell>{formatDate(item.createdAt)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="users">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <ShieldCheck className="h-5 w-5 text-primary" />
+                Users & Roles
+              </CardTitle>
+              <CardDescription>Promote trusted operators to admin or classify accounts as parent/student.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {usersLoading ? (
+                <p className="py-8 text-center text-muted-foreground">Loading users...</p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Age Group</TableHead>
+                      <TableHead>Role</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredUsers.map((user) => (
+                      <TableRow key={user.id}>
+                        <TableCell className="font-medium">
+                          {user.fullName || `${user.firstName || ""} ${user.lastName || ""}`.trim() || `User ${user.id}`}
+                        </TableCell>
+                        <TableCell>{user.email}</TableCell>
+                        <TableCell>{user.ageGroup || "Not set"}</TableCell>
+                        <TableCell>
+                          <Select
+                            value={user.role || "student"}
+                            onValueChange={(role) => roleMutation.mutate({ userId: user.id, role })}
+                            disabled={roleMutation.isPending}
+                          >
+                            <SelectTrigger className="w-[150px]">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {roles.map((role) => (
+                                <SelectItem key={role} value={role}>{role}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
-      
-      {/* Lesson review dialog */}
-      {selectedLesson && (
-        <Dialog open={!!selectedLesson} onOpenChange={(open) => !open && setSelectedLesson(null)}>
-          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+
+      {selectedCollection && (
+        <Dialog open={Boolean(selectedCollection)} onOpenChange={(open) => !open && setSelectedCollection(null)}>
+          <DialogContent className="max-h-[90vh] max-w-4xl overflow-y-auto">
             <DialogHeader>
-              <div className="flex items-center gap-2 mb-2">
-                <Badge>{selectedLesson.subject}</Badge>
-                <Badge variant="outline">{selectedLesson.ageGroup} years</Badge>
-                {selectedLesson.status === "pending" ? (
-                  <Badge variant="outline" className="bg-yellow-50 text-yellow-800 border-yellow-200 dark:bg-yellow-950 dark:text-yellow-300 dark:border-yellow-800">
-                    <Clock className="mr-1 h-3 w-3" />
-                    Pending Review
-                  </Badge>
-                ) : (
-                  <Badge variant="outline" className="bg-green-50 text-green-800 border-green-200 dark:bg-green-950 dark:text-green-300 dark:border-green-800">
-                    <CheckCircle className="mr-1 h-3 w-3" />
-                    Approved
-                  </Badge>
-                )}
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge>{selectedCollection.subject}</Badge>
+                <Badge variant="outline">{selectedCollection.ageGroup}</Badge>
+                <Badge variant="secondary">{selectedCollection.estimatedWeeks} weeks</Badge>
+                {statusBadge(selectedCollection.status)}
               </div>
-              <DialogTitle className="text-2xl">{selectedLesson.title}</DialogTitle>
-              <DialogDescription className="text-base">
-                Submitted by {selectedLesson.contributorName} ({selectedLesson.affiliation}) on {formatDate(selectedLesson.submittedDate)}
+              <DialogTitle>{selectedCollection.title}</DialogTitle>
+              <DialogDescription>
+                Built by {selectedCollection.contributorProfile?.displayName || "unknown creator"}
               </DialogDescription>
-              
-              {selectedLesson.status === "pending" && (
-                <div className="flex gap-2 mt-4">
-                  <Button 
-                    variant={viewMode === "preview" ? "default" : "outline"} 
-                    size="sm" 
-                    className="gap-1"
-                    onClick={() => setViewMode("preview")}
-                  >
-                    <BookOpen className="h-4 w-4" />
-                    Preview Lesson
-                  </Button>
-                  <Button 
-                    variant={viewMode === "feedback" ? "default" : "outline"} 
-                    size="sm" 
-                    className="gap-1"
-                    onClick={() => setViewMode("feedback")}
-                  >
-                    <MessageSquare className="h-4 w-4" />
-                    Send Feedback
-                  </Button>
-                </div>
-              )}
             </DialogHeader>
 
-            {viewMode === "preview" ? (
-              <>
-                <div className="space-y-6 mt-2">
-                  <div>
-                    <h3 className="text-lg font-semibold mb-2">Lesson Objective</h3>
-                    <p className="text-muted-foreground whitespace-pre-line">{selectedLesson.objective}</p>
+            <div className="space-y-5">
+              <div className="rounded-md border bg-slate-50 p-4">
+                <h3 className="mb-2 font-semibold">Contributor Context</h3>
+                {selectedCollection.contributorProfile ? (
+                  <div className="space-y-2 text-sm text-muted-foreground">
+                    <div className="flex flex-wrap gap-2">
+                      <Badge variant="secondary">{selectedCollection.contributorProfile.trustLevel} creator</Badge>
+                      <Badge variant="outline">{selectedCollection.contributorProfile.status}</Badge>
+                    </div>
+                    {selectedCollection.contributorProfile.affiliation && (
+                      <p>Affiliation: {selectedCollection.contributorProfile.affiliation}</p>
+                    )}
+                    {selectedCollection.contributorProfile.expertiseTags?.length ? (
+                      <p>Expertise: {selectedCollection.contributorProfile.expertiseTags.join(", ")}</p>
+                    ) : null}
+                    {selectedCollection.contributorProfile.bio && (
+                      <p className="whitespace-pre-line">{selectedCollection.contributorProfile.bio}</p>
+                    )}
                   </div>
-                  
-                  <Separator />
-                  
-                  <div>
-                    <h3 className="text-lg font-semibold mb-2">Warm-Up</h3>
-                    <p className="text-muted-foreground whitespace-pre-line">{selectedLesson.warmUp}</p>
+                ) : (
+                  <p className="text-sm text-muted-foreground">No contributor profile is linked to this collection.</p>
+                )}
+              </div>
+
+              <div>
+                <h3 className="mb-1 font-semibold">Description</h3>
+                <p className="whitespace-pre-line text-sm text-muted-foreground">{selectedCollection.description}</p>
+              </div>
+
+              {selectedCollection.learningGoals?.length ? (
+                <div>
+                  <h3 className="mb-2 font-semibold">Learning Goals</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {selectedCollection.learningGoals.map((goal) => (
+                      <Badge key={goal} variant="secondary">{goal}</Badge>
+                    ))}
                   </div>
-                  
-                  <Separator />
-                  
-                  <div>
-                    <h3 className="text-lg font-semibold mb-2">Core Content</h3>
-                    <p className="text-muted-foreground whitespace-pre-line">{selectedLesson.coreContent}</p>
-                  </div>
-                  
-                  <Separator />
-                  
-                  <div>
-                    <h3 className="text-lg font-semibold mb-2">Real-World Scenario</h3>
-                    <p className="text-muted-foreground whitespace-pre-line">{selectedLesson.scenario}</p>
-                  </div>
-                  
-                  <Separator />
-                  
-                  <div>
-                    <h3 className="text-lg font-semibold mb-2">Activity</h3>
-                    <p className="text-muted-foreground whitespace-pre-line">{selectedLesson.activity}</p>
-                  </div>
-                  
-                  <Separator />
-                  
-                  <div>
-                    <h3 className="text-lg font-semibold mb-2">Reflection Prompt</h3>
-                    <p className="text-muted-foreground whitespace-pre-line">{selectedLesson.reflection}</p>
-                  </div>
-                  
-                  {selectedLesson.badge && (
-                    <>
-                      <Separator />
-                      <div>
-                        <h3 className="text-lg font-semibold mb-2">Completion Badge</h3>
-                        <div className="flex items-center gap-2">
-                          <Badge variant="outline" className="bg-yellow-50 text-yellow-800 border-yellow-200 dark:bg-yellow-950 dark:text-yellow-300 dark:border-yellow-800">
-                            {selectedLesson.badge}
-                          </Badge>
-                        </div>
+                </div>
+              ) : null}
+
+              {selectedCollection.parentNotes && (
+                <div>
+                  <h3 className="mb-1 font-semibold">Parent Notes</h3>
+                  <p className="whitespace-pre-line text-sm text-muted-foreground">{selectedCollection.parentNotes}</p>
+                </div>
+              )}
+
+              {selectedCollection.finalProject && (
+                <div>
+                  <h3 className="mb-1 font-semibold">Final Project</h3>
+                  <p className="whitespace-pre-line text-sm text-muted-foreground">{selectedCollection.finalProject}</p>
+                </div>
+              )}
+
+              <Separator />
+
+              <div className="space-y-3">
+                <h3 className="font-semibold">Collection Items</h3>
+                {(selectedCollection.items || []).map((item) => (
+                  <div key={item.id} className="rounded-md border p-4">
+                    <div className="mb-2 flex flex-wrap items-center gap-2">
+                      <Badge variant="outline">Step {item.order}</Badge>
+                      <Badge variant="secondary">{item.itemType}</Badge>
+                      <h4 className="font-medium">{item.title}</h4>
+                    </div>
+                    {item.url && (
+                      <a className="break-all text-sm text-primary underline" href={item.url} target="_blank" rel="noreferrer">
+                        {item.url}
+                      </a>
+                    )}
+                    {(item.sourceLabel || item.duration) && (
+                      <div className="mt-2 flex flex-wrap gap-2 text-sm text-muted-foreground">
+                        {item.sourceLabel && <Badge variant="outline">Source: {item.sourceLabel}</Badge>}
+                        {item.duration && <Badge variant="outline">{item.duration}</Badge>}
                       </div>
-                    </>
+                    )}
+                    {item.embedUrl && (
+                      <p className="mt-2 break-all text-xs text-muted-foreground">Embed: {item.embedUrl}</p>
+                    )}
+                    {item.safetyNotes && (
+                      <p className="mt-2 rounded-md border bg-amber-50 p-2 text-sm text-amber-900">
+                        <span className="font-medium">Safety notes:</span> {item.safetyNotes}
+                      </p>
+                    )}
+                    {item.description && <p className="mt-2 whitespace-pre-line text-sm text-muted-foreground">{item.description}</p>}
+                    {item.parentPrompt && <p className="mt-2 text-sm"><span className="font-medium">Parent:</span> {item.parentPrompt}</p>}
+                    {item.studentPrompt && <p className="mt-1 text-sm"><span className="font-medium">Student:</span> {item.studentPrompt}</p>}
+                  </div>
+                ))}
+              </div>
+
+              {renderReviewControls()}
+
+              <div className="space-y-2">
+                <h3 className="font-semibold">Reviewer Note</h3>
+                <Textarea
+                  value={reviewNote}
+                  onChange={(event) => setReviewNote(event.target.value)}
+                  placeholder="Add notes for the contributor or internal review history..."
+                  className="min-h-[120px]"
+                />
+              </div>
+            </div>
+
+            <DialogFooter className="flex flex-wrap gap-2">
+              {collectionStatuses.map((status) => (
+                <Button
+                  key={status}
+                  variant={status === "approved" || status === "published" ? "default" : status === "rejected" ? "destructive" : "outline"}
+                  disabled={collectionReviewMutation.isPending}
+                  onClick={() => collectionReviewMutation.mutate({
+                    id: selectedCollection.id,
+                    status,
+                    reviewerNote: reviewNote || undefined,
+                    internalReviewNote: internalReviewNote || undefined,
+                    reviewRubric,
+                  })}
+                >
+                  {status.replace("_", " ")}
+                </Button>
+              ))}
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {selectedResource && (
+        <Dialog open={Boolean(selectedResource)} onOpenChange={(open) => !open && setSelectedResource(null)}>
+          <DialogContent className="max-h-[90vh] max-w-4xl overflow-y-auto">
+            <DialogHeader>
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge>{selectedResource.resourceType}</Badge>
+                <Badge variant="outline">{selectedResource.category}</Badge>
+                <Badge variant="secondary">{selectedResource.ageGroup}</Badge>
+                {statusBadge(selectedResource.status)}
+              </div>
+              <DialogTitle>{selectedResource.title}</DialogTitle>
+              <DialogDescription>
+                Submitted by {selectedResource.contributorProfile?.displayName || selectedResource.contributorName} ({selectedResource.contributorEmail})
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-5">
+              <div className="rounded-md border bg-slate-50 p-4">
+                <h3 className="mb-2 font-semibold">Contributor Context</h3>
+                {selectedResource.contributorProfile ? (
+                  <div className="space-y-2 text-sm text-muted-foreground">
+                    <div className="flex flex-wrap gap-2">
+                      <Badge variant="secondary">{selectedResource.contributorProfile.trustLevel} creator</Badge>
+                      <Badge variant="outline">{selectedResource.contributorProfile.status}</Badge>
+                    </div>
+                    {selectedResource.contributorProfile.affiliation && (
+                      <p>Affiliation: {selectedResource.contributorProfile.affiliation}</p>
+                    )}
+                    {selectedResource.contributorProfile.expertiseTags?.length ? (
+                      <p>Expertise: {selectedResource.contributorProfile.expertiseTags.join(", ")}</p>
+                    ) : null}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">No contributor profile is linked to this resource.</p>
+                )}
+              </div>
+
+              <div>
+                <h3 className="mb-1 font-semibold">Description</h3>
+                <p className="whitespace-pre-line text-sm text-muted-foreground">{selectedResource.description}</p>
+              </div>
+
+              <div className="rounded-md border p-4">
+                <h3 className="mb-2 font-semibold">Source</h3>
+                <div className="space-y-2 text-sm">
+                  <a className="break-all text-primary underline" href={selectedResource.url} target="_blank" rel="noreferrer">
+                    {selectedResource.url}
+                  </a>
+                  {selectedResource.embedUrl && <p className="break-all text-muted-foreground">Embed: {selectedResource.embedUrl}</p>}
+                  <div className="flex flex-wrap gap-2">
+                    {selectedResource.sourceLabel && <Badge variant="outline">Source: {selectedResource.sourceLabel}</Badge>}
+                    {selectedResource.duration && <Badge variant="outline">{selectedResource.duration}</Badge>}
+                    {selectedResource.audience?.map((audience) => <Badge key={audience} variant="secondary">{audience}</Badge>)}
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <h3 className="mb-1 font-semibold">Learning Use</h3>
+                <p className="whitespace-pre-line text-sm text-muted-foreground">{selectedResource.learningUse}</p>
+              </div>
+
+              <div className="rounded-md border bg-amber-50 p-4">
+                <h3 className="mb-1 font-semibold text-amber-950">Safety Notes</h3>
+                <p className="whitespace-pre-line text-sm text-amber-900">{selectedResource.safetyNotes}</p>
+              </div>
+
+              {renderReviewControls()}
+
+              <div className="space-y-2">
+                <h3 className="font-semibold">Reviewer Note</h3>
+                <Textarea
+                  value={reviewNote}
+                  onChange={(event) => setReviewNote(event.target.value)}
+                  placeholder="Add notes for the contributor or internal review history..."
+                  className="min-h-[120px]"
+                />
+              </div>
+            </div>
+
+            <DialogFooter className="flex flex-wrap gap-2">
+              {resourceStatuses.map((status) => (
+                <Button
+                  key={status}
+                  variant={status === "approved" ? "default" : status === "rejected" ? "destructive" : "outline"}
+                  disabled={resourceReviewMutation.isPending}
+                  onClick={() => resourceReviewMutation.mutate({
+                    id: selectedResource.id,
+                    status,
+                    reviewerNote: reviewNote || undefined,
+                    internalReviewNote: internalReviewNote || undefined,
+                    reviewRubric,
+                  })}
+                >
+                  {status.replace("_", " ")}
+                </Button>
+              ))}
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {selectedSubmission && (
+        <Dialog open={Boolean(selectedSubmission)} onOpenChange={(open) => !open && setSelectedSubmission(null)}>
+          <DialogContent className="max-h-[90vh] max-w-4xl overflow-y-auto">
+            <DialogHeader>
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge>{selectedSubmission.subject}</Badge>
+                <Badge variant="outline">{selectedSubmission.ageGroup}</Badge>
+                {statusBadge(selectedSubmission.status)}
+              </div>
+              <DialogTitle>{selectedSubmission.title}</DialogTitle>
+              <DialogDescription>
+                Submitted by {selectedSubmission.contributorProfile?.displayName || selectedSubmission.contributorName} ({selectedSubmission.contributorEmail})
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-5">
+              <div className="rounded-md border bg-slate-50 p-4">
+                <h3 className="mb-2 font-semibold">Contributor Context</h3>
+                {selectedSubmission.contributorProfile ? (
+                  <div className="space-y-2 text-sm text-muted-foreground">
+                    <div className="flex flex-wrap gap-2">
+                      <Badge variant="secondary">{selectedSubmission.contributorProfile.trustLevel} creator</Badge>
+                      <Badge variant="outline">{selectedSubmission.contributorProfile.status}</Badge>
+                    </div>
+                    {selectedSubmission.contributorProfile.affiliation && (
+                      <p>Affiliation: {selectedSubmission.contributorProfile.affiliation}</p>
+                    )}
+                    {selectedSubmission.contributorProfile.expertiseTags?.length ? (
+                      <p>Expertise: {selectedSubmission.contributorProfile.expertiseTags.join(", ")}</p>
+                    ) : null}
+                    {selectedSubmission.contributorProfile.bio && (
+                      <p className="whitespace-pre-line">{selectedSubmission.contributorProfile.bio}</p>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    This submission is not linked to a creator profile yet. Review with the contributor's typed name and email only.
+                  </p>
+                )}
+              </div>
+
+              {[ 
+                ["Objective", selectedSubmission.objective],
+                ["Warm-Up", selectedSubmission.warmUp],
+                ["Core Content", selectedSubmission.coreContent],
+                ["Scenario", selectedSubmission.scenario],
+                ["Activity", selectedSubmission.activity],
+                ["Reflection", selectedSubmission.reflection],
+              ].map(([title, body]) => (
+                <div key={title}>
+                  <h3 className="mb-1 font-semibold">{title}</h3>
+                  <p className="whitespace-pre-line text-sm text-muted-foreground">{body}</p>
+                  <Separator className="mt-4" />
+                </div>
+              ))}
+
+              {selectedSubmission.resourceTitle && selectedSubmission.resourceUrl && (
+                <div className="rounded-md border p-4">
+                  <h3 className="mb-2 font-semibold">Attached Resource</h3>
+                  <div className="mb-2 flex flex-wrap gap-2">
+                    <Badge variant="secondary">{selectedSubmission.resourceType || "link"}</Badge>
+                    {selectedSubmission.resourceDuration && <Badge variant="outline">{selectedSubmission.resourceDuration}</Badge>}
+                    {selectedSubmission.resourceSourceLabel && <Badge variant="outline">Source: {selectedSubmission.resourceSourceLabel}</Badge>}
+                  </div>
+                  <p className="font-medium">{selectedSubmission.resourceTitle}</p>
+                  <a className="break-all text-sm text-primary underline" href={selectedSubmission.resourceUrl} target="_blank" rel="noreferrer">
+                    {selectedSubmission.resourceUrl}
+                  </a>
+                  {selectedSubmission.resourceDescription && (
+                    <p className="mt-2 whitespace-pre-line text-sm text-muted-foreground">{selectedSubmission.resourceDescription}</p>
+                  )}
+                  {selectedSubmission.resourceSafetyNotes && (
+                    <p className="mt-2 rounded-md border bg-amber-50 p-2 text-sm text-amber-900">
+                      <span className="font-medium">Safety notes:</span> {selectedSubmission.resourceSafetyNotes}
+                    </p>
+                  )}
+                  {selectedSubmission.resourceParentPrompt && (
+                    <p className="mt-2 text-sm"><span className="font-medium">Parent:</span> {selectedSubmission.resourceParentPrompt}</p>
+                  )}
+                  {selectedSubmission.resourceStudentPrompt && (
+                    <p className="mt-1 text-sm"><span className="font-medium">Student:</span> {selectedSubmission.resourceStudentPrompt}</p>
                   )}
                 </div>
-                
-                {selectedLesson.status === "pending" && (
-                  <DialogFooter className="flex gap-2 mt-6 pt-4 border-t">
-                    <div className="flex-1 text-left">
-                      <Button variant="outline" onClick={() => setViewMode("feedback")}>
-                        Request Changes
-                      </Button>
-                    </div>
-                    <Button onClick={handleApproveLesson} className="gap-1">
-                      <ThumbsUp className="h-4 w-4" />
-                      Approve Lesson
-                    </Button>
-                  </DialogFooter>
-                )}
-              </>
-            ) : (
-              <>
-                <div className="space-y-4 mt-2">
-                  <p>
-                    Send feedback to {selectedLesson.contributorName} about their lesson submission.
-                    Be specific about what needs improvement or clarification.
-                  </p>
-                  
-                  <div className="space-y-2">
-                    <h3 className="font-medium">Feedback Message:</h3>
-                    <Textarea 
-                      placeholder="Your feedback on the lesson submission..."
-                      className="min-h-[200px]"
-                      value={feedbackText}
-                      onChange={(e) => setFeedbackText(e.target.value)}
-                    />
-                  </div>
-                </div>
-                
-                <DialogFooter className="flex gap-2 mt-6 pt-4 border-t">
-                  <div className="flex-1 text-left">
-                    <Button variant="outline" onClick={() => setViewMode("preview")}>
-                      Back to Preview
-                    </Button>
-                  </div>
-                  <Button 
-                    variant="destructive" 
-                    onClick={handleSendFeedback}
-                    disabled={!feedbackText.trim()}
-                    className="gap-1"
-                  >
-                    <ThumbsDown className="h-4 w-4" />
-                    Send Feedback
-                  </Button>
-                </DialogFooter>
-              </>
-            )}
+              )}
+
+              {renderReviewControls()}
+
+              <div className="space-y-2">
+                <h3 className="font-semibold">Reviewer Note</h3>
+                <Textarea
+                  value={reviewNote}
+                  onChange={(event) => setReviewNote(event.target.value)}
+                  placeholder="Add notes for the contributor or internal review history..."
+                  className="min-h-[120px]"
+                />
+              </div>
+            </div>
+
+            <DialogFooter className="flex flex-wrap gap-2">
+              {curriculumStatuses.filter((status) => status !== "pending_review").map((status) => (
+                <Button
+                  key={status}
+                  variant={status === "approved" ? "default" : status === "rejected" ? "destructive" : "outline"}
+                  disabled={reviewMutation.isPending}
+                  onClick={() => reviewMutation.mutate({
+                    id: selectedSubmission.id,
+                    status,
+                    reviewerNote: reviewNote || undefined,
+                    internalReviewNote: internalReviewNote || undefined,
+                    reviewRubric,
+                  })}
+                >
+                  {status.replace("_", " ")}
+                </Button>
+              ))}
+            </DialogFooter>
           </DialogContent>
         </Dialog>
       )}

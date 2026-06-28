@@ -10,6 +10,7 @@ import {
   Home,
   UserCircle,
   BookOpen,
+  CalendarClock,
   BarChart as ChartBarIcon,
   Settings as SettingsIcon
 } from "lucide-react";
@@ -66,6 +67,12 @@ const Header: React.FC = () => {
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem>
+                    <Link href="/portfolio" className="flex w-full items-center">
+                      <BookOpenIcon className="mr-2 h-4 w-4" />
+                      Portfolio
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem>
                     <Link href="/settings" className="flex w-full items-center">
                       <SettingsIcon className="mr-2 h-4 w-4" />
                       Settings
@@ -74,21 +81,33 @@ const Header: React.FC = () => {
                   <DropdownMenuSeparator />
                   <DropdownMenuLabel>Educational Tools</DropdownMenuLabel>
                   <DropdownMenuItem>
-                    <Link href="/teacher-dashboard" className="flex w-full items-center">
-                      <Users className="mr-2 h-4 w-4" />
-                      <span>Educator Dashboard</span>
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem>
                     <Link href="/parent-dashboard" className="flex w-full items-center">
                       <Home className="mr-2 h-4 w-4" />
                       <span>Homeschool Hub</span>
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem>
-                    <Link href="/curriculum-builder" className="flex w-full items-center">
+                    <Link href="/contribute" className="flex w-full items-center">
                       <BookOpen className="mr-2 h-4 w-4" />
-                      <span>Curriculum Builder</span>
+                      <span>Contribute Curriculum</span>
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem>
+                    <Link href="/educators" className="flex w-full items-center">
+                      <GraduationCapIcon className="mr-2 h-4 w-4" />
+                      <span>Educator Marketplace</span>
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem>
+                    <Link href="/my-classes" className="flex w-full items-center">
+                      <CalendarClock className="mr-2 h-4 w-4" />
+                      <span>My Classes</span>
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem>
+                    <Link href="/admin/lessons" className="flex w-full items-center">
+                      <Users className="mr-2 h-4 w-4" />
+                      <span>Admin Management</span>
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />

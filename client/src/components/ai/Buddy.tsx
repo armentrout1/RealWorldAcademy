@@ -2493,7 +2493,7 @@ export function Buddy() {
                     <p className="text-sm text-muted-foreground">{recommendedProject.description}</p>
                     
                     <div className="flex flex-wrap gap-1 pt-1">
-                      {recommendedProject.skills.map((skill, index) => (
+                      {recommendedProject.skills.map((skill: string, index: number) => (
                         <Badge key={index} variant="secondary" className="text-xs">
                           {skill}
                         </Badge>

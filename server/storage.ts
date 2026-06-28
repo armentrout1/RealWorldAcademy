@@ -13,6 +13,7 @@ import {
   visionBoardItems, type VisionBoardItem, type InsertVisionBoardItem,
   subjects, type Subject, type InsertSubject,
   lessons, type Lesson, type InsertLesson,
+  lessonResources, type LessonResource, type InsertLessonResource,
   userSubjectProgress, type UserSubjectProgress, type InsertUserSubjectProgress,
   userLessonProgress, type UserLessonProgress, type InsertUserLessonProgress,
   resources, type Resource, type InsertResource,
@@ -21,16 +22,119 @@ import {
   buddyProfiles, type BuddyProfile, type InsertBuddyProfile,
   buddyMessages, type BuddyMessage, type InsertBuddyMessage,
   buddyEmotionLogs, type BuddyEmotionLog, type InsertBuddyEmotionLog,
-  buddyJournalEntries, type BuddyJournalEntry, type InsertBuddyJournalEntry
+  buddyJournalEntries, type BuddyJournalEntry, type InsertBuddyJournalEntry,
+  parentChildRelationships, type ParentChildRelationship, type InsertParentChildRelationship,
+  parentLessonReviews, type ParentLessonReview, type InsertParentLessonReview,
+  contributorProfiles, type ContributorProfile, type InsertContributorProfile,
+  educatorOfferings, type EducatorOffering, type InsertEducatorOffering,
+  offeringSessions, type OfferingSession, type InsertOfferingSession,
+  offeringEnrollments, type OfferingEnrollment, type InsertOfferingEnrollment,
+  offeringInterests, type OfferingInterest, type InsertOfferingInterest,
+  offeringReviews, type OfferingReview, type InsertOfferingReview,
+  curriculumSubmissions, type CurriculumSubmission, type InsertCurriculumSubmission,
+  resourceSubmissions, type ResourceSubmission, type InsertResourceSubmission,
+  curriculumCollections, type CurriculumCollection, type InsertCurriculumCollection,
+  curriculumCollectionItems, type CurriculumCollectionItem, type InsertCurriculumCollectionItem,
+  userCurriculumCollectionProgress, type UserCurriculumCollectionProgress, type InsertUserCurriculumCollectionProgress,
+  feedbackSubmissions, type FeedbackSubmission, type InsertFeedbackSubmission,
+  contentReports, type ContentReport, type InsertContentReport,
+  credentialDefinitions, type CredentialDefinition, type InsertCredentialDefinition,
+  credentialRequirements, type CredentialRequirement, type InsertCredentialRequirement,
+  issuedCredentials, type IssuedCredential, type InsertIssuedCredential
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, sql, and, inArray } from "drizzle-orm";
+import { eq, sql, and, inArray, or } from "drizzle-orm";
 
 export interface IStorage {
   // User operations
   getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
+  getUserByEmail(email: string): Promise<User | undefined>;
+  getAllUsers(): Promise<User[]>;
   createUser(user: InsertUser): Promise<User>;
+  updateUserRole(userId: number, role: string): Promise<User>;
+  getChildrenForParent(parentUserId: number): Promise<User[]>;
+  getParentsForChild(childUserId: number): Promise<User[]>;
+  createParentChildRelationship(relationship: InsertParentChildRelationship): Promise<ParentChildRelationship>;
+  getParentLessonReviewsForChild(childUserId: number): Promise<ParentLessonReview[]>;
+  createParentLessonReview(review: InsertParentLessonReview): Promise<ParentLessonReview>;
+  getCurriculumSubmissions(status?: string): Promise<CurriculumSubmission[]>;
+  getCurriculumSubmissionsForContributor(contributorProfileId: number, contributorEmail: string): Promise<CurriculumSubmission[]>;
+  getCurriculumSubmission(id: number): Promise<CurriculumSubmission | undefined>;
+  createCurriculumSubmission(submission: InsertCurriculumSubmission): Promise<CurriculumSubmission>;
+  reviewCurriculumSubmission(id: number, updates: Partial<CurriculumSubmission>): Promise<CurriculumSubmission>;
+  getResourceSubmissions(status?: string): Promise<ResourceSubmission[]>;
+  getResourceSubmissionsForContributor(contributorProfileId: number, contributorEmail: string): Promise<ResourceSubmission[]>;
+  getResourceSubmission(id: number): Promise<ResourceSubmission | undefined>;
+  createResourceSubmission(submission: InsertResourceSubmission): Promise<ResourceSubmission>;
+  reviewResourceSubmission(id: number, updates: Partial<ResourceSubmission>): Promise<ResourceSubmission>;
+  getCurriculumCollections(status?: string): Promise<CurriculumCollection[]>;
+  getCurriculumCollectionsForContributor(contributorProfileId: number): Promise<CurriculumCollection[]>;
+  getCurriculumCollection(id: number): Promise<CurriculumCollection | undefined>;
+  createCurriculumCollection(collection: InsertCurriculumCollection): Promise<CurriculumCollection>;
+  updateCurriculumCollection(id: number, updates: Partial<CurriculumCollection>): Promise<CurriculumCollection>;
+  getCurriculumCollectionItems(collectionId: number): Promise<CurriculumCollectionItem[]>;
+  replaceCurriculumCollectionItems(
+    collectionId: number,
+    items: InsertCurriculumCollectionItem[],
+  ): Promise<CurriculumCollectionItem[]>;
+  getUserCurriculumCollectionProgress(userId: number, collectionId: number): Promise<UserCurriculumCollectionProgress | undefined>;
+  getAllUserCurriculumCollectionProgress(userId: number): Promise<UserCurriculumCollectionProgress[]>;
+  upsertUserCurriculumCollectionProgress(
+    userId: number,
+    collectionId: number,
+    updates: Partial<UserCurriculumCollectionProgress>,
+  ): Promise<UserCurriculumCollectionProgress>;
+  getAllContributorProfiles(): Promise<ContributorProfile[]>;
+  getContributorProfile(id: number): Promise<ContributorProfile | undefined>;
+  getContributorProfileByUserId(userId: number): Promise<ContributorProfile | undefined>;
+  upsertContributorProfile(profile: InsertContributorProfile): Promise<ContributorProfile>;
+  getEducatorOfferings(status?: string): Promise<EducatorOffering[]>;
+  getEducatorOffering(id: number): Promise<EducatorOffering | undefined>;
+  getEducatorOfferingsForContributor(contributorProfileId: number): Promise<EducatorOffering[]>;
+  createEducatorOffering(offering: InsertEducatorOffering): Promise<EducatorOffering>;
+  updateEducatorOffering(id: number, updates: Partial<EducatorOffering>): Promise<EducatorOffering>;
+  getOfferingSessions(status?: string): Promise<OfferingSession[]>;
+  getOfferingSession(id: number): Promise<OfferingSession | undefined>;
+  getOfferingSessionsForContributor(contributorProfileId: number): Promise<OfferingSession[]>;
+  getOfferingSessionsForOffering(educatorOfferingId: number): Promise<OfferingSession[]>;
+  createOfferingSession(session: InsertOfferingSession): Promise<OfferingSession>;
+  updateOfferingSession(id: number, updates: Partial<OfferingSession>): Promise<OfferingSession>;
+  adjustOfferingSessionReservedSeats(id: number, delta: number): Promise<OfferingSession>;
+  getOfferingEnrollments(status?: string): Promise<OfferingEnrollment[]>;
+  getOfferingEnrollmentsForContributor(contributorProfileId: number): Promise<OfferingEnrollment[]>;
+  getOfferingEnrollmentsForRequester(userId: number, email: string): Promise<OfferingEnrollment[]>;
+  getOfferingEnrollmentsForSession(offeringSessionId: number): Promise<OfferingEnrollment[]>;
+  createOfferingEnrollment(enrollment: InsertOfferingEnrollment): Promise<OfferingEnrollment>;
+  updateOfferingEnrollment(id: number, updates: Partial<OfferingEnrollment>): Promise<OfferingEnrollment>;
+  getOfferingInterests(): Promise<OfferingInterest[]>;
+  getOfferingInterestsForContributor(contributorProfileId: number): Promise<OfferingInterest[]>;
+  getOfferingInterestsForOffering(educatorOfferingId: number): Promise<OfferingInterest[]>;
+  createOfferingInterest(interest: InsertOfferingInterest): Promise<OfferingInterest>;
+  updateOfferingInterest(id: number, updates: Partial<OfferingInterest>): Promise<OfferingInterest>;
+  getOfferingReviews(status?: string): Promise<OfferingReview[]>;
+  getOfferingReviewsForContributor(contributorProfileId: number): Promise<OfferingReview[]>;
+  getOfferingReviewsForOffering(educatorOfferingId: number): Promise<OfferingReview[]>;
+  getOfferingReviewForEnrollment(offeringEnrollmentId: number): Promise<OfferingReview | undefined>;
+  createOfferingReview(review: InsertOfferingReview): Promise<OfferingReview>;
+  updateOfferingReview(id: number, updates: Partial<OfferingReview>): Promise<OfferingReview>;
+  getFeedbackSubmissions(): Promise<FeedbackSubmission[]>;
+  createFeedbackSubmission(submission: InsertFeedbackSubmission): Promise<FeedbackSubmission>;
+  updateFeedbackSubmission(id: number, updates: Partial<FeedbackSubmission>): Promise<FeedbackSubmission>;
+  getContentReports(status?: string): Promise<ContentReport[]>;
+  createContentReport(report: InsertContentReport): Promise<ContentReport>;
+  updateContentReport(id: number, updates: Partial<ContentReport>): Promise<ContentReport>;
+
+  // Credential operations
+  getAllCredentialDefinitions(): Promise<CredentialDefinition[]>;
+  getCredentialDefinition(id: number): Promise<CredentialDefinition | undefined>;
+  getCredentialDefinitionBySlug(slug: string): Promise<CredentialDefinition | undefined>;
+  createCredentialDefinition(credential: InsertCredentialDefinition): Promise<CredentialDefinition>;
+  getCredentialRequirements(credentialId: number): Promise<CredentialRequirement[]>;
+  createCredentialRequirement(requirement: InsertCredentialRequirement): Promise<CredentialRequirement>;
+  getIssuedCredentialsForUser(userId: number): Promise<IssuedCredential[]>;
+  getIssuedCredentialByShareCode(shareCode: string): Promise<IssuedCredential | undefined>;
+  issueCredential(credential: InsertIssuedCredential): Promise<IssuedCredential>;
   
   // Course operations
   getAllCourses(): Promise<Course[]>;
@@ -113,6 +217,8 @@ export interface IStorage {
   getLessonBySlug(subjectSlug: string, lessonSlug: string): Promise<Lesson | undefined>;
   createLesson(lesson: InsertLesson): Promise<Lesson>;
   updateLesson(id: number, lesson: Partial<Lesson>): Promise<Lesson>;
+  getLessonResources(lessonId: number): Promise<LessonResource[]>;
+  createLessonResource(resource: InsertLessonResource): Promise<LessonResource>;
   
   // User Subject Progress operations
   getUserSubjectProgress(userId: number, subjectId: number): Promise<UserSubjectProgress | undefined>;
@@ -122,6 +228,7 @@ export interface IStorage {
   
   // User Lesson Progress operations
   getUserLessonProgress(userId: number, lessonId: number): Promise<UserLessonProgress | undefined>;
+  getAllUserLessonProgress(userId: number): Promise<UserLessonProgress[]>;
   getAllUserLessonProgressBySubject(userId: number, subjectId: number): Promise<UserLessonProgress[]>;
   createUserLessonProgress(progress: InsertUserLessonProgress): Promise<UserLessonProgress>;
   updateUserLessonProgress(userId: number, lessonId: number, progress: Partial<UserLessonProgress>): Promise<UserLessonProgress>;
@@ -181,8 +288,558 @@ export class DatabaseStorage implements IStorage {
     return results.length > 0 ? results[0] : undefined;
   }
 
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    const results = await db.select().from(users).where(eq(users.email, email));
+    return results.length > 0 ? results[0] : undefined;
+  }
+
+  async getAllUsers(): Promise<User[]> {
+    return await db.select().from(users);
+  }
+
   async createUser(insertUser: InsertUser): Promise<User> {
     const results = await db.insert(users).values(insertUser).returning();
+    return results[0];
+  }
+
+  async updateUserRole(userId: number, role: string): Promise<User> {
+    const results = await db.update(users)
+      .set({ role })
+      .where(eq(users.id, userId))
+      .returning();
+    return results[0];
+  }
+
+  async getChildrenForParent(parentUserId: number): Promise<User[]> {
+    const relationships = await db.select().from(parentChildRelationships)
+      .where(and(
+        eq(parentChildRelationships.parentUserId, parentUserId),
+        eq(parentChildRelationships.status, "active")
+      ));
+
+    if (relationships.length === 0) return [];
+
+    const childIds = relationships.map((relationship) => relationship.childUserId);
+    return await db.select().from(users).where(inArray(users.id, childIds));
+  }
+
+  async getParentsForChild(childUserId: number): Promise<User[]> {
+    const relationships = await db.select().from(parentChildRelationships)
+      .where(and(
+        eq(parentChildRelationships.childUserId, childUserId),
+        eq(parentChildRelationships.status, "active")
+      ));
+
+    if (relationships.length === 0) return [];
+
+    const parentIds = relationships.map((relationship) => relationship.parentUserId);
+    return await db.select().from(users).where(inArray(users.id, parentIds));
+  }
+
+  async createParentChildRelationship(relationship: InsertParentChildRelationship): Promise<ParentChildRelationship> {
+    const results = await db.insert(parentChildRelationships).values(relationship).returning();
+    return results[0];
+  }
+
+  async getParentLessonReviewsForChild(childUserId: number): Promise<ParentLessonReview[]> {
+    return await db.select().from(parentLessonReviews)
+      .where(eq(parentLessonReviews.childUserId, childUserId));
+  }
+
+  async createParentLessonReview(review: InsertParentLessonReview): Promise<ParentLessonReview> {
+    const results = await db.insert(parentLessonReviews).values(review).returning();
+    return results[0];
+  }
+
+  async getCurriculumSubmissions(status?: string): Promise<CurriculumSubmission[]> {
+    if (status) {
+      return await db.select().from(curriculumSubmissions)
+        .where(eq(curriculumSubmissions.status, status));
+    }
+
+    return await db.select().from(curriculumSubmissions);
+  }
+
+  async getCurriculumSubmissionsForContributor(
+    contributorProfileId: number,
+    contributorEmail: string,
+  ): Promise<CurriculumSubmission[]> {
+    const allSubmissions = await this.getCurriculumSubmissions();
+    const normalizedEmail = contributorEmail.trim().toLowerCase();
+
+    return allSubmissions.filter((submission) =>
+      submission.contributorProfileId === contributorProfileId ||
+      submission.contributorEmail.trim().toLowerCase() === normalizedEmail
+    );
+  }
+
+  async getCurriculumSubmission(id: number): Promise<CurriculumSubmission | undefined> {
+    const results = await db.select().from(curriculumSubmissions)
+      .where(eq(curriculumSubmissions.id, id));
+    return results[0];
+  }
+
+  async createCurriculumSubmission(submission: InsertCurriculumSubmission): Promise<CurriculumSubmission> {
+    const results = await db.insert(curriculumSubmissions).values(submission).returning();
+    return results[0];
+  }
+
+  async reviewCurriculumSubmission(id: number, updates: Partial<CurriculumSubmission>): Promise<CurriculumSubmission> {
+    const results = await db.update(curriculumSubmissions)
+      .set(updates)
+      .where(eq(curriculumSubmissions.id, id))
+      .returning();
+    return results[0];
+  }
+
+  async getResourceSubmissions(status?: string): Promise<ResourceSubmission[]> {
+    if (status) {
+      return await db.select().from(resourceSubmissions)
+        .where(eq(resourceSubmissions.status, status));
+    }
+
+    return await db.select().from(resourceSubmissions);
+  }
+
+  async getResourceSubmissionsForContributor(
+    contributorProfileId: number,
+    contributorEmail: string,
+  ): Promise<ResourceSubmission[]> {
+    const allSubmissions = await this.getResourceSubmissions();
+    const normalizedEmail = contributorEmail.trim().toLowerCase();
+
+    return allSubmissions.filter((submission) =>
+      submission.contributorProfileId === contributorProfileId ||
+      submission.contributorEmail.trim().toLowerCase() === normalizedEmail
+    );
+  }
+
+  async getResourceSubmission(id: number): Promise<ResourceSubmission | undefined> {
+    const results = await db.select().from(resourceSubmissions)
+      .where(eq(resourceSubmissions.id, id));
+    return results[0];
+  }
+
+  async createResourceSubmission(submission: InsertResourceSubmission): Promise<ResourceSubmission> {
+    const results = await db.insert(resourceSubmissions).values(submission).returning();
+    return results[0];
+  }
+
+  async reviewResourceSubmission(id: number, updates: Partial<ResourceSubmission>): Promise<ResourceSubmission> {
+    const results = await db.update(resourceSubmissions)
+      .set(updates)
+      .where(eq(resourceSubmissions.id, id))
+      .returning();
+    return results[0];
+  }
+
+  async getCurriculumCollections(status?: string): Promise<CurriculumCollection[]> {
+    if (status) {
+      return await db.select().from(curriculumCollections)
+        .where(eq(curriculumCollections.status, status));
+    }
+
+    return await db.select().from(curriculumCollections);
+  }
+
+  async getCurriculumCollectionsForContributor(contributorProfileId: number): Promise<CurriculumCollection[]> {
+    return await db.select().from(curriculumCollections)
+      .where(eq(curriculumCollections.contributorProfileId, contributorProfileId));
+  }
+
+  async getCurriculumCollection(id: number): Promise<CurriculumCollection | undefined> {
+    const results = await db.select().from(curriculumCollections)
+      .where(eq(curriculumCollections.id, id));
+    return results[0];
+  }
+
+  async createCurriculumCollection(collection: InsertCurriculumCollection): Promise<CurriculumCollection> {
+    const results = await db.insert(curriculumCollections).values(collection).returning();
+    return results[0];
+  }
+
+  async updateCurriculumCollection(
+    id: number,
+    updates: Partial<CurriculumCollection>,
+  ): Promise<CurriculumCollection> {
+    const results = await db.update(curriculumCollections)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(curriculumCollections.id, id))
+      .returning();
+    return results[0];
+  }
+
+  async getCurriculumCollectionItems(collectionId: number): Promise<CurriculumCollectionItem[]> {
+    const items = await db.select().from(curriculumCollectionItems)
+      .where(eq(curriculumCollectionItems.collectionId, collectionId));
+    return items.sort((left, right) => left.order - right.order);
+  }
+
+  async replaceCurriculumCollectionItems(
+    collectionId: number,
+    items: InsertCurriculumCollectionItem[],
+  ): Promise<CurriculumCollectionItem[]> {
+    await db.delete(curriculumCollectionItems)
+      .where(eq(curriculumCollectionItems.collectionId, collectionId));
+
+    if (items.length === 0) {
+      return [];
+    }
+
+    const results = await db.insert(curriculumCollectionItems)
+      .values(items)
+      .returning();
+    return results.sort((left, right) => left.order - right.order);
+  }
+
+  async getUserCurriculumCollectionProgress(
+    userId: number,
+    collectionId: number,
+  ): Promise<UserCurriculumCollectionProgress | undefined> {
+    const results = await db.select().from(userCurriculumCollectionProgress)
+      .where(and(
+        eq(userCurriculumCollectionProgress.userId, userId),
+        eq(userCurriculumCollectionProgress.collectionId, collectionId),
+      ));
+    return results[0];
+  }
+
+  async getAllUserCurriculumCollectionProgress(userId: number): Promise<UserCurriculumCollectionProgress[]> {
+    return await db.select().from(userCurriculumCollectionProgress)
+      .where(eq(userCurriculumCollectionProgress.userId, userId));
+  }
+
+  async upsertUserCurriculumCollectionProgress(
+    userId: number,
+    collectionId: number,
+    updates: Partial<UserCurriculumCollectionProgress>,
+  ): Promise<UserCurriculumCollectionProgress> {
+    const existing = await this.getUserCurriculumCollectionProgress(userId, collectionId);
+
+    if (existing) {
+      const results = await db.update(userCurriculumCollectionProgress)
+        .set({ ...updates, updatedAt: new Date() })
+        .where(and(
+          eq(userCurriculumCollectionProgress.userId, userId),
+          eq(userCurriculumCollectionProgress.collectionId, collectionId),
+        ))
+        .returning();
+      return results[0];
+    }
+
+    const newProgress: InsertUserCurriculumCollectionProgress = {
+      userId,
+      collectionId,
+      status: updates.status || "in_progress",
+      currentItemId: updates.currentItemId,
+      completedItemIds: updates.completedItemIds || [],
+      percentComplete: updates.percentComplete || 0,
+      startedAt: updates.startedAt || new Date(),
+      completedAt: updates.completedAt,
+      updatedAt: new Date(),
+    };
+
+    const results = await db.insert(userCurriculumCollectionProgress)
+      .values(newProgress)
+      .returning();
+    return results[0];
+  }
+
+  async getAllContributorProfiles(): Promise<ContributorProfile[]> {
+    return await db.select().from(contributorProfiles);
+  }
+
+  async getContributorProfile(id: number): Promise<ContributorProfile | undefined> {
+    const results = await db.select().from(contributorProfiles)
+      .where(eq(contributorProfiles.id, id));
+    return results[0];
+  }
+
+  async getContributorProfileByUserId(userId: number): Promise<ContributorProfile | undefined> {
+    const results = await db.select().from(contributorProfiles)
+      .where(eq(contributorProfiles.userId, userId));
+    return results[0];
+  }
+
+  async upsertContributorProfile(profile: InsertContributorProfile): Promise<ContributorProfile> {
+    const existing = await this.getContributorProfileByUserId(profile.userId);
+
+    if (existing) {
+      const results = await db.update(contributorProfiles)
+        .set({ ...profile, updatedAt: new Date() })
+        .where(eq(contributorProfiles.userId, profile.userId))
+        .returning();
+      return results[0];
+    }
+
+    const results = await db.insert(contributorProfiles)
+      .values(profile)
+      .returning();
+    return results[0];
+  }
+
+  async getEducatorOfferings(status?: string): Promise<EducatorOffering[]> {
+    if (status) {
+      return await db.select().from(educatorOfferings).where(eq(educatorOfferings.status, status));
+    }
+
+    return await db.select().from(educatorOfferings);
+  }
+
+  async getEducatorOffering(id: number): Promise<EducatorOffering | undefined> {
+    const results = await db.select().from(educatorOfferings)
+      .where(eq(educatorOfferings.id, id));
+    return results[0];
+  }
+
+  async getEducatorOfferingsForContributor(contributorProfileId: number): Promise<EducatorOffering[]> {
+    return await db.select().from(educatorOfferings)
+      .where(eq(educatorOfferings.contributorProfileId, contributorProfileId));
+  }
+
+  async createEducatorOffering(offering: InsertEducatorOffering): Promise<EducatorOffering> {
+    const results = await db.insert(educatorOfferings).values(offering).returning();
+    return results[0];
+  }
+
+  async updateEducatorOffering(id: number, updates: Partial<EducatorOffering>): Promise<EducatorOffering> {
+    const results = await db.update(educatorOfferings)
+      .set(updates)
+      .where(eq(educatorOfferings.id, id))
+      .returning();
+    return results[0];
+  }
+
+  async getOfferingSessions(status?: string): Promise<OfferingSession[]> {
+    if (status) {
+      return await db.select().from(offeringSessions).where(eq(offeringSessions.status, status));
+    }
+
+    return await db.select().from(offeringSessions);
+  }
+
+  async getOfferingSession(id: number): Promise<OfferingSession | undefined> {
+    const results = await db.select().from(offeringSessions)
+      .where(eq(offeringSessions.id, id));
+    return results[0];
+  }
+
+  async getOfferingSessionsForContributor(contributorProfileId: number): Promise<OfferingSession[]> {
+    return await db.select().from(offeringSessions)
+      .where(eq(offeringSessions.contributorProfileId, contributorProfileId));
+  }
+
+  async getOfferingSessionsForOffering(educatorOfferingId: number): Promise<OfferingSession[]> {
+    return await db.select().from(offeringSessions)
+      .where(eq(offeringSessions.educatorOfferingId, educatorOfferingId));
+  }
+
+  async createOfferingSession(session: InsertOfferingSession): Promise<OfferingSession> {
+    const results = await db.insert(offeringSessions).values(session).returning();
+    return results[0];
+  }
+
+  async updateOfferingSession(id: number, updates: Partial<OfferingSession>): Promise<OfferingSession> {
+    const results = await db.update(offeringSessions)
+      .set(updates)
+      .where(eq(offeringSessions.id, id))
+      .returning();
+    return results[0];
+  }
+
+  async adjustOfferingSessionReservedSeats(id: number, delta: number): Promise<OfferingSession> {
+    const results = await db.update(offeringSessions)
+      .set({
+        reservedSeats: sql`greatest(0, ${offeringSessions.reservedSeats} + ${delta})`,
+        updatedAt: new Date(),
+      })
+      .where(eq(offeringSessions.id, id))
+      .returning();
+    return results[0];
+  }
+
+  async getOfferingEnrollments(status?: string): Promise<OfferingEnrollment[]> {
+    if (status) {
+      return await db.select().from(offeringEnrollments).where(eq(offeringEnrollments.status, status));
+    }
+
+    return await db.select().from(offeringEnrollments);
+  }
+
+  async getOfferingEnrollmentsForContributor(contributorProfileId: number): Promise<OfferingEnrollment[]> {
+    return await db.select().from(offeringEnrollments)
+      .where(eq(offeringEnrollments.contributorProfileId, contributorProfileId));
+  }
+
+  async getOfferingEnrollmentsForRequester(userId: number, email: string): Promise<OfferingEnrollment[]> {
+    return await db.select().from(offeringEnrollments)
+      .where(or(
+        eq(offeringEnrollments.requesterUserId, userId),
+        eq(offeringEnrollments.requesterEmail, email.trim().toLowerCase()),
+      ));
+  }
+
+  async getOfferingEnrollmentsForSession(offeringSessionId: number): Promise<OfferingEnrollment[]> {
+    return await db.select().from(offeringEnrollments)
+      .where(eq(offeringEnrollments.offeringSessionId, offeringSessionId));
+  }
+
+  async createOfferingEnrollment(enrollment: InsertOfferingEnrollment): Promise<OfferingEnrollment> {
+    const results = await db.insert(offeringEnrollments).values(enrollment).returning();
+    return results[0];
+  }
+
+  async updateOfferingEnrollment(id: number, updates: Partial<OfferingEnrollment>): Promise<OfferingEnrollment> {
+    const results = await db.update(offeringEnrollments)
+      .set(updates)
+      .where(eq(offeringEnrollments.id, id))
+      .returning();
+    return results[0];
+  }
+
+  async getOfferingInterests(): Promise<OfferingInterest[]> {
+    return await db.select().from(offeringInterests);
+  }
+
+  async getOfferingInterestsForContributor(contributorProfileId: number): Promise<OfferingInterest[]> {
+    return await db.select().from(offeringInterests)
+      .where(eq(offeringInterests.contributorProfileId, contributorProfileId));
+  }
+
+  async getOfferingInterestsForOffering(educatorOfferingId: number): Promise<OfferingInterest[]> {
+    return await db.select().from(offeringInterests)
+      .where(eq(offeringInterests.educatorOfferingId, educatorOfferingId));
+  }
+
+  async createOfferingInterest(interest: InsertOfferingInterest): Promise<OfferingInterest> {
+    const results = await db.insert(offeringInterests).values(interest).returning();
+    return results[0];
+  }
+
+  async updateOfferingInterest(id: number, updates: Partial<OfferingInterest>): Promise<OfferingInterest> {
+    const results = await db.update(offeringInterests)
+      .set(updates)
+      .where(eq(offeringInterests.id, id))
+      .returning();
+    return results[0];
+  }
+
+  async getOfferingReviews(status?: string): Promise<OfferingReview[]> {
+    if (status) {
+      return await db.select().from(offeringReviews).where(eq(offeringReviews.status, status));
+    }
+
+    return await db.select().from(offeringReviews);
+  }
+
+  async getOfferingReviewsForContributor(contributorProfileId: number): Promise<OfferingReview[]> {
+    return await db.select().from(offeringReviews)
+      .where(eq(offeringReviews.contributorProfileId, contributorProfileId));
+  }
+
+  async getOfferingReviewsForOffering(educatorOfferingId: number): Promise<OfferingReview[]> {
+    return await db.select().from(offeringReviews)
+      .where(eq(offeringReviews.educatorOfferingId, educatorOfferingId));
+  }
+
+  async getOfferingReviewForEnrollment(offeringEnrollmentId: number): Promise<OfferingReview | undefined> {
+    const results = await db.select().from(offeringReviews)
+      .where(eq(offeringReviews.offeringEnrollmentId, offeringEnrollmentId));
+    return results[0];
+  }
+
+  async createOfferingReview(review: InsertOfferingReview): Promise<OfferingReview> {
+    const results = await db.insert(offeringReviews).values(review).returning();
+    return results[0];
+  }
+
+  async updateOfferingReview(id: number, updates: Partial<OfferingReview>): Promise<OfferingReview> {
+    const results = await db.update(offeringReviews)
+      .set(updates)
+      .where(eq(offeringReviews.id, id))
+      .returning();
+    return results[0];
+  }
+
+  async getFeedbackSubmissions(): Promise<FeedbackSubmission[]> {
+    return await db.select().from(feedbackSubmissions);
+  }
+
+  async createFeedbackSubmission(submission: InsertFeedbackSubmission): Promise<FeedbackSubmission> {
+    const results = await db.insert(feedbackSubmissions).values(submission).returning();
+    return results[0];
+  }
+
+  async updateFeedbackSubmission(id: number, updates: Partial<FeedbackSubmission>): Promise<FeedbackSubmission> {
+    const results = await db.update(feedbackSubmissions)
+      .set(updates)
+      .where(eq(feedbackSubmissions.id, id))
+      .returning();
+    return results[0];
+  }
+
+  async getContentReports(status?: string): Promise<ContentReport[]> {
+    if (status) {
+      return await db.select().from(contentReports).where(eq(contentReports.status, status));
+    }
+
+    return await db.select().from(contentReports);
+  }
+
+  async createContentReport(report: InsertContentReport): Promise<ContentReport> {
+    const results = await db.insert(contentReports).values(report).returning();
+    return results[0];
+  }
+
+  async updateContentReport(id: number, updates: Partial<ContentReport>): Promise<ContentReport> {
+    const results = await db.update(contentReports)
+      .set(updates)
+      .where(eq(contentReports.id, id))
+      .returning();
+    return results[0];
+  }
+
+  async getAllCredentialDefinitions(): Promise<CredentialDefinition[]> {
+    return await db.select().from(credentialDefinitions).where(eq(credentialDefinitions.active, true));
+  }
+
+  async getCredentialDefinition(id: number): Promise<CredentialDefinition | undefined> {
+    const results = await db.select().from(credentialDefinitions).where(eq(credentialDefinitions.id, id));
+    return results[0];
+  }
+
+  async getCredentialDefinitionBySlug(slug: string): Promise<CredentialDefinition | undefined> {
+    const results = await db.select().from(credentialDefinitions).where(eq(credentialDefinitions.slug, slug));
+    return results[0];
+  }
+
+  async createCredentialDefinition(credential: InsertCredentialDefinition): Promise<CredentialDefinition> {
+    const results = await db.insert(credentialDefinitions).values(credential).returning();
+    return results[0];
+  }
+
+  async getCredentialRequirements(credentialId: number): Promise<CredentialRequirement[]> {
+    return await db.select().from(credentialRequirements)
+      .where(eq(credentialRequirements.credentialId, credentialId))
+      .orderBy(credentialRequirements.order);
+  }
+
+  async createCredentialRequirement(requirement: InsertCredentialRequirement): Promise<CredentialRequirement> {
+    const results = await db.insert(credentialRequirements).values(requirement).returning();
+    return results[0];
+  }
+
+  async getIssuedCredentialsForUser(userId: number): Promise<IssuedCredential[]> {
+    return await db.select().from(issuedCredentials).where(eq(issuedCredentials.userId, userId));
+  }
+
+  async getIssuedCredentialByShareCode(shareCode: string): Promise<IssuedCredential | undefined> {
+    const results = await db.select().from(issuedCredentials).where(eq(issuedCredentials.shareCode, shareCode));
+    return results.length > 0 ? results[0] : undefined;
+  }
+
+  async issueCredential(credential: InsertIssuedCredential): Promise<IssuedCredential> {
+    const results = await db.insert(issuedCredentials).values(credential).returning();
     return results[0];
   }
   
@@ -452,6 +1109,17 @@ export class DatabaseStorage implements IStorage {
       .returning();
     return results[0];
   }
+
+  async getLessonResources(lessonId: number): Promise<LessonResource[]> {
+    const items = await db.select().from(lessonResources)
+      .where(eq(lessonResources.lessonId, lessonId));
+    return items.sort((left, right) => left.order - right.order);
+  }
+
+  async createLessonResource(resource: InsertLessonResource): Promise<LessonResource> {
+    const results = await db.insert(lessonResources).values(resource).returning();
+    return results[0];
+  }
   
   // User Subject Progress operations
   async getUserSubjectProgress(userId: number, subjectId: number): Promise<UserSubjectProgress | undefined> {
@@ -480,8 +1148,10 @@ export class DatabaseStorage implements IStorage {
       const results = await db
         .update(userSubjectProgress)
         .set(progress)
-        .where(eq(userSubjectProgress.userId, userId))
-        .where(eq(userSubjectProgress.subjectId, subjectId))
+        .where(and(
+          eq(userSubjectProgress.userId, userId),
+          eq(userSubjectProgress.subjectId, subjectId)
+        ))
         .returning();
       return results[0];
     } else {
@@ -502,9 +1172,16 @@ export class DatabaseStorage implements IStorage {
   // User Lesson Progress operations
   async getUserLessonProgress(userId: number, lessonId: number): Promise<UserLessonProgress | undefined> {
     const results = await db.select().from(userLessonProgress)
-      .where(eq(userLessonProgress.userId, userId))
-      .where(eq(userLessonProgress.lessonId, lessonId));
+      .where(and(
+        eq(userLessonProgress.userId, userId),
+        eq(userLessonProgress.lessonId, lessonId)
+      ));
     return results.length > 0 ? results[0] : undefined;
+  }
+
+  async getAllUserLessonProgress(userId: number): Promise<UserLessonProgress[]> {
+    return await db.select().from(userLessonProgress)
+      .where(eq(userLessonProgress.userId, userId));
   }
   
   async getAllUserLessonProgressBySubject(userId: number, subjectId: number): Promise<UserLessonProgress[]> {
@@ -515,8 +1192,10 @@ export class DatabaseStorage implements IStorage {
     if (lessonIds.length === 0) return [];
     
     return await db.select().from(userLessonProgress)
-      .where(eq(userLessonProgress.userId, userId))
-      .where(userLessonProgress.lessonId.in(lessonIds));
+      .where(and(
+        eq(userLessonProgress.userId, userId),
+        inArray(userLessonProgress.lessonId, lessonIds)
+      ));
   }
   
   async createUserLessonProgress(progress: InsertUserLessonProgress): Promise<UserLessonProgress> {
@@ -531,8 +1210,10 @@ export class DatabaseStorage implements IStorage {
       const results = await db
         .update(userLessonProgress)
         .set(progress)
-        .where(eq(userLessonProgress.userId, userId))
-        .where(eq(userLessonProgress.lessonId, lessonId))
+        .where(and(
+          eq(userLessonProgress.userId, userId),
+          eq(userLessonProgress.lessonId, lessonId)
+        ))
         .returning();
       return results[0];
     } else {
@@ -541,9 +1222,10 @@ export class DatabaseStorage implements IStorage {
         userId,
         lessonId,
         status: progress.status || 'not_started',
+        ageGroup: progress.ageGroup || '13-15',
         startedAt: progress.startedAt,
         completedAt: progress.completedAt,
-        answers: progress.answers,
+        answers: progress.answers as InsertUserLessonProgress["answers"],
         notes: progress.notes,
       };
       return await this.createUserLessonProgress(newProgress);
@@ -563,7 +1245,7 @@ export class DatabaseStorage implements IStorage {
     // We need a different approach for array fields
     // Since audience is an array, we need to find resources where the audience array includes the requested audience
     const allResources = await this.getAllResources();
-    return allResources.filter(resource => resource.audience.includes(audience));
+    return allResources.filter(resource => resource.audience?.includes(audience));
   }
 
   async getResourcesByType(type: string): Promise<Resource[]> {
@@ -600,7 +1282,7 @@ export class DatabaseStorage implements IStorage {
     }
     
     return await this.updateResource(id, {
-      downloadCount: resource.downloadCount + 1
+      downloadCount: (resource.downloadCount || 0) + 1
     });
   }
   
@@ -772,9 +1454,11 @@ export class DatabaseStorage implements IStorage {
     tomorrow.setDate(tomorrow.getDate() + 1);
     
     return await db.select().from(userChallenges)
-      .where(eq(userChallenges.userId, userId))
-      .where(sql`${userChallenges.completedAt} >= ${today.toISOString()}`)
-      .where(sql`${userChallenges.completedAt} < ${tomorrow.toISOString()}`);
+      .where(and(
+        eq(userChallenges.userId, userId),
+        sql`${userChallenges.completedAt} >= ${today.toISOString()}`,
+        sql`${userChallenges.completedAt} < ${tomorrow.toISOString()}`
+      ));
   }
   
   async completeChallenge(userChallenge: InsertUserChallenge): Promise<UserChallenge> {
@@ -1058,21 +1742,334 @@ export class DatabaseStorage implements IStorage {
   async initializeSubjectsData() {
     // Check if subjects already exist
     try {
+      const parseJsonSeedField = (value: unknown) => {
+        if (typeof value !== "string") return value;
+        try {
+          return JSON.parse(value);
+        } catch {
+          return value;
+        }
+      };
+
+      const normalizeLessonSeed = (lesson: any): InsertLesson => ({
+        subjectId: lesson.subjectId,
+        title: lesson.title,
+        subtitle: lesson.subtitle,
+        slug: lesson.slug,
+        order: lesson.order,
+        learningObjective: lesson.learningObjective || `Understand and apply ${lesson.title.toLowerCase()} in real-world situations.`,
+        warmUpQuestion: lesson.warmUpQuestion || `Where have you seen ${lesson.title.toLowerCase()} show up in everyday life?`,
+        lessonExplanation: lesson.lessonExplanation || lesson.content || "",
+        scenarioTitle: lesson.scenarioTitle,
+        scenarioContent: lesson.scenarioContent,
+        activityType: lesson.activityType,
+        activityContent: parseJsonSeedField(lesson.activityContent),
+        reflectionPrompt: lesson.reflectionPrompt || "What is one specific way you can use this lesson in your own life?",
+        estimatedMinutes: lesson.estimatedMinutes,
+        xpReward: lesson.xpReward || 50,
+        badgeId: lesson.badgeId,
+        ageGroupContent: parseJsonSeedField(lesson.ageGroupContent),
+      });
+
+      const seedBetaPathway = async ({
+        subject,
+        lessons: lessonSeeds,
+        credential,
+      }: {
+        subject: InsertSubject;
+        lessons: Omit<InsertLesson, "subjectId">[];
+        credential: {
+          title: string;
+          slug: string;
+          description: string;
+          criteriaSummary: string;
+        };
+      }) => {
+        let subjectRecord = await this.getSubjectBySlug(subject.slug);
+        if (!subjectRecord) {
+          subjectRecord = await this.createSubject(subject);
+        }
+
+        const existingLessons = await this.getLessonsBySubject(subjectRecord.id);
+        const createdOrExistingLessons: Lesson[] = [];
+        for (const lesson of lessonSeeds) {
+          const existingLesson = existingLessons.find((item) => item.slug === lesson.slug);
+          if (existingLesson) {
+            createdOrExistingLessons.push(existingLesson);
+          } else {
+            createdOrExistingLessons.push(await this.createLesson(normalizeLessonSeed({
+              ...lesson,
+              subjectId: subjectRecord.id,
+            })));
+          }
+        }
+
+        const existingCredential = await this.getCredentialDefinitionBySlug(credential.slug);
+        if (!existingCredential) {
+          const credentialRecord = await this.createCredentialDefinition({
+            ...credential,
+            subjectId: subjectRecord.id,
+            disclaimer: "This is a Real World Academy completion credential and does not represent accredited school credit.",
+            active: true,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          });
+
+          for (let index = 0; index < createdOrExistingLessons.length; index++) {
+            const lesson = createdOrExistingLessons[index];
+            await this.createCredentialRequirement({
+              credentialId: credentialRecord.id,
+              requirementType: "lesson",
+              title: `Complete lesson: ${lesson.title}`,
+              description: `Student must complete the ${lesson.title} lesson.`,
+              targetId: lesson.id,
+              required: true,
+              order: index + 1,
+            });
+          }
+        }
+      };
+
+      const seedRoadmapBetaPathways = async () => {
+        await seedBetaPathway({
+          subject: {
+            title: "Career Exploration",
+            description: "Discover strengths, research career options, practice workplace communication, and build a clear next-step plan.",
+            slug: "career-exploration",
+            iconName: "briefcase",
+            color: "indigo",
+            featured: true,
+            order: 4,
+            category: "future",
+            ageGroups: ["13-15", "16-18"],
+            summary: "You've explored career options, practiced professional communication, and built a practical next-step plan.",
+            nextSubjectIds: [],
+          },
+          lessons: [
+            {
+              title: "Strengths and Interests",
+              subtitle: "Notice the patterns in what you enjoy and do well",
+              slug: "strengths-and-interests",
+              order: 1,
+              learningObjective: "Identify personal strengths, interests, and values that can guide career exploration.",
+              warmUpQuestion: "What is something people often ask you for help with?",
+              lessonExplanation: "Career exploration starts by noticing patterns. Your strengths are things you tend to do well, your interests are things that pull your attention, and your values are what you want your work to support. A good career direction often sits where these three overlap.",
+              scenarioTitle: "Choosing a Direction",
+              scenarioContent: "Jordan likes helping younger students, enjoys organizing events, and cares about community impact. Jordan is trying to choose between education, nonprofit work, and business.",
+              activityType: "reflection",
+              activityContent: { prompts: ["List three strengths.", "List three interests.", "Name two values you want your work to support."] },
+              reflectionPrompt: "Which strength or interest could become part of a future career path?",
+              estimatedMinutes: 20,
+              xpReward: 50,
+              ageGroupContent: { "13-15": { focus: "school activities and hobbies" }, "16-18": { focus: "work, volunteering, and postsecondary options" } },
+            },
+            {
+              title: "Career Research",
+              subtitle: "Learn how to compare real jobs",
+              slug: "career-research",
+              order: 2,
+              learningObjective: "Research a career using reliable sources and compare pay, training, tasks, and lifestyle fit.",
+              warmUpQuestion: "What is one job you are curious about but do not fully understand?",
+              lessonExplanation: "A career title only tells part of the story. Good research looks at daily tasks, training requirements, work environment, pay range, growth outlook, and whether the work fits your values.",
+              scenarioTitle: "Beyond the Job Title",
+              scenarioContent: "Sam thinks graphic design sounds fun, but needs to learn what designers actually do each day, what skills are required, and how people get started.",
+              activityType: "research-profile",
+              activityContent: { fields: ["career title", "daily tasks", "required skills", "training path", "why it fits or does not fit"] },
+              reflectionPrompt: "What did your research reveal that surprised you?",
+              estimatedMinutes: 30,
+              xpReward: 60,
+              ageGroupContent: { "13-15": { sources: "family interviews and career websites" }, "16-18": { sources: "career databases, job postings, and training programs" } },
+            },
+            {
+              title: "Resume Basics",
+              subtitle: "Show what you can do",
+              slug: "resume-basics",
+              order: 3,
+              learningObjective: "Create a simple resume section that highlights skills, experience, projects, or volunteer work.",
+              warmUpQuestion: "What is one project, chore, club, or responsibility you could proudly explain to someone?",
+              lessonExplanation: "A beginner resume is not about having a long work history. It is about clearly showing responsibility, skills, projects, learning, and character. Strong bullets start with action words and describe what you did.",
+              scenarioTitle: "First Opportunity",
+              scenarioContent: "A local business is hiring weekend help. Taylor has never had a formal job but has babysitting experience, a school project, and volunteer hours.",
+              activityType: "resume-draft",
+              activityContent: { sections: ["summary", "skills", "experience or projects", "education"] },
+              reflectionPrompt: "Which experience from your life shows responsibility or initiative?",
+              estimatedMinutes: 35,
+              xpReward: 60,
+              ageGroupContent: { "13-15": { resumeType: "project and responsibility based" }, "16-18": { resumeType: "job, volunteer, and project based" } },
+            },
+            {
+              title: "Interview Practice",
+              subtitle: "Answer with examples",
+              slug: "interview-practice",
+              order: 4,
+              learningObjective: "Practice answering interview questions with specific examples and a confident structure.",
+              warmUpQuestion: "What is one time you solved a problem or helped someone?",
+              lessonExplanation: "Strong interview answers are specific. A simple structure is situation, action, result: explain what was happening, what you did, and what changed because of it.",
+              scenarioTitle: "Tell Me About Yourself",
+              scenarioContent: "Riley has an interview for a summer program and wants to sound prepared without memorizing every word.",
+              activityType: "practice-script",
+              activityContent: { questions: ["Tell me about yourself.", "Describe a challenge you handled.", "Why are you interested in this opportunity?"] },
+              reflectionPrompt: "Which example from your life would make a strong interview answer?",
+              estimatedMinutes: 25,
+              xpReward: 50,
+              ageGroupContent: { "13-15": { interviewType: "club, volunteer, and school opportunities" }, "16-18": { interviewType: "job, internship, and program opportunities" } },
+            },
+            {
+              title: "Career Next-Step Plan",
+              subtitle: "Turn research into action",
+              slug: "career-next-step-plan",
+              order: 5,
+              learningObjective: "Create a short action plan for exploring or preparing for one career direction.",
+              warmUpQuestion: "What is one small step you could take this month to learn more about a career?",
+              lessonExplanation: "A career plan should be useful, not perfect. Pick one direction to explore, choose a skill to build, identify someone to learn from, and set one next action with a date.",
+              scenarioTitle: "One Month From Now",
+              scenarioContent: "Avery is interested in healthcare but does not know whether to explore nursing, therapy, medical technology, or administration.",
+              activityType: "action-plan",
+              activityContent: { steps: ["career to explore", "skill to practice", "person or source to learn from", "next action", "deadline"] },
+              reflectionPrompt: "What is your next step, and when will you do it?",
+              estimatedMinutes: 30,
+              xpReward: 70,
+              ageGroupContent: { "13-15": { timeline: "one month exploration plan" }, "16-18": { timeline: "three month preparation plan" } },
+            },
+          ],
+          credential: {
+            title: "Career Explorer Credential",
+            slug: "career-explorer",
+            description: "Awarded for completing the Career Exploration pathway and creating a practical career next-step plan.",
+            criteriaSummary: "Complete Career Exploration lessons and save a career profile or next-step plan.",
+          },
+        });
+
+        await seedBetaPathway({
+          subject: {
+            title: "Digital Productivity",
+            description: "Build practical computer, document, spreadsheet, email, research, and digital safety habits for school, work, and life.",
+            slug: "digital-productivity",
+            iconName: "laptop",
+            color: "cyan",
+            featured: true,
+            order: 5,
+            category: "technology",
+            ageGroups: ["9-12", "13-15", "16-18"],
+            summary: "You've practiced the digital organization and communication skills needed for modern learning and work.",
+            nextSubjectIds: [],
+          },
+          lessons: [
+            {
+              title: "Files and Folders",
+              subtitle: "Keep digital work findable",
+              slug: "files-and-folders",
+              order: 1,
+              learningObjective: "Organize files with clear names, folders, and backup habits.",
+              warmUpQuestion: "Have you ever lost a file or forgotten where you saved something?",
+              lessonExplanation: "Digital organization saves time and prevents stress. Strong file habits include clear names, logical folders, dates or versions when needed, and backups for important work.",
+              scenarioTitle: "Missing Assignment",
+              scenarioContent: "Mia finished a project but saved it as final-final-new.docx somewhere on the computer and cannot find it before the deadline.",
+              activityType: "organization-plan",
+              activityContent: { folders: ["School", "Projects", "Personal", "Archive"], namingExample: "2026-06-budget-project-v1" },
+              reflectionPrompt: "What folder system would make your digital work easier to find?",
+              estimatedMinutes: 20,
+              xpReward: 50,
+              ageGroupContent: { "9-12": { focus: "simple folders" }, "13-15": { focus: "projects and versions" }, "16-18": { focus: "school, work, and backup habits" } },
+            },
+            {
+              title: "Document Basics",
+              subtitle: "Make writing readable and polished",
+              slug: "document-basics",
+              order: 2,
+              learningObjective: "Create a clear document using headings, spacing, lists, and proofreading.",
+              warmUpQuestion: "What makes a document easy or hard to read?",
+              lessonExplanation: "A polished document helps readers understand your ideas. Good formatting uses a clear title, headings, short paragraphs, consistent spacing, and careful proofreading.",
+              scenarioTitle: "Instructions That Work",
+              scenarioContent: "Noah wrote instructions for a science activity, but classmates are confused because everything is in one long paragraph.",
+              activityType: "document-polish",
+              activityContent: { checklist: ["title", "headings", "short paragraphs", "bullets or numbers", "proofread"] },
+              reflectionPrompt: "What formatting choice would most improve your next document?",
+              estimatedMinutes: 25,
+              xpReward: 50,
+              ageGroupContent: { "9-12": { focus: "titles and spacing" }, "13-15": { focus: "headings and lists" }, "16-18": { focus: "professional formatting" } },
+            },
+            {
+              title: "Spreadsheet Basics",
+              subtitle: "Use rows, columns, and formulas",
+              slug: "spreadsheet-basics",
+              order: 3,
+              learningObjective: "Build a simple spreadsheet with labels, numbers, and a total formula.",
+              warmUpQuestion: "Where could a table or spreadsheet help you keep track of something?",
+              lessonExplanation: "Spreadsheets organize information in rows and columns. Labels explain what data means, formulas calculate automatically, and formatting makes patterns easier to see.",
+              scenarioTitle: "Savings Tracker",
+              scenarioContent: "Kai wants to track weekly income, spending, and savings for eight weeks to see if a goal is realistic.",
+              activityType: "spreadsheet-plan",
+              activityContent: { columns: ["week", "income", "spending", "saved", "running total"], formula: "SUM saved amounts" },
+              reflectionPrompt: "What could you track in a spreadsheet for your own life?",
+              estimatedMinutes: 30,
+              xpReward: 60,
+              ageGroupContent: { "9-12": { formula: "simple totals" }, "13-15": { formula: "totals and averages" }, "16-18": { formula: "budgets and comparisons" } },
+            },
+            {
+              title: "Email Etiquette",
+              subtitle: "Communicate clearly online",
+              slug: "email-etiquette",
+              order: 4,
+              learningObjective: "Write a clear, respectful email with a subject, greeting, message, and closing.",
+              warmUpQuestion: "What makes a message sound respectful instead of rushed?",
+              lessonExplanation: "Email is still important for school, work, and formal communication. A strong email has a useful subject line, polite greeting, clear request, context, and a closing.",
+              scenarioTitle: "Asking for Help",
+              scenarioContent: "Leah needs to ask a mentor for advice but wants the message to sound respectful and easy to answer.",
+              activityType: "email-draft",
+              activityContent: { parts: ["subject", "greeting", "context", "request", "closing"] },
+              reflectionPrompt: "What is one email you might need to write this year?",
+              estimatedMinutes: 20,
+              xpReward: 50,
+              ageGroupContent: { "9-12": { focus: "polite messages" }, "13-15": { focus: "clear requests" }, "16-18": { focus: "professional tone" } },
+            },
+            {
+              title: "Online Research and Safety",
+              subtitle: "Find useful information without getting fooled",
+              slug: "online-research-and-safety",
+              order: 5,
+              learningObjective: "Evaluate online sources for trustworthiness and practice basic digital safety.",
+              warmUpQuestion: "How do you decide whether something online is true?",
+              lessonExplanation: "Good online research means checking the source, date, evidence, purpose, and whether other reliable sources agree. Digital safety also means protecting personal information and slowing down before clicking suspicious links.",
+              scenarioTitle: "Too Good to Be True",
+              scenarioContent: "A search result claims students can earn thousands of dollars instantly with no skills. The page asks for personal information before explaining the opportunity.",
+              activityType: "source-check",
+              activityContent: { checks: ["author", "date", "evidence", "purpose", "personal information risk"] },
+              reflectionPrompt: "What warning sign would make you leave a website or ask an adult for help?",
+              estimatedMinutes: 30,
+              xpReward: 70,
+              ageGroupContent: { "9-12": { focus: "ask before sharing info" }, "13-15": { focus: "source checks" }, "16-18": { focus: "research quality and scams" } },
+            },
+          ],
+          credential: {
+            title: "Digital Productivity Credential",
+            slug: "digital-productivity",
+            description: "Awarded for completing the Digital Productivity pathway and demonstrating practical digital organization and communication skills.",
+            criteriaSummary: "Complete Digital Productivity lessons and save a practical digital workflow or project reflection.",
+          },
+        });
+      };
+
       const existingSubjects = await db.select().from(subjects);
-      if (existingSubjects.length > 0) return; // Skip if data exists
+      if (existingSubjects.length > 0) {
+        await seedRoadmapBetaPathways();
+        return;
+      }
       
       console.log("Initializing subjects and lessons data...");
       
       // Create the three core subjects for Phase 19
       const financialLiteracySubject = await this.createSubject({
-        title: "Financial Literacy",
+        title: "Money Basics",
         description: "Learn essential money management skills for real-world financial success. Understand budgeting, saving, investing, and making smart financial decisions.",
-        slug: "financial-literacy",
+        slug: "money-basics",
         iconName: "wallet",
         color: "green",
         featured: true,
         order: 1,
-        summary: "You've gained critical financial skills that will serve you throughout life. You now understand budgeting, saving strategies, how to avoid debt traps, and basic investing concepts.",
+        category: "money",
+        ageGroups: ["9-12", "13-15", "16-18"],
+        summary: "You've gained practical money skills that will serve you throughout life. You now understand needs and wants, budgeting, saving strategies, credit basics, and how to build a simple money plan.",
         nextSubjectIds: []
       });
       
@@ -1084,6 +2081,8 @@ export class DatabaseStorage implements IStorage {
         color: "violet",
         featured: true,
         order: 2,
+        category: "life",
+        ageGroups: ["9-12", "13-15", "16-18"],
         summary: "You've developed essential communication skills to express yourself clearly, listen actively, resolve conflicts, and build meaningful connections with others.",
         nextSubjectIds: []
       });
@@ -1096,6 +2095,8 @@ export class DatabaseStorage implements IStorage {
         color: "blue",
         featured: true,
         order: 3,
+        category: "math",
+        ageGroups: ["9-12", "13-15", "16-18"],
         summary: "You've mastered practical mathematical skills for everyday life, from calculating tips and understanding percentages to making data-driven decisions.",
         nextSubjectIds: []
       });
@@ -1733,18 +2734,19 @@ export class DatabaseStorage implements IStorage {
       
       // Create the lessons for each subject
       console.log("Creating Financial Literacy lessons...");
+      const createdFinancialLessons: Lesson[] = [];
       for (const lesson of financialLiteracyLessons) {
-        await this.createLesson(lesson);
+        createdFinancialLessons.push(await this.createLesson(normalizeLessonSeed(lesson)));
       }
       
       console.log("Creating Communication & Relationships lessons...");
       for (const lesson of communicationLessons) {
-        await this.createLesson(lesson);
+        await this.createLesson(normalizeLessonSeed(lesson));
       }
       
       console.log("Creating Real-World Math lessons...");
       for (const lesson of realWorldMathLessons) {
-        await this.createLesson(lesson);
+        await this.createLesson(normalizeLessonSeed(lesson));
       }
       
       // Update subject relations
@@ -1759,6 +2761,46 @@ export class DatabaseStorage implements IStorage {
       await this.updateSubject(realWorldMathSubject.id, {
         nextSubjectIds: [financialLiteracySubject.id, communicationSubject.id]
       });
+
+      const existingMoneyCredential = await this.getCredentialDefinitionBySlug("money-basics");
+      if (!existingMoneyCredential) {
+        const moneyCredential = await this.createCredentialDefinition({
+          title: "Money Basics Credential",
+          slug: "money-basics",
+          description: "Awarded for completing the Money Basics pathway and demonstrating core budgeting, saving, credit, and investing concepts.",
+          subjectId: financialLiteracySubject.id,
+          criteriaSummary: "Complete all Money Basics lessons and save a reflection or activity response.",
+          disclaimer: "This is a Real World Academy completion credential and does not represent accredited school credit.",
+          active: true,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
+
+        for (let index = 0; index < createdFinancialLessons.length; index++) {
+          const lesson = createdFinancialLessons[index];
+          await this.createCredentialRequirement({
+            credentialId: moneyCredential.id,
+            requirementType: "lesson",
+            title: `Complete lesson: ${lesson.title}`,
+            description: `Student must complete the ${lesson.title} lesson.`,
+            targetId: lesson.id,
+            required: true,
+            order: index + 1,
+          });
+        }
+
+        await this.createCredentialRequirement({
+          credentialId: moneyCredential.id,
+          requirementType: "parent_review",
+          title: "Parent review",
+          description: "A parent or mentor should review the student's final reflection or activity work.",
+          targetId: null,
+          required: false,
+          order: createdFinancialLessons.length + 1,
+        });
+      }
+
+      await seedRoadmapBetaPathways();
       
       console.log("Subjects and lessons data initialization complete!");
       
@@ -1968,7 +3010,7 @@ export class DatabaseStorage implements IStorage {
     
     // Get subjects to link resources
     const allSubjects = await this.getAllSubjects();
-    const financialLiteracySubject = allSubjects.find(subject => subject.slug === "financial-literacy");
+    const financialLiteracySubject = allSubjects.find(subject => subject.slug === "money-basics");
     const communicationSubject = allSubjects.find(subject => subject.slug === "communication-relationships");
     const mathSubject = allSubjects.find(subject => subject.slug === "real-world-math");
     
@@ -2166,7 +3208,7 @@ export class DatabaseStorage implements IStorage {
   
   // Buddy Messages operations
   async getBuddyMessages(userId: number, limit?: number): Promise<BuddyMessage[]> {
-    let query = db.select().from(buddyMessages)
+    let query: any = db.select().from(buddyMessages)
       .where(eq(buddyMessages.userId, userId))
       .orderBy(sql`${buddyMessages.sentAt} DESC`);
     
@@ -2190,7 +3232,7 @@ export class DatabaseStorage implements IStorage {
   
   // Buddy Emotion operations
   async getBuddyEmotions(userId: number, limit?: number): Promise<BuddyEmotionLog[]> {
-    let query = db.select().from(buddyEmotionLogs)
+    let query: any = db.select().from(buddyEmotionLogs)
       .where(eq(buddyEmotionLogs.userId, userId))
       .orderBy(sql`${buddyEmotionLogs.loggedAt} DESC`);
     
@@ -2213,7 +3255,7 @@ export class DatabaseStorage implements IStorage {
   
   // Journal Entries operations
   async getBuddyJournalEntries(userId: number, limit?: number): Promise<BuddyJournalEntry[]> {
-    let query = db.select().from(buddyJournalEntries)
+    let query: any = db.select().from(buddyJournalEntries)
       .where(eq(buddyJournalEntries.userId, userId))
       .orderBy(sql`${buddyJournalEntries.createdAt} DESC`);
     

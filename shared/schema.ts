@@ -13,6 +13,7 @@ export const users = pgTable("users", {
   bio: text("bio"),
   firstName: text("first_name"),
   lastName: text("last_name"),
+  role: text("role").default("student").notNull(), // student, parent, admin
   ageGroup: text("age_group"),
   interests: text("interests").array(),
   // Gamification fields
@@ -35,6 +36,7 @@ export const insertUserSchema = createInsertSchema(users).pick({
   bio: true,
   firstName: true,
   lastName: true,
+  role: true,
   ageGroup: true,
   interests: true,
   xp: true,
@@ -410,6 +412,38 @@ export const resourcesRelations = relations(resources, ({ one }) => ({
   }),
 }));
 
+export const lessonResources = pgTable("lesson_resources", {
+  id: serial("id").primaryKey(),
+  lessonId: integer("lesson_id").notNull().references(() => lessons.id),
+  resourceId: integer("resource_id").references(() => resources.id),
+  resourceType: text("resource_type").notNull(),
+  title: text("title").notNull(),
+  description: text("description"),
+  url: text("url").notNull(),
+  embedUrl: text("embed_url"),
+  sourceLabel: text("source_label"),
+  duration: text("duration"),
+  safetyNotes: text("safety_notes"),
+  parentPrompt: text("parent_prompt"),
+  studentPrompt: text("student_prompt"),
+  order: integer("order").default(1).notNull(),
+});
+
+export const insertLessonResourceSchema = createInsertSchema(lessonResources).omit({ id: true });
+export type InsertLessonResource = z.infer<typeof insertLessonResourceSchema>;
+export type LessonResource = typeof lessonResources.$inferSelect;
+
+export const lessonResourcesRelations = relations(lessonResources, ({ one }) => ({
+  lesson: one(lessons, {
+    fields: [lessonResources.lessonId],
+    references: [lessons.id],
+  }),
+  resource: one(resources, {
+    fields: [lessonResources.resourceId],
+    references: [resources.id],
+  }),
+}));
+
 // Daily challenges model
 export const dailyChallenges = pgTable("daily_challenges", {
   id: serial("id").primaryKey(),
@@ -553,6 +587,601 @@ export const insertBuddyJournalEntrySchema = createInsertSchema(buddyJournalEntr
 export type InsertBuddyJournalEntry = z.infer<typeof insertBuddyJournalEntrySchema>;
 export type BuddyJournalEntry = typeof buddyJournalEntries.$inferSelect;
 
+// Credential System
+export const credentialDefinitions = pgTable("credential_definitions", {
+  id: serial("id").primaryKey(),
+  title: text("title").notNull(),
+  slug: text("slug").notNull().unique(),
+  description: text("description").notNull(),
+  subjectId: integer("subject_id").references(() => subjects.id),
+  criteriaSummary: text("criteria_summary").notNull(),
+  disclaimer: text("disclaimer").notNull().default("This is a Real World Academy completion credential and does not represent accredited school credit."),
+  active: boolean("active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const credentialRequirements = pgTable("credential_requirements", {
+  id: serial("id").primaryKey(),
+  credentialId: integer("credential_id").notNull().references(() => credentialDefinitions.id),
+  requirementType: text("requirement_type").notNull(), // lesson, reflection, project, parent_review
+  title: text("title").notNull(),
+  description: text("description").notNull(),
+  targetId: integer("target_id"),
+  required: boolean("required").default(true).notNull(),
+  order: integer("order").notNull(),
+});
+
+export const issuedCredentials = pgTable("issued_credentials", {
+  id: serial("id").primaryKey(),
+  credentialId: integer("credential_id").notNull().references(() => credentialDefinitions.id),
+  userId: integer("user_id").notNull().references(() => users.id),
+  status: text("status").notNull().default("issued"), // pending_review, issued, revoked
+  issuedAt: timestamp("issued_at").defaultNow(),
+  reviewedByUserId: integer("reviewed_by_user_id").references(() => users.id),
+  reviewNote: text("review_note"),
+  shareCode: text("share_code").notNull().unique(),
+});
+
+export const credentialDefinitionsRelations = relations(credentialDefinitions, ({ one, many }) => ({
+  subject: one(subjects, {
+    fields: [credentialDefinitions.subjectId],
+    references: [subjects.id],
+  }),
+  requirements: many(credentialRequirements),
+  issuedCredentials: many(issuedCredentials),
+}));
+
+export const credentialRequirementsRelations = relations(credentialRequirements, ({ one }) => ({
+  credential: one(credentialDefinitions, {
+    fields: [credentialRequirements.credentialId],
+    references: [credentialDefinitions.id],
+  }),
+}));
+
+export const issuedCredentialsRelations = relations(issuedCredentials, ({ one }) => ({
+  credential: one(credentialDefinitions, {
+    fields: [issuedCredentials.credentialId],
+    references: [credentialDefinitions.id],
+  }),
+  user: one(users, {
+    fields: [issuedCredentials.userId],
+    references: [users.id],
+  }),
+  reviewer: one(users, {
+    fields: [issuedCredentials.reviewedByUserId],
+    references: [users.id],
+  }),
+}));
+
+export const insertCredentialDefinitionSchema = createInsertSchema(credentialDefinitions).omit({ id: true });
+export type InsertCredentialDefinition = z.infer<typeof insertCredentialDefinitionSchema>;
+export type CredentialDefinition = typeof credentialDefinitions.$inferSelect;
+
+export const insertCredentialRequirementSchema = createInsertSchema(credentialRequirements).omit({ id: true });
+export type InsertCredentialRequirement = z.infer<typeof insertCredentialRequirementSchema>;
+export type CredentialRequirement = typeof credentialRequirements.$inferSelect;
+
+export const insertIssuedCredentialSchema = createInsertSchema(issuedCredentials).omit({ id: true });
+export type InsertIssuedCredential = z.infer<typeof insertIssuedCredentialSchema>;
+export type IssuedCredential = typeof issuedCredentials.$inferSelect;
+
+// Family relationships for homeschool parent review
+export const parentChildRelationships = pgTable("parent_child_relationships", {
+  id: serial("id").primaryKey(),
+  parentUserId: integer("parent_user_id").notNull().references(() => users.id),
+  childUserId: integer("child_user_id").notNull().references(() => users.id),
+  relationshipLabel: text("relationship_label").default("parent").notNull(),
+  status: text("status").default("active").notNull(), // pending, active, revoked
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const parentChildRelationshipsRelations = relations(parentChildRelationships, ({ one }) => ({
+  parent: one(users, {
+    fields: [parentChildRelationships.parentUserId],
+    references: [users.id],
+    relationName: "parentRelationships",
+  }),
+  child: one(users, {
+    fields: [parentChildRelationships.childUserId],
+    references: [users.id],
+    relationName: "childRelationships",
+  }),
+}));
+
+export const insertParentChildRelationshipSchema = createInsertSchema(parentChildRelationships).omit({ id: true });
+export type InsertParentChildRelationship = z.infer<typeof insertParentChildRelationshipSchema>;
+export type ParentChildRelationship = typeof parentChildRelationships.$inferSelect;
+
+export const parentLessonReviews = pgTable("parent_lesson_reviews", {
+  id: serial("id").primaryKey(),
+  parentUserId: integer("parent_user_id").notNull().references(() => users.id),
+  childUserId: integer("child_user_id").notNull().references(() => users.id),
+  lessonId: integer("lesson_id").notNull().references(() => lessons.id),
+  status: text("status").default("approved").notNull(), // approved, changes_requested
+  note: text("note"),
+  reviewedAt: timestamp("reviewed_at").defaultNow(),
+});
+
+export const parentLessonReviewsRelations = relations(parentLessonReviews, ({ one }) => ({
+  parent: one(users, {
+    fields: [parentLessonReviews.parentUserId],
+    references: [users.id],
+    relationName: "parentLessonReviews",
+  }),
+  child: one(users, {
+    fields: [parentLessonReviews.childUserId],
+    references: [users.id],
+    relationName: "childLessonReviews",
+  }),
+  lesson: one(lessons, {
+    fields: [parentLessonReviews.lessonId],
+    references: [lessons.id],
+  }),
+}));
+
+export const insertParentLessonReviewSchema = createInsertSchema(parentLessonReviews).omit({ id: true });
+export type InsertParentLessonReview = z.infer<typeof insertParentLessonReviewSchema>;
+export type ParentLessonReview = typeof parentLessonReviews.$inferSelect;
+
+export const contributorProfiles = pgTable("contributor_profiles", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id).unique(),
+  displayName: text("display_name").notNull(),
+  bio: text("bio"),
+  affiliation: text("affiliation"),
+  website: text("website"),
+  avatarUrl: text("avatar_url"),
+  expertiseTags: text("expertise_tags").array(),
+  teachingStyle: text("teaching_style"),
+  subjectsTaught: text("subjects_taught").array(),
+  ageGroupsServed: text("age_groups_served").array(),
+  introVideoUrl: text("intro_video_url"),
+  sampleLessonUrls: text("sample_lesson_urls").array(),
+  availabilitySummary: text("availability_summary"),
+  timeZone: text("time_zone"),
+  offeringTypes: text("offering_types").array(), // free_sample, live_class, recorded_course, tutoring, coaching, curriculum_bundle
+  trustLevel: text("trust_level").default("new").notNull(), // new, verified, trusted, partner, restricted
+  status: text("status").default("active").notNull(), // active, restricted, archived
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const contributorProfilesRelations = relations(contributorProfiles, ({ one }) => ({
+  user: one(users, {
+    fields: [contributorProfiles.userId],
+    references: [users.id],
+  }),
+}));
+
+export const insertContributorProfileSchema = createInsertSchema(contributorProfiles).omit({ id: true });
+export type InsertContributorProfile = z.infer<typeof insertContributorProfileSchema>;
+export type ContributorProfile = typeof contributorProfiles.$inferSelect;
+
+export const educatorOfferings = pgTable("educator_offerings", {
+  id: serial("id").primaryKey(),
+  contributorProfileId: integer("contributor_profile_id").notNull().references(() => contributorProfiles.id),
+  title: text("title").notNull(),
+  description: text("description").notNull(),
+  offeringType: text("offering_type").notNull(), // free_sample, live_class, recorded_course, tutoring, coaching, curriculum_bundle
+  subject: text("subject").notNull(),
+  ageGroup: text("age_group").notNull(),
+  format: text("format").notNull(), // free, paid_placeholder, live, recorded, one_on_one, group
+  duration: text("duration"),
+  priceCents: integer("price_cents"),
+  currency: text("currency").default("USD").notNull(),
+  sampleUrl: text("sample_url"),
+  meetingUrl: text("meeting_url"),
+  parentExpectations: text("parent_expectations"),
+  completionEvidence: text("completion_evidence"),
+  status: text("status").default("draft").notNull(), // draft, pending_review, approved, changes_requested, rejected, archived
+  reviewerNote: text("reviewer_note"),
+  internalReviewNote: text("internal_review_note"),
+  submittedAt: timestamp("submitted_at"),
+  reviewedAt: timestamp("reviewed_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const educatorOfferingsRelations = relations(educatorOfferings, ({ one }) => ({
+  contributorProfile: one(contributorProfiles, {
+    fields: [educatorOfferings.contributorProfileId],
+    references: [contributorProfiles.id],
+  }),
+}));
+
+export const insertEducatorOfferingSchema = createInsertSchema(educatorOfferings).omit({ id: true });
+export type InsertEducatorOffering = z.infer<typeof insertEducatorOfferingSchema>;
+export type EducatorOffering = typeof educatorOfferings.$inferSelect;
+
+export const offeringSessions = pgTable("offering_sessions", {
+  id: serial("id").primaryKey(),
+  educatorOfferingId: integer("educator_offering_id").notNull().references(() => educatorOfferings.id),
+  contributorProfileId: integer("contributor_profile_id").notNull().references(() => contributorProfiles.id),
+  title: text("title").notNull(),
+  startsAt: timestamp("starts_at").notNull(),
+  endsAt: timestamp("ends_at"),
+  duration: text("duration"),
+  capacity: integer("capacity"),
+  reservedSeats: integer("reserved_seats").default(0).notNull(),
+  meetingUrl: text("meeting_url"),
+  locationNote: text("location_note"),
+  registrationNote: text("registration_note"),
+  status: text("status").default("draft").notNull(), // draft, pending_review, approved, changes_requested, cancelled, archived
+  reviewerNote: text("reviewer_note"),
+  internalReviewNote: text("internal_review_note"),
+  submittedAt: timestamp("submitted_at"),
+  reviewedAt: timestamp("reviewed_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const offeringSessionsRelations = relations(offeringSessions, ({ one }) => ({
+  offering: one(educatorOfferings, {
+    fields: [offeringSessions.educatorOfferingId],
+    references: [educatorOfferings.id],
+  }),
+  contributorProfile: one(contributorProfiles, {
+    fields: [offeringSessions.contributorProfileId],
+    references: [contributorProfiles.id],
+  }),
+}));
+
+export const insertOfferingSessionSchema = createInsertSchema(offeringSessions).omit({ id: true });
+export type InsertOfferingSession = z.infer<typeof insertOfferingSessionSchema>;
+export type OfferingSession = typeof offeringSessions.$inferSelect;
+
+export const offeringEnrollments = pgTable("offering_enrollments", {
+  id: serial("id").primaryKey(),
+  educatorOfferingId: integer("educator_offering_id").notNull().references(() => educatorOfferings.id),
+  offeringSessionId: integer("offering_session_id").notNull().references(() => offeringSessions.id),
+  contributorProfileId: integer("contributor_profile_id").notNull().references(() => contributorProfiles.id),
+  requesterUserId: integer("requester_user_id").references(() => users.id),
+  requesterName: text("requester_name").notNull(),
+  requesterEmail: text("requester_email").notNull(),
+  learnerAgeGroup: text("learner_age_group"),
+  learnerCount: integer("learner_count").default(1).notNull(),
+  message: text("message"),
+  status: text("status").default("requested").notNull(), // requested, reserved, waitlisted, cancelled, completed, archived
+  sourceInterestId: integer("source_interest_id"),
+  reservedAt: timestamp("reserved_at"),
+  cancelledAt: timestamp("cancelled_at"),
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const offeringEnrollmentsRelations = relations(offeringEnrollments, ({ one }) => ({
+  offering: one(educatorOfferings, {
+    fields: [offeringEnrollments.educatorOfferingId],
+    references: [educatorOfferings.id],
+  }),
+  session: one(offeringSessions, {
+    fields: [offeringEnrollments.offeringSessionId],
+    references: [offeringSessions.id],
+  }),
+  contributorProfile: one(contributorProfiles, {
+    fields: [offeringEnrollments.contributorProfileId],
+    references: [contributorProfiles.id],
+  }),
+  requester: one(users, {
+    fields: [offeringEnrollments.requesterUserId],
+    references: [users.id],
+  }),
+}));
+
+export const insertOfferingEnrollmentSchema = createInsertSchema(offeringEnrollments).omit({ id: true });
+export type InsertOfferingEnrollment = z.infer<typeof insertOfferingEnrollmentSchema>;
+export type OfferingEnrollment = typeof offeringEnrollments.$inferSelect;
+
+export const offeringInterests = pgTable("offering_interests", {
+  id: serial("id").primaryKey(),
+  educatorOfferingId: integer("educator_offering_id").notNull().references(() => educatorOfferings.id),
+  offeringSessionId: integer("offering_session_id").references(() => offeringSessions.id),
+  contributorProfileId: integer("contributor_profile_id").notNull().references(() => contributorProfiles.id),
+  requesterUserId: integer("requester_user_id").references(() => users.id),
+  requesterName: text("requester_name").notNull(),
+  requesterEmail: text("requester_email").notNull(),
+  learnerAgeGroup: text("learner_age_group"),
+  message: text("message"),
+  status: text("status").default("new").notNull(), // new, contacted, waitlisted, closed, archived
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const offeringInterestsRelations = relations(offeringInterests, ({ one }) => ({
+  offering: one(educatorOfferings, {
+    fields: [offeringInterests.educatorOfferingId],
+    references: [educatorOfferings.id],
+  }),
+  session: one(offeringSessions, {
+    fields: [offeringInterests.offeringSessionId],
+    references: [offeringSessions.id],
+  }),
+  contributorProfile: one(contributorProfiles, {
+    fields: [offeringInterests.contributorProfileId],
+    references: [contributorProfiles.id],
+  }),
+  requester: one(users, {
+    fields: [offeringInterests.requesterUserId],
+    references: [users.id],
+  }),
+}));
+
+export const insertOfferingInterestSchema = createInsertSchema(offeringInterests).omit({ id: true });
+export type InsertOfferingInterest = z.infer<typeof insertOfferingInterestSchema>;
+export type OfferingInterest = typeof offeringInterests.$inferSelect;
+
+export const offeringReviews = pgTable("offering_reviews", {
+  id: serial("id").primaryKey(),
+  offeringEnrollmentId: integer("offering_enrollment_id").notNull().references(() => offeringEnrollments.id),
+  educatorOfferingId: integer("educator_offering_id").notNull().references(() => educatorOfferings.id),
+  offeringSessionId: integer("offering_session_id").notNull().references(() => offeringSessions.id),
+  contributorProfileId: integer("contributor_profile_id").notNull().references(() => contributorProfiles.id),
+  reviewerUserId: integer("reviewer_user_id").references(() => users.id),
+  reviewerName: text("reviewer_name").notNull(),
+  reviewerEmail: text("reviewer_email").notNull(),
+  rating: integer("rating").notNull(),
+  reviewText: text("review_text").notNull(),
+  status: text("status").default("pending_review").notNull(), // pending_review, approved, rejected, archived
+  adminNote: text("admin_note"),
+  reviewedAt: timestamp("reviewed_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const offeringReviewsRelations = relations(offeringReviews, ({ one }) => ({
+  enrollment: one(offeringEnrollments, {
+    fields: [offeringReviews.offeringEnrollmentId],
+    references: [offeringEnrollments.id],
+  }),
+  offering: one(educatorOfferings, {
+    fields: [offeringReviews.educatorOfferingId],
+    references: [educatorOfferings.id],
+  }),
+  session: one(offeringSessions, {
+    fields: [offeringReviews.offeringSessionId],
+    references: [offeringSessions.id],
+  }),
+  contributorProfile: one(contributorProfiles, {
+    fields: [offeringReviews.contributorProfileId],
+    references: [contributorProfiles.id],
+  }),
+  reviewer: one(users, {
+    fields: [offeringReviews.reviewerUserId],
+    references: [users.id],
+  }),
+}));
+
+export const insertOfferingReviewSchema = createInsertSchema(offeringReviews).omit({ id: true });
+export type InsertOfferingReview = z.infer<typeof insertOfferingReviewSchema>;
+export type OfferingReview = typeof offeringReviews.$inferSelect;
+
+export const curriculumSubmissions = pgTable("curriculum_submissions", {
+  id: serial("id").primaryKey(),
+  contributorProfileId: integer("contributor_profile_id").references(() => contributorProfiles.id),
+  contributorName: text("contributor_name").notNull(),
+  contributorEmail: text("contributor_email").notNull(),
+  affiliation: text("affiliation").notNull(),
+  title: text("title").notNull(),
+  subject: text("subject").notNull(),
+  ageGroup: text("age_group").notNull(),
+  objective: text("objective").notNull(),
+  warmUp: text("warm_up").notNull(),
+  coreContent: text("core_content").notNull(),
+  scenario: text("scenario").notNull(),
+  activity: text("activity").notNull(),
+  reflection: text("reflection").notNull(),
+  badge: text("badge"),
+  resourceTitle: text("resource_title"),
+  resourceType: text("resource_type"),
+  resourceUrl: text("resource_url"),
+  resourceDescription: text("resource_description"),
+  resourceSourceLabel: text("resource_source_label"),
+  resourceDuration: text("resource_duration"),
+  resourceSafetyNotes: text("resource_safety_notes"),
+  resourceParentPrompt: text("resource_parent_prompt"),
+  resourceStudentPrompt: text("resource_student_prompt"),
+  status: text("status").default("pending_review").notNull(), // draft, pending_review, changes_requested, approved, rejected, archived
+  reviewerNote: text("reviewer_note"),
+  internalReviewNote: text("internal_review_note"),
+  reviewRubric: json("review_rubric"),
+  submittedAt: timestamp("submitted_at").defaultNow(),
+  reviewedAt: timestamp("reviewed_at"),
+});
+
+export const insertCurriculumSubmissionSchema = createInsertSchema(curriculumSubmissions).omit({ id: true });
+export type InsertCurriculumSubmission = z.infer<typeof insertCurriculumSubmissionSchema>;
+export type CurriculumSubmission = typeof curriculumSubmissions.$inferSelect;
+
+export const curriculumSubmissionsRelations = relations(curriculumSubmissions, ({ one }) => ({
+  contributorProfile: one(contributorProfiles, {
+    fields: [curriculumSubmissions.contributorProfileId],
+    references: [contributorProfiles.id],
+  }),
+}));
+
+export const resourceSubmissions = pgTable("resource_submissions", {
+  id: serial("id").primaryKey(),
+  contributorProfileId: integer("contributor_profile_id").references(() => contributorProfiles.id),
+  contributorName: text("contributor_name").notNull(),
+  contributorEmail: text("contributor_email").notNull(),
+  affiliation: text("affiliation").notNull(),
+  title: text("title").notNull(),
+  description: text("description").notNull(),
+  resourceType: text("resource_type").notNull(), // video, link, pdf, worksheet, guide, activity
+  category: text("category").notNull(),
+  audience: text("audience").array(),
+  ageGroup: text("age_group").notNull(),
+  url: text("url").notNull(),
+  embedUrl: text("embed_url"),
+  sourceLabel: text("source_label"),
+  duration: text("duration"),
+  learningUse: text("learning_use").notNull(),
+  safetyNotes: text("safety_notes").notNull(),
+  thumbnailUrl: text("thumbnail_url"),
+  status: text("status").default("pending_review").notNull(), // pending_review, changes_requested, approved, rejected, archived
+  reviewerNote: text("reviewer_note"),
+  internalReviewNote: text("internal_review_note"),
+  reviewRubric: json("review_rubric"),
+  publishedResourceId: integer("published_resource_id").references(() => resources.id),
+  submittedAt: timestamp("submitted_at").defaultNow(),
+  reviewedAt: timestamp("reviewed_at"),
+});
+
+export const insertResourceSubmissionSchema = createInsertSchema(resourceSubmissions).omit({ id: true });
+export type InsertResourceSubmission = z.infer<typeof insertResourceSubmissionSchema>;
+export type ResourceSubmission = typeof resourceSubmissions.$inferSelect;
+
+export const resourceSubmissionsRelations = relations(resourceSubmissions, ({ one }) => ({
+  contributorProfile: one(contributorProfiles, {
+    fields: [resourceSubmissions.contributorProfileId],
+    references: [contributorProfiles.id],
+  }),
+  publishedResource: one(resources, {
+    fields: [resourceSubmissions.publishedResourceId],
+    references: [resources.id],
+  }),
+}));
+
+export const curriculumCollections = pgTable("curriculum_collections", {
+  id: serial("id").primaryKey(),
+  contributorProfileId: integer("contributor_profile_id").notNull().references(() => contributorProfiles.id),
+  title: text("title").notNull(),
+  description: text("description").notNull(),
+  subject: text("subject").notNull(),
+  ageGroup: text("age_group").notNull(),
+  estimatedWeeks: integer("estimated_weeks").default(1).notNull(),
+  learningGoals: text("learning_goals").array(),
+  parentNotes: text("parent_notes"),
+  finalProject: text("final_project"),
+  status: text("status").default("draft").notNull(), // draft, pending_review, changes_requested, approved, published, rejected, archived
+  reviewerNote: text("reviewer_note"),
+  internalReviewNote: text("internal_review_note"),
+  reviewRubric: json("review_rubric"),
+  submittedAt: timestamp("submitted_at"),
+  reviewedAt: timestamp("reviewed_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertCurriculumCollectionSchema = createInsertSchema(curriculumCollections).omit({ id: true });
+export type InsertCurriculumCollection = z.infer<typeof insertCurriculumCollectionSchema>;
+export type CurriculumCollection = typeof curriculumCollections.$inferSelect;
+
+export const curriculumCollectionItems = pgTable("curriculum_collection_items", {
+  id: serial("id").primaryKey(),
+  collectionId: integer("collection_id").notNull().references(() => curriculumCollections.id),
+  itemType: text("item_type").notNull(), // lesson, resource, video, link, activity
+  title: text("title").notNull(),
+  description: text("description"),
+  url: text("url"),
+  embedUrl: text("embed_url"),
+  sourceLabel: text("source_label"),
+  duration: text("duration"),
+  safetyNotes: text("safety_notes"),
+  lessonId: integer("lesson_id").references(() => lessons.id),
+  resourceId: integer("resource_id").references(() => resources.id),
+  order: integer("order").notNull(),
+  parentPrompt: text("parent_prompt"),
+  studentPrompt: text("student_prompt"),
+});
+
+export const insertCurriculumCollectionItemSchema = createInsertSchema(curriculumCollectionItems).omit({ id: true });
+export type InsertCurriculumCollectionItem = z.infer<typeof insertCurriculumCollectionItemSchema>;
+export type CurriculumCollectionItem = typeof curriculumCollectionItems.$inferSelect;
+
+export const curriculumCollectionsRelations = relations(curriculumCollections, ({ one, many }) => ({
+  contributorProfile: one(contributorProfiles, {
+    fields: [curriculumCollections.contributorProfileId],
+    references: [contributorProfiles.id],
+  }),
+  items: many(curriculumCollectionItems),
+}));
+
+export const curriculumCollectionItemsRelations = relations(curriculumCollectionItems, ({ one }) => ({
+  collection: one(curriculumCollections, {
+    fields: [curriculumCollectionItems.collectionId],
+    references: [curriculumCollections.id],
+  }),
+  lesson: one(lessons, {
+    fields: [curriculumCollectionItems.lessonId],
+    references: [lessons.id],
+  }),
+  resource: one(resources, {
+    fields: [curriculumCollectionItems.resourceId],
+    references: [resources.id],
+  }),
+}));
+
+export const userCurriculumCollectionProgress = pgTable("user_curriculum_collection_progress", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id),
+  collectionId: integer("collection_id").notNull().references(() => curriculumCollections.id),
+  status: text("status").default("not_started").notNull(), // not_started, in_progress, completed
+  currentItemId: integer("current_item_id").references(() => curriculumCollectionItems.id),
+  completedItemIds: integer("completed_item_ids").array(),
+  percentComplete: integer("percent_complete").default(0).notNull(),
+  startedAt: timestamp("started_at"),
+  completedAt: timestamp("completed_at"),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertUserCurriculumCollectionProgressSchema = createInsertSchema(userCurriculumCollectionProgress).omit({ id: true });
+export type InsertUserCurriculumCollectionProgress = z.infer<typeof insertUserCurriculumCollectionProgressSchema>;
+export type UserCurriculumCollectionProgress = typeof userCurriculumCollectionProgress.$inferSelect;
+
+export const userCurriculumCollectionProgressRelations = relations(userCurriculumCollectionProgress, ({ one }) => ({
+  user: one(users, {
+    fields: [userCurriculumCollectionProgress.userId],
+    references: [users.id],
+  }),
+  collection: one(curriculumCollections, {
+    fields: [userCurriculumCollectionProgress.collectionId],
+    references: [curriculumCollections.id],
+  }),
+  currentItem: one(curriculumCollectionItems, {
+    fields: [userCurriculumCollectionProgress.currentItemId],
+    references: [curriculumCollectionItems.id],
+  }),
+}));
+
+export const feedbackSubmissions = pgTable("feedback_submissions", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  email: text("email").notNull(),
+  audience: text("audience").notNull(), // parent, student, contributor, other
+  category: text("category").notNull(), // bug, content, safety, idea, general
+  message: text("message").notNull(),
+  status: text("status").default("new").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertFeedbackSubmissionSchema = createInsertSchema(feedbackSubmissions).omit({ id: true });
+export type InsertFeedbackSubmission = z.infer<typeof insertFeedbackSubmissionSchema>;
+export type FeedbackSubmission = typeof feedbackSubmissions.$inferSelect;
+
+export const contentReports = pgTable("content_reports", {
+  id: serial("id").primaryKey(),
+  reporterUserId: integer("reporter_user_id").references(() => users.id),
+  reporterName: text("reporter_name"),
+  reporterEmail: text("reporter_email"),
+  contentType: text("content_type").notNull(), // lesson, resource, collection
+  contentId: integer("content_id").notNull(),
+  contentTitle: text("content_title").notNull(),
+  category: text("category").notNull(), // inaccurate, unsafe, age_mismatch, broken_link, copyright, other
+  message: text("message").notNull(),
+  status: text("status").default("new").notNull(),
+  adminNote: text("admin_note"),
+  actionTaken: text("action_taken"),
+  createdAt: timestamp("created_at").defaultNow(),
+  resolvedAt: timestamp("resolved_at"),
+});
+
+export const insertContentReportSchema = createInsertSchema(contentReports).omit({ id: true });
+export type InsertContentReport = z.infer<typeof insertContentReportSchema>;
+export type ContentReport = typeof contentReports.$inferSelect;
+
 // Define the user relations after all models are defined
 export const usersRelations = relations(users, ({ many, one }) => ({
   badges: many(badges),
@@ -568,4 +1197,12 @@ export const usersRelations = relations(users, ({ many, one }) => ({
   buddyMessages: many(buddyMessages),
   buddyEmotionLogs: many(buddyEmotionLogs),
   buddyJournalEntries: many(buddyJournalEntries),
+  issuedCredentials: many(issuedCredentials),
+  collectionProgress: many(userCurriculumCollectionProgress),
+  parentRelationships: many(parentChildRelationships, { relationName: "parentRelationships" }),
+  childRelationships: many(parentChildRelationships, { relationName: "childRelationships" }),
+  parentLessonReviews: many(parentLessonReviews, { relationName: "parentLessonReviews" }),
+  childLessonReviews: many(parentLessonReviews, { relationName: "childLessonReviews" }),
+  contributorProfile: one(contributorProfiles),
+  contentReports: many(contentReports),
 }));
