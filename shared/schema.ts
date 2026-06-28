@@ -912,6 +912,51 @@ export const insertOfferingInterestSchema = createInsertSchema(offeringInterests
 export type InsertOfferingInterest = z.infer<typeof insertOfferingInterestSchema>;
 export type OfferingInterest = typeof offeringInterests.$inferSelect;
 
+export const offeringReviews = pgTable("offering_reviews", {
+  id: serial("id").primaryKey(),
+  offeringEnrollmentId: integer("offering_enrollment_id").notNull().references(() => offeringEnrollments.id),
+  educatorOfferingId: integer("educator_offering_id").notNull().references(() => educatorOfferings.id),
+  offeringSessionId: integer("offering_session_id").notNull().references(() => offeringSessions.id),
+  contributorProfileId: integer("contributor_profile_id").notNull().references(() => contributorProfiles.id),
+  reviewerUserId: integer("reviewer_user_id").references(() => users.id),
+  reviewerName: text("reviewer_name").notNull(),
+  reviewerEmail: text("reviewer_email").notNull(),
+  rating: integer("rating").notNull(),
+  reviewText: text("review_text").notNull(),
+  status: text("status").default("pending_review").notNull(), // pending_review, approved, rejected, archived
+  adminNote: text("admin_note"),
+  reviewedAt: timestamp("reviewed_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const offeringReviewsRelations = relations(offeringReviews, ({ one }) => ({
+  enrollment: one(offeringEnrollments, {
+    fields: [offeringReviews.offeringEnrollmentId],
+    references: [offeringEnrollments.id],
+  }),
+  offering: one(educatorOfferings, {
+    fields: [offeringReviews.educatorOfferingId],
+    references: [educatorOfferings.id],
+  }),
+  session: one(offeringSessions, {
+    fields: [offeringReviews.offeringSessionId],
+    references: [offeringSessions.id],
+  }),
+  contributorProfile: one(contributorProfiles, {
+    fields: [offeringReviews.contributorProfileId],
+    references: [contributorProfiles.id],
+  }),
+  reviewer: one(users, {
+    fields: [offeringReviews.reviewerUserId],
+    references: [users.id],
+  }),
+}));
+
+export const insertOfferingReviewSchema = createInsertSchema(offeringReviews).omit({ id: true });
+export type InsertOfferingReview = z.infer<typeof insertOfferingReviewSchema>;
+export type OfferingReview = typeof offeringReviews.$inferSelect;
+
 export const curriculumSubmissions = pgTable("curriculum_submissions", {
   id: serial("id").primaryKey(),
   contributorProfileId: integer("contributor_profile_id").references(() => contributorProfiles.id),

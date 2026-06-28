@@ -19,6 +19,7 @@ import {
   insertCurriculumCollectionSchema, insertCurriculumCollectionItemSchema,
   insertFeedbackSubmissionSchema, insertContentReportSchema,
   insertEducatorOfferingSchema, insertOfferingSessionSchema, insertOfferingEnrollmentSchema, insertOfferingInterestSchema,
+  insertOfferingReviewSchema,
   insertCredentialDefinitionSchema, insertCredentialRequirementSchema,
   insertContributorProfileSchema,
   type CurriculumCollection,
@@ -1474,6 +1475,103 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/my-offering-enrollments/:id/reviews", express.json(), async (req, res) => {
+    try {
+      const sessionUserId = requireSessionUserId(req, res);
+      if (!sessionUserId) return;
+
+      const user = await storage.getUser(sessionUserId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const enrollmentId = Number(req.params.id);
+      const enrollment = (await storage.getOfferingEnrollmentsForRequester(user.id, user.email))
+        .find((item) => item.id === enrollmentId);
+      if (!enrollment) {
+        return res.status(404).json({ message: "Enrollment not found" });
+      }
+
+      if (enrollment.status !== "completed") {
+        return res.status(400).json({ message: "Reviews can only be submitted after a completed class" });
+      }
+
+      const existingReview = await storage.getOfferingReviewForEnrollment(enrollment.id);
+      if (existingReview) {
+        return res.status(409).json({ message: "A review already exists for this class" });
+      }
+
+      const rating = Number(req.body.rating);
+      if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
+        return res.status(400).json({ message: "Rating must be between 1 and 5" });
+      }
+
+      const reviewText = String(req.body.reviewText || "").trim();
+      if (reviewText.length < 10) {
+        return res.status(400).json({ message: "Review must be at least 10 characters" });
+      }
+
+      const review = insertOfferingReviewSchema.parse({
+        offeringEnrollmentId: enrollment.id,
+        educatorOfferingId: enrollment.educatorOfferingId,
+        offeringSessionId: enrollment.offeringSessionId,
+        contributorProfileId: enrollment.contributorProfileId,
+        reviewerUserId: user.id,
+        reviewerName: user.fullName || enrollment.requesterName,
+        reviewerEmail: user.email,
+        rating,
+        reviewText,
+        status: "pending_review",
+        adminNote: null,
+        reviewedAt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+
+      res.status(201).json(await storage.createOfferingReview(review));
+    } catch (error) {
+      res.status(400).json({ message: error instanceof Error ? error.message : "Failed to submit review" });
+    }
+  });
+
+  app.post("/api/my-offering-enrollments/:id/checkout", async (req, res) => {
+    try {
+      const sessionUserId = requireSessionUserId(req, res);
+      if (!sessionUserId) return;
+
+      const user = await storage.getUser(sessionUserId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const enrollment = (await storage.getOfferingEnrollmentsForRequester(user.id, user.email))
+        .find((item) => item.id === Number(req.params.id));
+      if (!enrollment) {
+        return res.status(404).json({ message: "Enrollment not found" });
+      }
+
+      const offering = await storage.getEducatorOffering(enrollment.educatorOfferingId);
+      if (!offering?.priceCents) {
+        return res.status(400).json({ message: "This class does not require checkout" });
+      }
+
+      if (!process.env.STRIPE_SECRET_KEY) {
+        return res.status(503).json({
+          message: "Checkout is not configured yet",
+          readiness: {
+            provider: "stripe",
+            requiredEnv: ["STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET"],
+            platformFeePercent: 15,
+          },
+        });
+      }
+
+      return res.status(501).json({ message: "Stripe checkout session creation is ready for provider wiring" });
+    } catch (error) {
+      res.status(400).json({ message: error instanceof Error ? error.message : "Failed to start checkout" });
+    }
+  });
+
   app.patch("/api/offering-enrollments/:id", express.json(), async (req, res) => {
     try {
       const sessionUserId = requireSessionUserId(req, res);
@@ -1524,6 +1622,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(enrollment);
     } catch (error) {
       res.status(400).json({ message: error instanceof Error ? error.message : "Failed to update enrollment" });
+    }
+  });
+
+  const enrichOfferingReviews = async (
+    reviews: Awaited<ReturnType<typeof storage.getOfferingReviews>>,
+  ) => {
+    const offerings = await storage.getEducatorOfferings();
+    const sessions = await storage.getOfferingSessions();
+    const profiles = await storage.getAllContributorProfiles();
+    const offeringById = new Map(offerings.map((offering) => [offering.id, offering]));
+    const sessionById = new Map(sessions.map((session) => [session.id, session]));
+    const profileById = new Map(profiles.map((profile) => [profile.id, profile]));
+
+    return reviews.map((review) => ({
+      ...review,
+      offering: offeringById.get(review.educatorOfferingId) || null,
+      session: sessionById.get(review.offeringSessionId) || null,
+      contributorProfile: profileById.get(review.contributorProfileId) || null,
+    }));
+  };
+
+  app.get("/api/admin/offering-reviews", async (req, res) => {
+    try {
+      if (!(await requireAdminUser(req, res))) return;
+
+      const status = typeof req.query.status === "string" ? req.query.status : undefined;
+      const reviews = await storage.getOfferingReviews(status);
+      res.json(await enrichOfferingReviews(reviews));
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch offering reviews" });
+    }
+  });
+
+  app.patch("/api/admin/offering-reviews/:id", express.json(), async (req, res) => {
+    try {
+      if (!(await requireAdminUser(req, res))) return;
+
+      const allowedStatuses = new Set(["pending_review", "approved", "rejected", "archived"]);
+      if (!allowedStatuses.has(req.body.status)) {
+        return res.status(400).json({ message: "Invalid review status" });
+      }
+
+      const review = await storage.updateOfferingReview(Number(req.params.id), {
+        status: req.body.status,
+        adminNote: req.body.adminNote ? String(req.body.adminNote).trim() : null,
+        reviewedAt: req.body.status === "pending_review" ? null : new Date(),
+        updatedAt: new Date(),
+      });
+      res.json(review);
+    } catch (error) {
+      res.status(400).json({ message: "Failed to update offering review" });
     }
   });
 
@@ -2488,6 +2637,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(requirement);
     } catch (error) {
       res.status(400).json({ message: "Invalid credential requirement data" });
+    }
+  });
+
+  app.get("/api/admin/credential-requirements", async (req, res) => {
+    try {
+      if (!(await requireAdminUser(req, res))) return;
+
+      const credentials = await storage.getAllCredentialDefinitions();
+      const offerings = await storage.getEducatorOfferings("approved");
+      const offeringById = new Map(offerings.map((offering) => [offering.id, offering]));
+
+      const requirementRows = await Promise.all(credentials.map(async (credential) => ({
+        ...credential,
+        requirements: (await storage.getCredentialRequirements(credential.id)).map((requirement) => ({
+          ...requirement,
+          offering: requirement.requirementType === "offering_completion" && requirement.targetId
+            ? offeringById.get(requirement.targetId) || null
+            : null,
+        })),
+      })));
+
+      res.json({ credentials: requirementRows, approvedOfferings: offerings });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch credential requirements" });
     }
   });
 

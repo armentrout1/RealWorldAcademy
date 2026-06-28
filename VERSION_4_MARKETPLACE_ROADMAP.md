@@ -158,7 +158,8 @@ Current build status:
 - `green`: moving enrollments into or out of reserved/completed status updates session reserved seat counts.
 - `green`: families can view requested, reserved, waitlisted, and completed session enrollments from `/my-classes`.
 - `green`: learner dashboard and navigation now link into family class tracking.
-- `yellow`: calendar integrations and payment-backed enrollment still need future passes.
+- `green`: families can download reserved/completed class sessions as `.ics` calendar files from My Classes.
+- `yellow`: payment-backed enrollment still needs live provider credentials and hosted checkout creation.
 
 ### Phase 5: Payments and Platform Fee
 
@@ -180,6 +181,11 @@ Exit criteria:
 - Educators can see earnings.
 - Real World Academy can collect a platform fee.
 
+Current build status:
+
+- `green`: paid offering enrollments now have a checkout readiness endpoint that reports required Stripe configuration and platform fee assumptions.
+- `yellow`: hosted checkout, webhook handling, receipts, refunds, payout onboarding, and earnings dashboards still need the real Stripe integration pass.
+
 ### Phase 6: Reviews, Trust, and Quality
 
 Goal: let the marketplace improve quality over time.
@@ -197,6 +203,13 @@ Exit criteria:
 - Families can judge educator quality.
 - Admins can identify strong or risky educators.
 - Trust levels are based on more than manual labels.
+
+Current build status:
+
+- `green`: families can submit reviews after completed class enrollments.
+- `green`: admins have a family review moderation queue with pending/approved/rejected/archived statuses.
+- `yellow`: approved reviews are not yet shown publicly on educator/offering pages.
+- `yellow`: educator responses and automatic trust scoring still need future passes.
 
 ### Phase 7: Credential and Portfolio Integration
 
@@ -222,7 +235,7 @@ Current build status:
 - `green`: credential requirements can use `offering_completion` with an approved offering id as the target.
 - `green`: credential issuing checks completed class enrollments for `offering_completion` requirements.
 - `green`: public offering pages show eligible Real World Academy completion credentials.
-- `yellow`: admin credential requirement management still needs a polished UI instead of relying on the existing API and target id convention.
+- `green`: admins can link approved offerings to credentials from the Admin Management marketplace tab.
 
 ## Version 4 Quality Bar
 

@@ -240,6 +240,61 @@ interface OfferingEnrollment {
   } | null;
 }
 
+interface OfferingReview {
+  id: number;
+  offeringEnrollmentId: number;
+  rating: number;
+  reviewText: string;
+  reviewerName: string;
+  reviewerEmail: string;
+  status: string;
+  adminNote?: string | null;
+  createdAt?: string | null;
+  offering?: {
+    id: number;
+    title: string;
+    subject: string;
+    ageGroup: string;
+  } | null;
+  session?: {
+    id: number;
+    title: string;
+    startsAt?: string | null;
+  } | null;
+  contributorProfile?: {
+    id: number;
+    displayName: string;
+    affiliation?: string | null;
+    trustLevel: string;
+  } | null;
+}
+
+interface CredentialDefinition {
+  id: number;
+  title: string;
+  slug: string;
+  description: string;
+  criteriaSummary?: string | null;
+  requirements?: CredentialRequirement[];
+}
+
+interface CredentialRequirement {
+  id: number;
+  credentialId: number;
+  requirementType: string;
+  targetId?: number | null;
+  title: string;
+  description?: string | null;
+  required: boolean;
+  order: number;
+  offering?: EducatorOffering | null;
+}
+
+interface CredentialRequirementOverview {
+  credentials: CredentialDefinition[];
+  approvedOfferings: EducatorOffering[];
+}
+
 interface ResourceSubmission {
   id: number;
   contributorName: string;
@@ -296,6 +351,7 @@ const offeringReviewStatuses = ["approved", "changes_requested", "rejected", "ar
 const sessionReviewStatuses = ["approved", "changes_requested", "rejected", "cancelled", "archived"];
 const interestStatuses = ["new", "contacted", "waitlisted", "closed", "archived"];
 const enrollmentStatuses = ["requested", "reserved", "waitlisted", "cancelled", "completed", "archived"];
+const offeringReviewModerationStatuses = ["pending_review", "approved", "rejected", "archived"];
 const roles = ["student", "parent", "admin"];
 const rubricCriteria = [
   ["safety", "Safety"],
@@ -318,6 +374,13 @@ export default function AdminLessons() {
   const [reviewNote, setReviewNote] = useState("");
   const [internalReviewNote, setInternalReviewNote] = useState("");
   const [reviewRubric, setReviewRubric] = useState<ReviewRubric>(emptyRubric());
+  const [credentialRequirementForm, setCredentialRequirementForm] = useState({
+    credentialId: "",
+    offeringId: "",
+    title: "",
+    description: "",
+    order: "1",
+  });
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -364,6 +427,16 @@ export default function AdminLessons() {
   const { data: offeringEnrollments = [], isLoading: enrollmentsLoading } = useQuery<OfferingEnrollment[]>({
     queryKey: ["/api/admin/offering-enrollments"],
     queryFn: () => apiRequest<OfferingEnrollment[]>("/api/admin/offering-enrollments"),
+  });
+
+  const { data: offeringReviews = [], isLoading: offeringReviewsLoading } = useQuery<OfferingReview[]>({
+    queryKey: ["/api/admin/offering-reviews"],
+    queryFn: () => apiRequest<OfferingReview[]>("/api/admin/offering-reviews"),
+  });
+
+  const { data: credentialRequirementOverview } = useQuery<CredentialRequirementOverview>({
+    queryKey: ["/api/admin/credential-requirements"],
+    queryFn: () => apiRequest<CredentialRequirementOverview>("/api/admin/credential-requirements"),
   });
 
   const { data: users = [], isLoading: usersLoading } = useQuery<AdminUser[]>({
@@ -583,7 +656,53 @@ export default function AdminLessons() {
     },
   });
 
+  const offeringReviewModerationMutation = useMutation({
+    mutationFn: ({ id, status }: { id: number; status: string }) =>
+      apiRequest<OfferingReview>(`/api/admin/offering-reviews/${id}`, {
+        method: "PATCH",
+        body: { status },
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/offering-reviews"] });
+      toast({ title: "Class review updated", description: "The family review moderation status has been saved." });
+    },
+    onError: (error) => {
+      toast({
+        title: "Class review update failed",
+        description: error instanceof Error ? error.message : "Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
 
+  const credentialRequirementMutation = useMutation({
+    mutationFn: () => {
+      const offering = credentialRequirementOverview?.approvedOfferings.find((item) => String(item.id) === credentialRequirementForm.offeringId);
+      return apiRequest(`/api/credentials/${credentialRequirementForm.credentialId}/requirements`, {
+        method: "POST",
+        body: {
+          requirementType: "offering_completion",
+          targetId: Number(credentialRequirementForm.offeringId),
+          title: credentialRequirementForm.title || `Complete ${offering?.title || "approved class"}`,
+          description: credentialRequirementForm.description || offering?.description || null,
+          required: true,
+          order: Number(credentialRequirementForm.order || 1),
+        },
+      });
+    },
+    onSuccess: () => {
+      setCredentialRequirementForm({ credentialId: "", offeringId: "", title: "", description: "", order: "1" });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/credential-requirements"] });
+      toast({ title: "Credential requirement added", description: "That approved class now counts toward the selected credential." });
+    },
+    onError: (error) => {
+      toast({
+        title: "Requirement not added",
+        description: error instanceof Error ? error.message : "Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
 
 
   const roleMutation = useMutation({
@@ -722,6 +841,21 @@ export default function AdminLessons() {
       .includes(searchQuery.toLowerCase())
   );
 
+  const filteredOfferingReviews = offeringReviews.filter((review) =>
+    [
+      review.reviewerName,
+      review.reviewerEmail,
+      review.reviewText,
+      review.status,
+      review.offering?.title,
+      review.session?.title,
+      review.contributorProfile?.displayName,
+    ]
+      .join(" ")
+      .toLowerCase()
+      .includes(searchQuery.toLowerCase())
+  );
+
   const filteredUsers = users.filter((user) =>
     [user.fullName, user.email, user.role, user.ageGroup]
       .join(" ")
@@ -803,6 +937,7 @@ export default function AdminLessons() {
     offerings: educatorOfferings.filter((offering) => offering.status === "pending_review").length,
     sessions: offeringSessions.filter((session) => session.status === "pending_review").length,
     enrollments: offeringEnrollments.filter((enrollment) => ["requested", "reserved", "waitlisted"].includes(enrollment.status)).length,
+    reviews: offeringReviews.filter((review) => review.status === "pending_review").length,
     interests: offeringInterests.filter((interest) => ["new", "waitlisted"].includes(interest.status)).length,
     feedback: feedback.filter((item) => item.status === "new" || item.status === "reviewing").length,
     reports: contentReports.filter((item) => item.status === "new" || item.status === "reviewing").length,
@@ -867,8 +1002,8 @@ export default function AdminLessons() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold">{counts.offerings + counts.sessions}</div>
-            <p className="text-sm text-muted-foreground">{counts.sessions} sessions, {counts.enrollments} enrollments</p>
+            <div className="text-3xl font-bold">{counts.offerings + counts.sessions + counts.reviews}</div>
+            <p className="text-sm text-muted-foreground">{counts.sessions} sessions, {counts.enrollments} enrollments, {counts.reviews} reviews</p>
           </CardContent>
         </Card>
         <Card>
@@ -1099,6 +1234,121 @@ export default function AdminLessons() {
         </TabsContent>
 
         <TabsContent value="offerings" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Credential Class Requirements</CardTitle>
+              <CardDescription>Connect approved classes to credentials so completed enrollments can unlock real evidence of learning.</CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-6 lg:grid-cols-[420px_1fr]">
+              <div className="space-y-4 rounded-md border p-4">
+                <div className="space-y-2">
+                  <div className="text-sm font-medium">Credential</div>
+                  <Select
+                    value={credentialRequirementForm.credentialId}
+                    onValueChange={(credentialId) => setCredentialRequirementForm((current) => ({ ...current, credentialId }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select credential" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(credentialRequirementOverview?.credentials || []).map((credential) => (
+                        <SelectItem key={credential.id} value={String(credential.id)}>{credential.title}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <div className="text-sm font-medium">Approved Offering</div>
+                  <Select
+                    value={credentialRequirementForm.offeringId}
+                    onValueChange={(offeringId) => {
+                      const offering = credentialRequirementOverview?.approvedOfferings.find((item) => String(item.id) === offeringId);
+                      setCredentialRequirementForm((current) => ({
+                        ...current,
+                        offeringId,
+                        title: current.title || (offering ? `Complete ${offering.title}` : ""),
+                      }));
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select offering" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(credentialRequirementOverview?.approvedOfferings || []).map((offering) => (
+                        <SelectItem key={offering.id} value={String(offering.id)}>{offering.title}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <div className="text-sm font-medium">Requirement Title</div>
+                  <Input
+                    value={credentialRequirementForm.title}
+                    onChange={(event) => setCredentialRequirementForm((current) => ({ ...current, title: event.target.value }))}
+                    placeholder="Complete the budgeting workshop"
+                  />
+                </div>
+                <div className="grid gap-3 md:grid-cols-[1fr_96px]">
+                  <Textarea
+                    className="min-h-[90px]"
+                    value={credentialRequirementForm.description}
+                    onChange={(event) => setCredentialRequirementForm((current) => ({ ...current, description: event.target.value }))}
+                    placeholder="Why this class supports the credential"
+                  />
+                  <Input
+                    type="number"
+                    min="1"
+                    value={credentialRequirementForm.order}
+                    onChange={(event) => setCredentialRequirementForm((current) => ({ ...current, order: event.target.value }))}
+                    aria-label="Requirement order"
+                  />
+                </div>
+                <Button
+                  className="w-full"
+                  onClick={() => credentialRequirementMutation.mutate()}
+                  disabled={
+                    credentialRequirementMutation.isPending ||
+                    !credentialRequirementForm.credentialId ||
+                    !credentialRequirementForm.offeringId
+                  }
+                >
+                  Add Class Requirement
+                </Button>
+              </div>
+
+              <div className="space-y-3">
+                {(credentialRequirementOverview?.credentials || []).map((credential) => {
+                  const offeringRequirements = (credential.requirements || [])
+                    .filter((requirement) => requirement.requirementType === "offering_completion");
+
+                  return (
+                    <div key={credential.id} className="rounded-md border p-4">
+                      <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                        <div>
+                          <div className="font-semibold">{credential.title}</div>
+                          <div className="text-xs text-muted-foreground">{credential.slug}</div>
+                        </div>
+                        <Badge variant="secondary">{offeringRequirements.length} class requirement{offeringRequirements.length === 1 ? "" : "s"}</Badge>
+                      </div>
+                      <div className="mt-3 space-y-2">
+                        {offeringRequirements.length === 0 ? (
+                          <p className="text-sm text-muted-foreground">No approved classes linked yet.</p>
+                        ) : offeringRequirements.map((requirement) => (
+                          <div key={requirement.id} className="rounded-md bg-slate-50 p-3 text-sm">
+                            <div className="font-medium">{requirement.title}</div>
+                            <div className="text-muted-foreground">
+                              {requirement.offering?.title || `Offering #${requirement.targetId}`} | order {requirement.order}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader>
               <CardTitle>Educator Offering Review Queue</CardTitle>
@@ -1396,6 +1646,77 @@ export default function AdminLessons() {
                             </SelectTrigger>
                             <SelectContent>
                               {enrollmentStatuses.map((status) => (
+                                <SelectItem key={status} value={status}>{status.replace("_", " ")}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Family Review Moderation</CardTitle>
+              <CardDescription>Approve class reviews only after checking tone, accuracy, privacy, and fit for public educator trust.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {offeringReviewsLoading ? (
+                <p className="py-8 text-center text-muted-foreground">Loading class reviews...</p>
+              ) : filteredOfferingReviews.length === 0 ? (
+                <div className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
+                  No class reviews match the current search.
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Review</TableHead>
+                      <TableHead>Class</TableHead>
+                      <TableHead>Educator</TableHead>
+                      <TableHead>Reviewer</TableHead>
+                      <TableHead>Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredOfferingReviews.map((review) => (
+                      <TableRow key={review.id}>
+                        <TableCell className="max-w-md">
+                          <div className="font-medium">{review.rating}/5 stars</div>
+                          <p className="mt-1 text-sm text-muted-foreground">{review.reviewText}</p>
+                          <div className="mt-1 text-xs text-muted-foreground">Received {formatDate(review.createdAt)}</div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="font-medium">{review.session?.title || review.offering?.title || "Class unavailable"}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {review.offering ? `${review.offering.subject} | ${review.offering.ageGroup}` : "No offering details"}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="font-medium">{review.contributorProfile?.displayName || "Unknown educator"}</div>
+                          <div className="text-xs text-muted-foreground">{review.contributorProfile?.trustLevel || "No trust level"}</div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="font-medium">{review.reviewerName}</div>
+                          <a className="text-xs text-primary underline" href={`mailto:${review.reviewerEmail}`}>
+                            {review.reviewerEmail}
+                          </a>
+                        </TableCell>
+                        <TableCell>
+                          <Select
+                            value={review.status}
+                            onValueChange={(status) => offeringReviewModerationMutation.mutate({ id: review.id, status })}
+                            disabled={offeringReviewModerationMutation.isPending}
+                          >
+                            <SelectTrigger className="w-[160px]">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {offeringReviewModerationStatuses.map((status) => (
                                 <SelectItem key={status} value={status}>{status.replace("_", " ")}</SelectItem>
                               ))}
                             </SelectContent>

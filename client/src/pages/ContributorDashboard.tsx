@@ -45,6 +45,10 @@ interface EducatorOffering {
   ageGroup: string;
   format: string;
   duration?: string | null;
+  priceCents?: number | null;
+  sampleUrl?: string | null;
+  parentExpectations?: string | null;
+  completionEvidence?: string | null;
   status: string;
   reviewerNote?: string | null;
   submittedAt?: string | null;
@@ -172,6 +176,7 @@ export default function ContributorDashboard() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [offeringForm, setOfferingForm] = React.useState(emptyOfferingForm);
+  const [editingOffering, setEditingOffering] = React.useState<EducatorOffering | null>(null);
   const [sessionForm, setSessionForm] = React.useState(emptySessionForm);
 
   const { data: profile, isLoading: profileLoading } = useQuery<ContributorProfileRecord | null>({
@@ -210,17 +215,42 @@ export default function ContributorDashboard() {
     enabled: Boolean(profile?.id),
   });
 
+  const resetOfferingForm = () => {
+    setOfferingForm(emptyOfferingForm);
+    setEditingOffering(null);
+  };
+
+  const beginOfferingEdit = (offering: EducatorOffering) => {
+    setEditingOffering(offering);
+    setOfferingForm({
+      title: offering.title || "",
+      description: offering.description || "",
+      offeringType: offering.offeringType || "free_sample",
+      subject: offering.subject || "",
+      ageGroup: offering.ageGroup || "",
+      format: offering.format || "free",
+      duration: offering.duration || "",
+      priceCents: offering.priceCents ? String(offering.priceCents) : "",
+      sampleUrl: offering.sampleUrl || "",
+      parentExpectations: offering.parentExpectations || "",
+      completionEvidence: offering.completionEvidence || "",
+    });
+  };
+
   const offeringMutation = useMutation({
-    mutationFn: (submitForReview: boolean) => apiRequest<EducatorOffering>("/api/educator-offerings", {
-      method: "POST",
-      body: {
-        ...offeringForm,
-        priceCents: offeringForm.priceCents ? Number(offeringForm.priceCents) : null,
-        submitForReview,
+    mutationFn: (submitForReview: boolean) => apiRequest<EducatorOffering>(
+      editingOffering ? `/api/educator-offerings/${editingOffering.id}` : "/api/educator-offerings",
+      {
+        method: editingOffering ? "PATCH" : "POST",
+        body: {
+          ...offeringForm,
+          priceCents: offeringForm.priceCents ? Number(offeringForm.priceCents) : null,
+          submitForReview,
+        },
       },
-    }),
+    ),
     onSuccess: (_, submitForReview) => {
-      setOfferingForm(emptyOfferingForm);
+      resetOfferingForm();
       queryClient.invalidateQueries({ queryKey: ["/api/educator-offerings/me"] });
       toast({
         title: submitForReview ? "Offering submitted" : "Offering saved",
@@ -611,6 +641,7 @@ export default function ContributorDashboard() {
                     <TableHead>Type</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Submitted</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -623,6 +654,15 @@ export default function ContributorDashboard() {
                       <TableCell>{offering.offeringType.replace("_", " ")}</TableCell>
                       <TableCell>{statusBadge(offering.status)}</TableCell>
                       <TableCell>{formatDate(offering.submittedAt)}</TableCell>
+                      <TableCell className="text-right">
+                        {["draft", "changes_requested"].includes(offering.status) ? (
+                          <Button variant="outline" size="sm" onClick={() => beginOfferingEdit(offering)}>
+                            Edit
+                          </Button>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">Locked</span>
+                        )}
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -633,8 +673,12 @@ export default function ContributorDashboard() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Create Offering</CardTitle>
-            <CardDescription>Start with free samples or placeholders. Paid checkout comes later.</CardDescription>
+            <CardTitle>{editingOffering ? "Edit Offering" : "Create Offering"}</CardTitle>
+            <CardDescription>
+              {editingOffering
+                ? "Update the draft or changes-requested offering, then send it back through review."
+                : "Start with free samples or placeholders. Paid checkout comes later."}
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
@@ -769,8 +813,13 @@ export default function ContributorDashboard() {
                 onClick={() => offeringMutation.mutate(true)}
                 disabled={offeringMutation.isPending}
               >
-                Submit For Review
+                {editingOffering ? "Resubmit For Review" : "Submit For Review"}
               </Button>
+              {editingOffering && (
+                <Button variant="ghost" onClick={resetOfferingForm} disabled={offeringMutation.isPending}>
+                  Cancel Edit
+                </Button>
+              )}
             </div>
           </CardContent>
         </Card>
