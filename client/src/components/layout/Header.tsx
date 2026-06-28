@@ -92,6 +92,12 @@ const Header: React.FC = () => {
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem>
+                    <Link href="/educators" className="flex w-full items-center">
+                      <GraduationCapIcon className="mr-2 h-4 w-4" />
+                      <span>Educator Marketplace</span>
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem>
                     <Link href="/admin/lessons" className="flex w-full items-center">
                       <Users className="mr-2 h-4 w-4" />
                       <span>Admin Management</span>

@@ -1200,6 +1200,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/educators", async (_req, res) => {
+    try {
+      const profiles = (await storage.getAllContributorProfiles())
+        .filter((profile) => profile.status === "active");
+      const approvedOfferings = (await storage.getEducatorOfferings("approved"));
+      const offeringsByProfile = new Map<number, typeof approvedOfferings>();
+
+      approvedOfferings.forEach((offering) => {
+        const existing = offeringsByProfile.get(offering.contributorProfileId) || [];
+        offeringsByProfile.set(offering.contributorProfileId, [...existing, offering]);
+      });
+
+      res.json(profiles
+        .filter((profile) => {
+          const hasEducatorFields = Boolean(
+            profile.teachingStyle ||
+            profile.subjectsTaught?.length ||
+            profile.ageGroupsServed?.length ||
+            profile.offeringTypes?.length ||
+            profile.introVideoUrl ||
+            profile.sampleLessonUrls?.length,
+          );
+          return hasEducatorFields || (offeringsByProfile.get(profile.id)?.length || 0) > 0;
+        })
+        .map((profile) => ({
+          ...profile,
+          approvedOfferings: offeringsByProfile.get(profile.id) || [],
+        })));
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch educators" });
+    }
+  });
+
+  app.get("/api/educators/:id", async (req, res) => {
+    try {
+      const profile = await storage.getContributorProfile(Number(req.params.id));
+      if (!profile || profile.status !== "active") {
+        return res.status(404).json({ message: "Educator not found" });
+      }
+
+      const approvedOfferings = (await storage.getEducatorOfferingsForContributor(profile.id))
+        .filter((offering) => offering.status === "approved");
+
+      res.json({
+        ...profile,
+        approvedOfferings,
+      });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch educator" });
+    }
+  });
+
   app.post("/api/resource-submissions", express.json(), async (req, res) => {
     try {
       const sessionUserId = requireSessionUserId(req, res);

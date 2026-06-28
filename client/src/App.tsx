@@ -44,6 +44,7 @@ import CredentialVerification from "@/pages/CredentialVerification";
 import Portfolio from "@/pages/Portfolio";
 import LegalInfo from "@/pages/LegalInfo";
 import Feedback from "@/pages/Feedback";
+import EducatorMarketplace from "@/pages/EducatorMarketplace";
 
 // Page transition variants
 const pageVariants = {
@@ -215,6 +216,16 @@ function Router() {
             <Route path="/resource-center">
               <PageWrapper>
                 <ResourceCenter />
+              </PageWrapper>
+            </Route>
+            <Route path="/educators">
+              <PageWrapper>
+                <EducatorMarketplace />
+              </PageWrapper>
+            </Route>
+            <Route path="/educators/:id">
+              <PageWrapper>
+                <EducatorMarketplace />
               </PageWrapper>
             </Route>
             <Route path="/credentials">

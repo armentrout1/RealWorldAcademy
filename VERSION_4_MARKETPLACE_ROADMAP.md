@@ -71,7 +71,7 @@ Current build status:
 - `green`: contributor profiles now include educator-ready fields for teaching style, subjects, age groups, intro video, sample lessons, availability, time zone, and future offering types.
 - `green`: educator profile editor lets teachers describe how and what they teach.
 - `green`: educator dashboard shows a profile snapshot for marketplace discovery readiness.
-- `yellow`: public educator profile pages still need to be built.
+- `green`: public educator profile pages show teaching style, samples, availability, and approved offerings.
 
 ### Phase 2: Offering Schema and Review
 
@@ -97,7 +97,7 @@ Current build status:
 - `green`: `educator_offerings` schema exists with free sample, live class, recorded course, tutoring, coaching, and curriculum bundle support.
 - `green`: educator dashboard can create draft offerings or submit them for review.
 - `green`: admin management has an educator offering review queue.
-- `yellow`: approved offerings are not yet shown on public educator profiles.
+- `green`: approved offerings are shown on public educator profiles.
 - `yellow`: editing existing offerings from the dashboard still needs a polished UI.
 
 ### Phase 3: Discovery and Marketplace Browse
@@ -116,6 +116,13 @@ Exit criteria:
 
 - Families can browse educator profiles and approved offerings.
 - The marketplace can operate manually before payment automation.
+
+Current build status:
+
+- `green`: `/educators` marketplace browse page exists.
+- `green`: families can search and filter educators by subject, age group, and future offering format.
+- `green`: `/educators/:id` detail pages show approved offerings and trust notes.
+- `yellow`: offering interest/inquiry buttons still need to be built.
 
 ### Phase 4: Scheduling and Enrollment Foundation
 

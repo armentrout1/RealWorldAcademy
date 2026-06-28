@@ -68,6 +68,11 @@ const Footer: React.FC = () => {
                 </Link>
               </li>
               <li>
+                <Link href="/educators" className="text-neutral-600 hover:text-primary transition-colors duration-200">
+                  Educators
+                </Link>
+              </li>
+              <li>
                 <Link href="/credentials" className="text-neutral-600 hover:text-primary transition-colors duration-200">
                   Credentials
                 </Link>
@@ -89,6 +94,7 @@ const Footer: React.FC = () => {
             <h3 className="font-sans font-semibold text-lg text-neutral-800 mb-5">Resources</h3>
             <ul className="space-y-3">
               <li><Link href="/resource-center" className="text-neutral-600 hover:text-primary transition-colors duration-200">Resource Center</Link></li>
+              <li><Link href="/educators" className="text-neutral-600 hover:text-primary transition-colors duration-200">Educator Marketplace</Link></li>
               <li><Link href="/contribute" className="text-neutral-600 hover:text-primary transition-colors duration-200">Contribute Curriculum</Link></li>
               <li><Link href="/feedback" className="text-neutral-600 hover:text-primary transition-colors duration-200">Beta Feedback</Link></li>
               <li><Link href="/admin/lessons" className="text-neutral-600 hover:text-primary transition-colors duration-200">Admin Management</Link></li>
