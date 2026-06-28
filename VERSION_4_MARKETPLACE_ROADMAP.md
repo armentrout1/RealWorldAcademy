@@ -214,6 +214,13 @@ Exit criteria:
 
 - Marketplace learning connects back into the Real World Academy progress and credential system.
 
+Current build status:
+
+- `green`: completed educator-led session enrollments now appear in the student portfolio.
+- `green`: marking an enrollment complete creates a learner timeline event when the requester account is known.
+- `green`: portfolio records include educator, subject, learner count, completed date, original request note, and completion evidence guidance.
+- `yellow`: credential eligibility rules still need to connect approved offerings/classes to specific credential requirements.
+
 ## Version 4 Quality Bar
 
 - No paid educator offering appears publicly without approval.

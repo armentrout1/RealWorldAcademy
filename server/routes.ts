@@ -1419,13 +1419,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await storage.adjustOfferingSessionReservedSeats(enrollment.offeringSessionId, -learnerCount);
     }
 
-    return await storage.updateOfferingEnrollment(enrollment.id, {
+    const updatedEnrollment = await storage.updateOfferingEnrollment(enrollment.id, {
       status,
       reservedAt: status === "reserved" && !enrollment.reservedAt ? new Date() : enrollment.reservedAt,
       cancelledAt: status === "cancelled" && !enrollment.cancelledAt ? new Date() : enrollment.cancelledAt,
       completedAt: status === "completed" && !enrollment.completedAt ? new Date() : enrollment.completedAt,
       updatedAt: new Date(),
     });
+
+    if (status === "completed" && !enrollment.completedAt && enrollment.requesterUserId) {
+      const offering = await storage.getEducatorOffering(enrollment.educatorOfferingId);
+      const session = await storage.getOfferingSession(enrollment.offeringSessionId);
+      await storage.createTimelineEvent({
+        userId: enrollment.requesterUserId,
+        title: `Completed class: ${session?.title || offering?.title || "Educator session"}`,
+        date: new Date(),
+        completed: true,
+        category: "class",
+      });
+    }
+
+    return updatedEnrollment;
   };
 
   app.get("/api/offering-enrollments/me", async (req, res) => {
