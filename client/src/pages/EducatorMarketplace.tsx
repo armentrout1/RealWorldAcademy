@@ -28,6 +28,12 @@ interface EducatorOffering {
   completionEvidence?: string | null;
   status: string;
   approvedSessions?: OfferingSession[];
+  eligibleCredentials?: Array<{
+    id: number;
+    title: string;
+    slug: string;
+    disclaimer: string;
+  }>;
 }
 
 interface OfferingSession {
@@ -274,6 +280,24 @@ function EducatorDetail({ educatorId }: { educatorId: number }) {
                       </div>
                     </>
                   )}
+                  {offering.eligibleCredentials?.length ? (
+                    <>
+                      <Separator className="my-4" />
+                      <div className="space-y-2">
+                        <h4 className="font-medium">Credential Support</h4>
+                        <div className="flex flex-wrap gap-2">
+                          {offering.eligibleCredentials.map((credential) => (
+                            <Badge key={credential.id} variant="secondary">
+                              Supports {credential.title}
+                            </Badge>
+                          ))}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          Completion can support Real World Academy completion credentials, not accredited school credit.
+                        </p>
+                      </div>
+                    </>
+                  ) : null}
                   {offering.approvedSessions?.length ? (
                     <>
                       <Separator className="my-4" />

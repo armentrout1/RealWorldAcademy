@@ -1740,17 +1740,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const approvedSessions = (await storage.getOfferingSessionsForContributor(profile.id))
         .filter((session) => session.status === "approved");
       const sessionsByOffering = new Map<number, typeof approvedSessions>();
+      const credentials = await storage.getAllCredentialDefinitions();
+      const credentialLinksByOffering = new Map<number, Array<{ id: number; title: string; slug: string; disclaimer: string }>>();
 
       approvedSessions.forEach((session) => {
         const existing = sessionsByOffering.get(session.educatorOfferingId) || [];
         sessionsByOffering.set(session.educatorOfferingId, [...existing, session]);
       });
 
+      for (const credential of credentials) {
+        const requirements = await storage.getCredentialRequirements(credential.id);
+        requirements
+          .filter((requirement) => requirement.requirementType === "offering_completion" && requirement.targetId)
+          .forEach((requirement) => {
+            const existing = credentialLinksByOffering.get(requirement.targetId!) || [];
+            credentialLinksByOffering.set(requirement.targetId!, [
+              ...existing,
+              {
+                id: credential.id,
+                title: credential.title,
+                slug: credential.slug,
+                disclaimer: credential.disclaimer,
+              },
+            ]);
+          });
+      }
+
       res.json({
         ...profile,
         approvedOfferings: approvedOfferings.map((offering) => ({
           ...offering,
           approvedSessions: sessionsByOffering.get(offering.id) || [],
+          eligibleCredentials: credentialLinksByOffering.get(offering.id) || [],
         })),
       });
     } catch (error) {
@@ -2502,6 +2523,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const requirements = await storage.getCredentialRequirements(credentialId);
       const lessonRequirements = requirements.filter((requirement) => requirement.requirementType === "lesson" && requirement.targetId);
+      const offeringRequirements = requirements.filter((requirement) => requirement.requirementType === "offering_completion" && requirement.targetId);
 
       for (const requirement of lessonRequirements) {
         const progress = await storage.getUserLessonProgress(userId, requirement.targetId!);
@@ -2510,12 +2532,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      if (offeringRequirements.length > 0) {
+        const enrollments = await storage.getOfferingEnrollmentsForRequester(user.id, user.email);
+        const completedOfferingIds = new Set(
+          enrollments
+            .filter((enrollment) => enrollment.status === "completed")
+            .map((enrollment) => enrollment.educatorOfferingId),
+        );
+
+        for (const requirement of offeringRequirements) {
+          if (!completedOfferingIds.has(requirement.targetId!)) {
+            return res.status(409).json({ message: "Credential class requirements are not complete" });
+          }
+        }
+      }
+
       const issuedCredential = await storage.issueCredential({
         credentialId,
         userId,
         status: "issued",
         issuedAt: new Date(),
-        reviewNote: "Issued automatically after required lesson completion.",
+        reviewNote: "Issued automatically after required lesson and class completion.",
         shareCode: randomUUID(),
       });
 

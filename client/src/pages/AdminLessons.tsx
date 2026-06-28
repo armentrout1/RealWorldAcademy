@@ -1126,6 +1126,9 @@ export default function AdminLessons() {
                           <div className="font-medium">{offering.title}</div>
                           <div className="text-xs text-muted-foreground">{offering.subject} | {offering.ageGroup}</div>
                           <p className="mt-1 line-clamp-2 max-w-md text-xs text-muted-foreground">{offering.description}</p>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            Credential target: offering_completion #{offering.id}
+                          </p>
                         </TableCell>
                         <TableCell>
                           <div className="font-medium">{offering.contributorProfile?.displayName || "Unknown educator"}</div>

@@ -23,6 +23,7 @@ interface CredentialRequirement {
   title: string;
   description: string;
   requirementType: string;
+  targetId?: number | null;
   required: boolean;
 }
 
@@ -36,6 +37,12 @@ interface IssuedCredential {
   status: string;
   issuedAt?: string;
   shareCode: string;
+}
+
+interface OfferingEnrollment {
+  id: number;
+  educatorOfferingId: number;
+  status: string;
 }
 
 export default function Credentials() {
@@ -67,6 +74,12 @@ export default function Credentials() {
     enabled: Boolean(user?.id),
   });
 
+  const { data: classEnrollments = [] } = useQuery<OfferingEnrollment[]>({
+    queryKey: ["/api/my-offering-enrollments"],
+    queryFn: () => apiRequest<OfferingEnrollment[]>("/api/my-offering-enrollments"),
+    enabled: Boolean(user?.id),
+  });
+
   const issueCredential = useMutation({
     mutationFn: async (credentialId: number) => {
       if (!user?.id) throw new Error("Please log in to issue credentials.");
@@ -92,6 +105,21 @@ export default function Credentials() {
 
   const issuedCredentialIds = new Set(issuedCredentials.map((credential) => credential.credentialId));
   const credentialById = new Map(credentials.map((credential) => [credential.id, credential]));
+  const completedOfferingIds = new Set(
+    classEnrollments
+      .filter((enrollment) => enrollment.status === "completed")
+      .map((enrollment) => enrollment.educatorOfferingId),
+  );
+
+  const requirementStatus = (requirement: CredentialRequirement) => {
+    if (requirement.requirementType === "offering_completion" && requirement.targetId) {
+      return completedOfferingIds.has(requirement.targetId) ? "Complete" : "Class needed";
+    }
+
+    if (requirement.requirementType === "lesson") return "Lesson needed";
+    if (requirement.requirementType === "parent_review") return "Review";
+    return requirement.required ? "Required" : "Review";
+  };
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -162,11 +190,22 @@ export default function Credentials() {
                             <div key={requirement.id} className="rounded-md border p-3 text-sm">
                               <div className="flex items-center justify-between gap-3">
                                 <span className="font-medium">{requirement.title}</span>
-                                <Badge variant={requirement.required ? "default" : "outline"}>
-                                  {requirement.required ? "Required" : "Review"}
+                                <Badge
+                                  variant={
+                                    requirement.requirementType === "offering_completion" && requirement.targetId && completedOfferingIds.has(requirement.targetId)
+                                      ? "secondary"
+                                      : requirement.required ? "default" : "outline"
+                                  }
+                                >
+                                  {requirementStatus(requirement)}
                                 </Badge>
                               </div>
                               <p className="text-muted-foreground mt-1">{requirement.description}</p>
+                              {requirement.requirementType === "offering_completion" && (
+                                <p className="mt-2 text-xs text-muted-foreground">
+                                  Educator-led class completion can satisfy this Real World Academy requirement.
+                                </p>
+                              )}
                             </div>
                           ))}
                         </div>

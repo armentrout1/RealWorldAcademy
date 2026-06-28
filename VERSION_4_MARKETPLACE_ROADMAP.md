@@ -219,7 +219,10 @@ Current build status:
 - `green`: completed educator-led session enrollments now appear in the student portfolio.
 - `green`: marking an enrollment complete creates a learner timeline event when the requester account is known.
 - `green`: portfolio records include educator, subject, learner count, completed date, original request note, and completion evidence guidance.
-- `yellow`: credential eligibility rules still need to connect approved offerings/classes to specific credential requirements.
+- `green`: credential requirements can use `offering_completion` with an approved offering id as the target.
+- `green`: credential issuing checks completed class enrollments for `offering_completion` requirements.
+- `green`: public offering pages show eligible Real World Academy completion credentials.
+- `yellow`: admin credential requirement management still needs a polished UI instead of relying on the existing API and target id convention.
 
 ## Version 4 Quality Bar
 
